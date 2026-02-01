@@ -11,20 +11,27 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static('.')); // Serve static files from root
+app.use(express.static('.'));
 
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || 'lotato-pro-super-secret-key-2024';
 
-// Connexion MongoDB
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/lotato', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
-.then(() => console.log('✅ Connecté à MongoDB'))
-.catch(err => console.error('❌ Erreur MongoDB:', err));
+// Connexion MongoDB Atlas
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/lotato';
 
-// Schémas et Modèles
+mongoose.connect(MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  serverSelectionTimeoutMS: 5000, // Timeout après 5 secondes
+  socketTimeoutMS: 45000, // Close sockets après 45s d'inactivité
+})
+.then(() => console.log('✅ Connecté à MongoDB Atlas'))
+.catch(err => {
+  console.error('❌ Erreur MongoDB:', err.message);
+  console.log('🔗 URI utilisée:', MONGODB_URI.replace(/mongodb\+srv:\/\/([^:]+):([^@]+)@/, 'mongodb+srv://USERNAME:PASSWORD@'));
+});
+
+// Schémas et Modèles (gardez les mêmes que précédemment)
 const ticketSchema = new mongoose.Schema({
   ticketId: { type: String, required: true, unique: true },
   agentId: { type: String, required: true },
@@ -140,7 +147,6 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body;
     
-    // Chercher l'agent par son agentId
     const agent = await Agent.findOne({ 
       agentId: username.toUpperCase(),
       isActive: true 
@@ -153,7 +159,6 @@ app.post('/api/auth/login', async (req, res) => {
       });
     }
 
-    // Comparer les mots de passe (sans bcrypt)
     if (agent.password !== password) {
       return res.status(401).json({
         success: false,
@@ -161,7 +166,6 @@ app.post('/api/auth/login', async (req, res) => {
       });
     }
 
-    // Créer le token JWT
     const token = jwt.sign(
       {
         id: agent._id,
@@ -198,7 +202,6 @@ app.post('/api/auth/supervisor-login', async (req, res) => {
   try {
     const { username, password } = req.body;
     
-    // Chercher le superviseur
     const supervisor = await Supervisor.findOne({ 
       username: username.toLowerCase(),
       isActive: true 
@@ -211,7 +214,6 @@ app.post('/api/auth/supervisor-login', async (req, res) => {
       });
     }
 
-    // Comparer les mots de passe (sans bcrypt)
     if (supervisor.password !== password) {
       return res.status(401).json({
         success: false,
@@ -219,7 +221,6 @@ app.post('/api/auth/supervisor-login', async (req, res) => {
       });
     }
 
-    // Créer le token JWT
     const token = jwt.sign(
       {
         id: supervisor._id,
@@ -258,7 +259,6 @@ app.post('/api/auth/owner-login', async (req, res) => {
   try {
     const { username, password } = req.body;
     
-    // Chercher le propriétaire
     const owner = await Owner.findOne({ 
       username: username.toLowerCase(),
       isActive: true 
@@ -271,7 +271,6 @@ app.post('/api/auth/owner-login', async (req, res) => {
       });
     }
 
-    // Comparer les mots de passe (sans bcrypt)
     if (owner.password !== password) {
       return res.status(401).json({
         success: false,
@@ -279,7 +278,6 @@ app.post('/api/auth/owner-login', async (req, res) => {
       });
     }
 
-    // Créer le token JWT
     const token = jwt.sign(
       {
         id: owner._id,
@@ -311,25 +309,7 @@ app.post('/api/auth/owner-login', async (req, res) => {
   }
 });
 
-// 4. Vérification de session
-app.get('/api/auth/verify', authenticate, async (req, res) => {
-  res.json({
-    success: true,
-    user: req.user
-  });
-});
-
-// 5. Déconnexion
-app.post('/api/auth/logout', authenticate, async (req, res) => {
-  res.json({
-    success: true,
-    message: 'Dekonekte avèk siksè'
-  });
-});
-
-// === ROUTES D'INITIALISATION ===
-
-// Initialiser les comptes par défaut
+// 4. Initialiser les comptes par défaut
 app.post('/api/init/default-accounts', async (req, res) => {
   try {
     // Créer un agent par défaut
@@ -343,6 +323,7 @@ app.post('/api/init/default-accounts', async (req, res) => {
         funds: 50000
       });
       await agent.save();
+      console.log('✅ Agent par défaut créé');
     }
 
     // Créer un superviseur par défaut
@@ -356,6 +337,7 @@ app.post('/api/init/default-accounts', async (req, res) => {
         permissions: ['view_all', 'manage_agents', 'approve_funds', 'view_reports']
       });
       await supervisor.save();
+      console.log('✅ Superviseur par défaut créé');
     }
 
     // Créer un propriétaire par défaut
@@ -368,6 +350,7 @@ app.post('/api/init/default-accounts', async (req, res) => {
         role: 'owner'
       });
       await owner.save();
+      console.log('✅ Propriétaire par défaut créé');
     }
 
     res.json({
@@ -383,151 +366,49 @@ app.post('/api/init/default-accounts', async (req, res) => {
   }
 });
 
-// === ROUTES PROTÉGÉES ===
-
-// Gestion des agents (accessible par superviseur et propriétaire)
-app.get('/api/agents', authenticate, requireRole(['supervisor', 'owner']), async (req, res) => {
+// 5. Test de connexion MongoDB
+app.get('/api/test-mongodb', async (req, res) => {
   try {
-    const agents = await Agent.find({}, 'agentId agentName funds isActive createdAt')
-      .sort({ createdAt: -1 });
+    // Tester la connexion
+    const dbState = mongoose.connection.readyState;
+    const states = ['disconnected', 'connected', 'connecting', 'disconnecting'];
+    
+    // Compter les documents
+    const agentCount = await Agent.countDocuments();
+    const ticketCount = await Ticket.countDocuments();
+    const winnerCount = await Winner.countDocuments();
     
     res.json({
       success: true,
-      agents: agents
-    });
-  } catch (error) {
-    console.error('Erreur récupération agents:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erè récupération ajan yo'
-    });
-  }
-});
-
-// Créer un nouvel agent
-app.post('/api/agents', authenticate, requireRole(['supervisor', 'owner']), async (req, res) => {
-  try {
-    const { agentId, agentName, password, initialFunds } = req.body;
-    
-    // Vérifier si l'agent existe déjà
-    const existingAgent = await Agent.findOne({ agentId: agentId.toUpperCase() });
-    if (existingAgent) {
-      return res.status(400).json({
-        success: false,
-        message: 'Kòd ajan sa deja egziste'
-      });
-    }
-    
-    const agent = new Agent({
-      agentId: agentId.toUpperCase(),
-      agentName: agentName,
-      password: password || '123456',
-      role: 'agent',
-      funds: initialFunds || 10000,
-      isActive: true
-    });
-    
-    await agent.save();
-    
-    res.json({
-      success: true,
-      message: 'Ajan kreye avèk siksè',
-      agent: {
-        agentId: agent.agentId,
-        agentName: agent.agentName,
-        funds: agent.funds
+      mongodb: {
+        state: states[dbState],
+        readyState: dbState,
+        database: mongoose.connection.db?.databaseName || 'N/A',
+        collections: {
+          agents: agentCount,
+          tickets: ticketCount,
+          winners: winnerCount
+        }
       }
     });
   } catch (error) {
-    console.error('Erreur création agent:', error);
     res.status(500).json({
       success: false,
-      message: 'Erè kreye ajan'
+      error: error.message,
+      mongodb: {
+        state: 'error',
+        readyState: mongoose.connection.readyState
+      }
     });
   }
 });
 
-// Mettre à jour les fonds d'un agent
-app.post('/api/agents/:agentId/funds', authenticate, requireRole(['supervisor', 'owner']), async (req, res) => {
-  try {
-    const { agentId } = req.params;
-    const { amount, type } = req.body;
-    
-    const agent = await Agent.findOne({ agentId: agentId });
-    if (!agent) {
-      return res.status(404).json({
-        success: false,
-        message: 'Ajan pa jwenn'
-      });
-    }
-    
-    let newBalance;
-    if (type === 'add') {
-      newBalance = agent.funds + amount;
-    } else if (type === 'subtract') {
-      newBalance = agent.funds - amount;
-    } else {
-      return res.status(400).json({
-        success: false,
-        message: 'Tip operasyon pa valab'
-      });
-    }
-    
-    agent.funds = newBalance;
-    await agent.save();
-    
-    res.json({
-      success: true,
-      message: 'Fonds ajan mete ajou',
-      newBalance: newBalance
-    });
-  } catch (error) {
-    console.error('Erreur mise à jour fonds agent:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erè mete ajou fonds'
-    });
-  }
-});
-
-// Modifier le mot de passe d'un agent
-app.post('/api/agents/:agentId/password', authenticate, requireRole(['supervisor', 'owner']), async (req, res) => {
-  try {
-    const { agentId } = req.params;
-    const { newPassword } = req.body;
-    
-    const agent = await Agent.findOne({ agentId: agentId });
-    if (!agent) {
-      return res.status(404).json({
-        success: false,
-        message: 'Ajan pa jwenn'
-      });
-    }
-    
-    agent.password = newPassword;
-    await agent.save();
-    
-    res.json({
-      success: true,
-      message: 'Modpas ajan mete ajou'
-    });
-  } catch (error) {
-    console.error('Erreur modification mot de passe:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erè mete ajou modpas'
-    });
-  }
-});
-
-// === ROUTES EXISTANTES (conservées) ===
+// === ROUTES PRINCIPALES ===
 
 // Sauvegarder un ticket
 app.post('/api/tickets/save', authenticate, requireRole(['agent']), async (req, res) => {
   try {
     const ticketData = req.body;
-    
-    // Générer un ID de ticket unique
     const ticketId = `T${Date.now()}${Math.floor(Math.random() * 1000)}`;
     
     const ticket = new Ticket({
@@ -538,7 +419,7 @@ app.post('/api/tickets/save', authenticate, requireRole(['agent']), async (req, 
     
     await ticket.save();
     
-    // Mettre à jour les fonds de l'agent (déduire le total)
+    // Mettre à jour les fonds de l'agent
     await Agent.findOneAndUpdate(
       { agentId: ticketData.agentId },
       { $inc: { funds: -ticketData.total } }
@@ -563,7 +444,6 @@ app.get('/api/tickets', authenticate, async (req, res) => {
   try {
     const { agentId } = req.query;
     
-    // Vérifier les permissions
     if (req.user.role === 'agent' && req.user.agentId !== agentId) {
       return res.status(403).json({
         success: false,
@@ -588,47 +468,11 @@ app.get('/api/tickets', authenticate, async (req, res) => {
   }
 });
 
-// Récupérer TOUS les tickets (pour superviseur/propriétaire)
-app.get('/api/tickets/all', authenticate, requireRole(['supervisor', 'owner']), async (req, res) => {
-  try {
-    const { startDate, endDate, drawId } = req.query;
-    
-    let query = {};
-    
-    if (startDate && endDate) {
-      query.date = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate)
-      };
-    }
-    
-    if (drawId) {
-      query.drawId = drawId;
-    }
-    
-    const tickets = await Ticket.find(query)
-      .sort({ date: -1 })
-      .limit(500);
-    
-    res.json({
-      success: true,
-      tickets: tickets
-    });
-  } catch (error) {
-    console.error('Erreur récupération tous les tickets:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erreur lors de la récupération des tickets'
-    });
-  }
-});
-
-// Récupérer les rapports d'un agent
+// Récupérer les rapports
 app.get('/api/reports', authenticate, async (req, res) => {
   try {
     const { agentId } = req.query;
     
-    // Vérifier les permissions
     if (req.user.role === 'agent' && req.user.agentId !== agentId) {
       return res.status(403).json({
         success: false,
@@ -636,25 +480,16 @@ app.get('/api/reports', authenticate, async (req, res) => {
       });
     }
     
-    // Récupérer tous les tickets de l'agent
     const tickets = await Ticket.find({ agentId: agentId });
-    
-    // Calculer les totaux
     const totalTickets = tickets.length;
     const totalBets = tickets.reduce((sum, ticket) => sum + ticket.total, 0);
     
-    // Calculer les gains (à partir des tickets vérifiés)
-    const checkedTickets = tickets.filter(t => t.checked);
-    const totalWins = checkedTickets.reduce((sum, ticket) => {
-      const ticketGains = ticket.bets.reduce((betSum, bet) => betSum + (bet.gain || 0), 0);
-      return sum + ticketGains;
-    }, 0);
+    const winners = await Winner.find({ agentId: agentId });
+    const totalWins = winners.reduce((sum, winner) => sum + (winner.winningAmount || 0), 0);
     
-    // Calculer les pertes (total des paris - gains)
     const totalLoss = totalBets - totalWins;
     const balance = totalWins - totalLoss;
     
-    // Breakdown par jeu
     const gameBreakdown = {};
     tickets.forEach(ticket => {
       ticket.bets.forEach(bet => {
@@ -685,131 +520,11 @@ app.get('/api/reports', authenticate, async (req, res) => {
   }
 });
 
-// Récupérer les rapports généraux (pour superviseur/propriétaire)
-app.get('/api/reports/all', authenticate, requireRole(['supervisor', 'owner']), async (req, res) => {
-  try {
-    const { startDate, endDate } = req.query;
-    
-    let query = {};
-    if (startDate && endDate) {
-      query.date = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate)
-      };
-    }
-    
-    // Récupérer tous les tickets
-    const tickets = await Ticket.find(query);
-    
-    // Calculer les totaux généraux
-    const totalTickets = tickets.length;
-    const totalBets = tickets.reduce((sum, ticket) => sum + ticket.total, 0);
-    
-    // Récupérer tous les gagnants
-    const winners = await Winner.find();
-    const totalWins = winners.reduce((sum, winner) => sum + (winner.winningAmount || 0), 0);
-    
-    // Calculer les pertes
-    const totalLoss = totalBets - totalWins;
-    const balance = totalWins - totalLoss;
-    
-    // Breakdown par agent
-    const agentBreakdown = {};
-    tickets.forEach(ticket => {
-      const agentId = ticket.agentId;
-      if (!agentBreakdown[agentId]) {
-        agentBreakdown[agentId] = { 
-          agentName: ticket.agentName,
-          tickets: 0, 
-          amount: 0,
-          wins: 0
-        };
-      }
-      agentBreakdown[agentId].tickets += 1;
-      agentBreakdown[agentId].amount += ticket.total;
-    });
-    
-    // Ajouter les gains par agent
-    winners.forEach(winner => {
-      if (agentBreakdown[winner.agentId]) {
-        agentBreakdown[winner.agentId].wins += winner.winningAmount;
-      }
-    });
-    
-    res.json({
-      success: true,
-      totalTickets: totalTickets,
-      totalBets: totalBets,
-      totalWins: totalWins,
-      totalLoss: totalLoss,
-      balance: balance,
-      agentBreakdown: agentBreakdown
-    });
-  } catch (error) {
-    console.error('Erreur récupération rapports généraux:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erreur lors de la récupération des rapports généraux'
-    });
-  }
-});
-
-// Récupérer les gagnants
-app.get('/api/winners', authenticate, async (req, res) => {
-  try {
-    const { agentId } = req.query;
-    
-    // Vérifier les permissions
-    if (req.user.role === 'agent' && req.user.agentId !== agentId) {
-      return res.status(403).json({
-        success: false,
-        message: 'Ou pa gen aksè a ganyen ajan sa a'
-      });
-    }
-    
-    const winners = await Winner.find({ agentId: agentId })
-      .sort({ date: -1 })
-      .limit(50);
-    
-    res.json({
-      success: true,
-      winners: winners
-    });
-  } catch (error) {
-    console.error('Erreur récupération gagnants:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erreur lors de la récupération des gagnants'
-    });
-  }
-});
-
-// Récupérer TOUS les gagnants (pour superviseur/propriétaire)
-app.get('/api/winners/all', authenticate, requireRole(['supervisor', 'owner']), async (req, res) => {
-  try {
-    const winners = await Winner.find()
-      .sort({ date: -1 })
-      .limit(200);
-    
-    res.json({
-      success: true,
-      winners: winners
-    });
-  } catch (error) {
-    console.error('Erreur récupération tous les gagnants:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erreur lors de la récupération des gagnants'
-    });
-  }
-});
-
 // Sauvegarder les gagnants
 app.post('/api/winners/save', authenticate, requireRole(['agent']), async (req, res) => {
   try {
     const winnerData = req.body;
     
-    // Vérifier si le gagnant existe déjà
     const existingWinner = await Winner.findOne({
       ticketId: winnerData.ticketId,
       drawId: winnerData.drawId
@@ -841,12 +556,40 @@ app.post('/api/winners/save', authenticate, requireRole(['agent']), async (req, 
   }
 });
 
-// Mettre à jour les fonds d'un agent
+// Récupérer les gagnants
+app.get('/api/winners', authenticate, async (req, res) => {
+  try {
+    const { agentId } = req.query;
+    
+    if (req.user.role === 'agent' && req.user.agentId !== agentId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Ou pa gen aksè a ganyen ajan sa a'
+      });
+    }
+    
+    const winners = await Winner.find({ agentId: agentId })
+      .sort({ date: -1 })
+      .limit(50);
+    
+    res.json({
+      success: true,
+      winners: winners
+    });
+  } catch (error) {
+    console.error('Erreur récupération gagnants:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la récupération des gagnants'
+    });
+  }
+});
+
+// Mettre à jour les fonds
 app.post('/api/agent/funds', authenticate, requireRole(['agent']), async (req, res) => {
   try {
     const { agentId, amount, type } = req.body;
     
-    // Vérifier que l'agent ne modifie que ses propres fonds
     if (req.user.role === 'agent' && req.user.agentId !== agentId) {
       return res.status(403).json({
         success: false,
@@ -891,59 +634,6 @@ app.post('/api/agent/funds', authenticate, requireRole(['agent']), async (req, r
   }
 });
 
-// Marquer un gagnant comme payé
-app.post('/api/winners/:id/pay', authenticate, async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    const winner = await Winner.findById(id);
-    if (!winner) {
-      return res.status(404).json({
-        success: false,
-        message: 'Ganyen pa jwenn'
-      });
-    }
-    
-    // Vérifier les permissions
-    if (req.user.role === 'agent' && req.user.agentId !== winner.agentId) {
-      return res.status(403).json({
-        success: false,
-        message: 'Ou pa ka peye ganyen sa a'
-      });
-    }
-    
-    // Vérifier si l'agent a assez de fonds (pour les agents)
-    if (req.user.role === 'agent') {
-      const agent = await Agent.findOne({ agentId: req.user.agentId });
-      if (agent.funds < winner.winningAmount) {
-        return res.status(400).json({
-          success: false,
-          message: 'Ou pa gen ase fonds pou peye ganyen sa a'
-        });
-      }
-      
-      // Déduire les fonds
-      agent.funds -= winner.winningAmount;
-      await agent.save();
-    }
-    
-    // Marquer comme payé
-    winner.paid = true;
-    await winner.save();
-    
-    res.json({
-      success: true,
-      message: 'Ganyen peye avèk siksè'
-    });
-  } catch (error) {
-    console.error('Erreur paiement gagnant:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erreur lors du paiement du gagnant'
-    });
-  }
-});
-
 // Vérifier le statut des tirages
 app.get('/api/draws/status', async (req, res) => {
   try {
@@ -960,7 +650,6 @@ app.get('/api/draws/status', async (req, res) => {
       { id: 'tn_soir', name: 'Tunisia Soir', time: '17:00', blocked: false }
     ];
     
-    // Vérifier si un tirage est bloqué (3 minutes avant l'heure)
     const now = new Date();
     draws.forEach(draw => {
       const [hours, minutes] = draw.time.split(':').map(Number);
@@ -985,14 +674,29 @@ app.get('/api/draws/status', async (req, res) => {
   }
 });
 
-// Route pour vérifier la connexion
-app.get('/api/health', (req, res) => {
-  res.json({
-    success: true,
-    message: 'API LOTATO PRO fonctionne',
-    timestamp: new Date().toISOString(),
-    version: '2.0.0'
-  });
+// Route santé
+app.get('/api/health', async (req, res) => {
+  try {
+    const dbState = mongoose.connection.readyState;
+    const isConnected = dbState === 1;
+    
+    res.json({
+      success: true,
+      message: 'API LOTATO PRO fonctionne',
+      mongodb: {
+        connected: isConnected,
+        state: ['disconnected', 'connected', 'connecting', 'disconnecting'][dbState]
+      },
+      timestamp: new Date().toISOString(),
+      version: '2.0.0'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Problème de connexion',
+      error: error.message
+    });
+  }
 });
 
 // Route de test
@@ -1000,7 +704,7 @@ app.get('/', (req, res) => {
   res.sendFile(__dirname + '/index.html');
 });
 
-// Routes pour les pages protégées
+// Routes pour les pages
 app.get('/agent1.html', (req, res) => {
   res.sendFile(__dirname + '/agent1.html');
 });
@@ -1013,6 +717,49 @@ app.get('/owner.html', (req, res) => {
   res.sendFile(__dirname + '/owner.html');
 });
 
+// Initialiser les comptes au démarrage
+async function initializeDefaultAccounts() {
+  try {
+    // Vérifier si la base est déjà initialisée
+    const agentCount = await Agent.countDocuments();
+    
+    if (agentCount === 0) {
+      console.log('🔄 Initialisation des comptes par défaut...');
+      
+      // Créer les comptes par défaut
+      const agent = new Agent({
+        agentId: 'AGENT01',
+        agentName: 'Ajan Prensipal',
+        password: '123456',
+        role: 'agent',
+        funds: 50000
+      });
+      await agent.save();
+      
+      const supervisor = new Supervisor({
+        username: 'supervisor',
+        password: '123456',
+        name: 'Supervizè Prensipal',
+        role: 'supervisor',
+        permissions: ['view_all', 'manage_agents', 'approve_funds', 'view_reports']
+      });
+      await supervisor.save();
+      
+      const owner = new Owner({
+        username: 'owner',
+        password: '123456',
+        name: 'Pwopriyetè',
+        role: 'owner'
+      });
+      await owner.save();
+      
+      console.log('✅ Comptes par défaut créés');
+    }
+  } catch (error) {
+    console.error('❌ Erreur initialisation comptes:', error.message);
+  }
+}
+
 // Gestion des erreurs 404
 app.use((req, res) => {
   res.status(404).json({
@@ -1022,12 +769,20 @@ app.use((req, res) => {
 });
 
 // Démarrer le serveur
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🚀 Serveur démarré sur le port ${PORT}`);
   console.log(`📡 API disponible à http://localhost:${PORT}`);
   console.log(`🔐 Page de connexion: http://localhost:${PORT}/`);
-  console.log(`👤 Comptes par défaut:`);
-  console.log(`   - Agent: AGENT01 / 123456`);
-  console.log(`   - Superviseur: supervisor / 123456`);
-  console.log(`   - Propriétaire: owner / 123456`);
+  console.log(`🗄️  MongoDB URI: ${MONGODB_URI ? 'Configurée' : 'Non configurée'}`);
+  
+  // Initialiser les comptes après connexion MongoDB réussie
+  mongoose.connection.once('open', async () => {
+    console.log('✅ Connexion MongoDB établie');
+    await initializeDefaultAccounts();
+    
+    console.log(`👤 Comptes par défaut:`);
+    console.log(`   - Agent: AGENT01 / 123456`);
+    console.log(`   - Superviseur: supervisor / 123456`);
+    console.log(`   - Propriétaire: owner / 123456`);
+  });
 });
