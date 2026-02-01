@@ -1,7 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
@@ -62,7 +61,7 @@ const winnerSchema = new mongoose.Schema({
 const agentSchema = new mongoose.Schema({
   agentId: { type: String, required: true, unique: true },
   agentName: { type: String, required: true },
-  password: { type: String, required: true },
+  password: { type: String, required: true, default: '123456' },
   role: { type: String, default: 'agent' },
   funds: { type: Number, default: 10000 },
   lotteryName: { type: String, default: 'LOTATO PRO' },
@@ -75,7 +74,7 @@ const agentSchema = new mongoose.Schema({
 
 const supervisorSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
+  password: { type: String, required: true, default: '123456' },
   name: { type: String, required: true },
   role: { type: String, default: 'supervisor' },
   permissions: [String],
@@ -85,7 +84,7 @@ const supervisorSchema = new mongoose.Schema({
 
 const ownerSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
+  password: { type: String, required: true, default: '123456' },
   name: { type: String, required: true },
   role: { type: String, default: 'owner' },
   isActive: { type: Boolean, default: true },
@@ -154,18 +153,12 @@ app.post('/api/auth/login', async (req, res) => {
       });
     }
 
-    // Comparer les mots de passe
-    const isPasswordValid = await bcrypt.compare(password, agent.password);
-    
-    if (!isPasswordValid) {
-      // Vérifier le mot de passe par défaut
-      const defaultPasswords = ['AGENT123', 'agent123', '123456'];
-      if (!defaultPasswords.includes(password)) {
-        return res.status(401).json({
-          success: false,
-          message: 'Modpas pa kòrèk'
-        });
-      }
+    // Comparer les mots de passe (sans bcrypt)
+    if (agent.password !== password) {
+      return res.status(401).json({
+        success: false,
+        message: 'Modpas pa kòrèk'
+      });
     }
 
     // Créer le token JWT
@@ -218,18 +211,12 @@ app.post('/api/auth/supervisor-login', async (req, res) => {
       });
     }
 
-    // Comparer les mots de passe
-    const isPasswordValid = await bcrypt.compare(password, supervisor.password);
-    
-    if (!isPasswordValid) {
-      // Vérifier le mot de passe par défaut
-      const defaultPasswords = ['SUPER123', 'super123', '123456'];
-      if (!defaultPasswords.includes(password)) {
-        return res.status(401).json({
-          success: false,
-          message: 'Modpas pa kòrèk'
-        });
-      }
+    // Comparer les mots de passe (sans bcrypt)
+    if (supervisor.password !== password) {
+      return res.status(401).json({
+        success: false,
+        message: 'Modpas pa kòrèk'
+      });
     }
 
     // Créer le token JWT
@@ -284,18 +271,12 @@ app.post('/api/auth/owner-login', async (req, res) => {
       });
     }
 
-    // Comparer les mots de passe
-    const isPasswordValid = await bcrypt.compare(password, owner.password);
-    
-    if (!isPasswordValid) {
-      // Vérifier le mot de passe par défaut
-      const defaultPasswords = ['OWNER123', 'owner123', '123456'];
-      if (!defaultPasswords.includes(password)) {
-        return res.status(401).json({
-          success: false,
-          message: 'Modpas pa kòrèk'
-        });
-      }
+    // Comparer les mots de passe (sans bcrypt)
+    if (owner.password !== password) {
+      return res.status(401).json({
+        success: false,
+        message: 'Modpas pa kòrèk'
+      });
     }
 
     // Créer le token JWT
@@ -351,24 +332,13 @@ app.post('/api/auth/logout', authenticate, async (req, res) => {
 // Initialiser les comptes par défaut
 app.post('/api/init/default-accounts', async (req, res) => {
   try {
-    const adminKey = req.headers['x-admin-key'];
-    if (adminKey !== 'LOTATO_INIT_2024') {
-      return res.status(403).json({
-        success: false,
-        message: 'Kle administratif pa kòrèk'
-      });
-    }
-
-    // Hasher le mot de passe par défaut
-    const defaultPassword = await bcrypt.hash('123456', 10);
-
     // Créer un agent par défaut
     const existingAgent = await Agent.findOne({ agentId: 'AGENT01' });
     if (!existingAgent) {
       const agent = new Agent({
         agentId: 'AGENT01',
         agentName: 'Ajan Prensipal',
-        password: defaultPassword,
+        password: '123456',
         role: 'agent',
         funds: 50000
       });
@@ -380,7 +350,7 @@ app.post('/api/init/default-accounts', async (req, res) => {
     if (!existingSupervisor) {
       const supervisor = new Supervisor({
         username: 'supervisor',
-        password: defaultPassword,
+        password: '123456',
         name: 'Supervizè Prensipal',
         role: 'supervisor',
         permissions: ['view_all', 'manage_agents', 'approve_funds', 'view_reports']
@@ -393,7 +363,7 @@ app.post('/api/init/default-accounts', async (req, res) => {
     if (!existingOwner) {
       const owner = new Owner({
         username: 'owner',
-        password: defaultPassword,
+        password: '123456',
         name: 'Pwopriyetè',
         role: 'owner'
       });
@@ -437,7 +407,7 @@ app.get('/api/agents', authenticate, requireRole(['supervisor', 'owner']), async
 // Créer un nouvel agent
 app.post('/api/agents', authenticate, requireRole(['supervisor', 'owner']), async (req, res) => {
   try {
-    const { agentId, agentName, initialFunds } = req.body;
+    const { agentId, agentName, password, initialFunds } = req.body;
     
     // Vérifier si l'agent existe déjà
     const existingAgent = await Agent.findOne({ agentId: agentId.toUpperCase() });
@@ -447,14 +417,11 @@ app.post('/api/agents', authenticate, requireRole(['supervisor', 'owner']), asyn
         message: 'Kòd ajan sa deja egziste'
       });
     }
-
-    // Hasher le mot de passe par défaut
-    const hashedPassword = await bcrypt.hash('123456', 10);
     
     const agent = new Agent({
       agentId: agentId.toUpperCase(),
       agentName: agentName,
-      password: hashedPassword,
+      password: password || '123456',
       role: 'agent',
       funds: initialFunds || 10000,
       isActive: true
@@ -519,6 +486,36 @@ app.post('/api/agents/:agentId/funds', authenticate, requireRole(['supervisor', 
     res.status(500).json({
       success: false,
       message: 'Erè mete ajou fonds'
+    });
+  }
+});
+
+// Modifier le mot de passe d'un agent
+app.post('/api/agents/:agentId/password', authenticate, requireRole(['supervisor', 'owner']), async (req, res) => {
+  try {
+    const { agentId } = req.params;
+    const { newPassword } = req.body;
+    
+    const agent = await Agent.findOne({ agentId: agentId });
+    if (!agent) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ajan pa jwenn'
+      });
+    }
+    
+    agent.password = newPassword;
+    await agent.save();
+    
+    res.json({
+      success: true,
+      message: 'Modpas ajan mete ajou'
+    });
+  } catch (error) {
+    console.error('Erreur modification mot de passe:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erè mete ajou modpas'
     });
   }
 });
@@ -591,6 +588,41 @@ app.get('/api/tickets', authenticate, async (req, res) => {
   }
 });
 
+// Récupérer TOUS les tickets (pour superviseur/propriétaire)
+app.get('/api/tickets/all', authenticate, requireRole(['supervisor', 'owner']), async (req, res) => {
+  try {
+    const { startDate, endDate, drawId } = req.query;
+    
+    let query = {};
+    
+    if (startDate && endDate) {
+      query.date = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+      };
+    }
+    
+    if (drawId) {
+      query.drawId = drawId;
+    }
+    
+    const tickets = await Ticket.find(query)
+      .sort({ date: -1 })
+      .limit(500);
+    
+    res.json({
+      success: true,
+      tickets: tickets
+    });
+  } catch (error) {
+    console.error('Erreur récupération tous les tickets:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la récupération des tickets'
+    });
+  }
+});
+
 // Récupérer les rapports d'un agent
 app.get('/api/reports', authenticate, async (req, res) => {
   try {
@@ -653,6 +685,75 @@ app.get('/api/reports', authenticate, async (req, res) => {
   }
 });
 
+// Récupérer les rapports généraux (pour superviseur/propriétaire)
+app.get('/api/reports/all', authenticate, requireRole(['supervisor', 'owner']), async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    
+    let query = {};
+    if (startDate && endDate) {
+      query.date = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+      };
+    }
+    
+    // Récupérer tous les tickets
+    const tickets = await Ticket.find(query);
+    
+    // Calculer les totaux généraux
+    const totalTickets = tickets.length;
+    const totalBets = tickets.reduce((sum, ticket) => sum + ticket.total, 0);
+    
+    // Récupérer tous les gagnants
+    const winners = await Winner.find();
+    const totalWins = winners.reduce((sum, winner) => sum + (winner.winningAmount || 0), 0);
+    
+    // Calculer les pertes
+    const totalLoss = totalBets - totalWins;
+    const balance = totalWins - totalLoss;
+    
+    // Breakdown par agent
+    const agentBreakdown = {};
+    tickets.forEach(ticket => {
+      const agentId = ticket.agentId;
+      if (!agentBreakdown[agentId]) {
+        agentBreakdown[agentId] = { 
+          agentName: ticket.agentName,
+          tickets: 0, 
+          amount: 0,
+          wins: 0
+        };
+      }
+      agentBreakdown[agentId].tickets += 1;
+      agentBreakdown[agentId].amount += ticket.total;
+    });
+    
+    // Ajouter les gains par agent
+    winners.forEach(winner => {
+      if (agentBreakdown[winner.agentId]) {
+        agentBreakdown[winner.agentId].wins += winner.winningAmount;
+      }
+    });
+    
+    res.json({
+      success: true,
+      totalTickets: totalTickets,
+      totalBets: totalBets,
+      totalWins: totalWins,
+      totalLoss: totalLoss,
+      balance: balance,
+      agentBreakdown: agentBreakdown
+    });
+  } catch (error) {
+    console.error('Erreur récupération rapports généraux:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la récupération des rapports généraux'
+    });
+  }
+});
+
 // Récupérer les gagnants
 app.get('/api/winners', authenticate, async (req, res) => {
   try {
@@ -676,6 +777,26 @@ app.get('/api/winners', authenticate, async (req, res) => {
     });
   } catch (error) {
     console.error('Erreur récupération gagnants:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la récupération des gagnants'
+    });
+  }
+});
+
+// Récupérer TOUS les gagnants (pour superviseur/propriétaire)
+app.get('/api/winners/all', authenticate, requireRole(['supervisor', 'owner']), async (req, res) => {
+  try {
+    const winners = await Winner.find()
+      .sort({ date: -1 })
+      .limit(200);
+    
+    res.json({
+      success: true,
+      winners: winners
+    });
+  } catch (error) {
+    console.error('Erreur récupération tous les gagnants:', error);
     res.status(500).json({
       success: false,
       message: 'Erreur lors de la récupération des gagnants'
@@ -770,6 +891,59 @@ app.post('/api/agent/funds', authenticate, requireRole(['agent']), async (req, r
   }
 });
 
+// Marquer un gagnant comme payé
+app.post('/api/winners/:id/pay', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const winner = await Winner.findById(id);
+    if (!winner) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ganyen pa jwenn'
+      });
+    }
+    
+    // Vérifier les permissions
+    if (req.user.role === 'agent' && req.user.agentId !== winner.agentId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Ou pa ka peye ganyen sa a'
+      });
+    }
+    
+    // Vérifier si l'agent a assez de fonds (pour les agents)
+    if (req.user.role === 'agent') {
+      const agent = await Agent.findOne({ agentId: req.user.agentId });
+      if (agent.funds < winner.winningAmount) {
+        return res.status(400).json({
+          success: false,
+          message: 'Ou pa gen ase fonds pou peye ganyen sa a'
+        });
+      }
+      
+      // Déduire les fonds
+      agent.funds -= winner.winningAmount;
+      await agent.save();
+    }
+    
+    // Marquer comme payé
+    winner.paid = true;
+    await winner.save();
+    
+    res.json({
+      success: true,
+      message: 'Ganyen peye avèk siksè'
+    });
+  } catch (error) {
+    console.error('Erreur paiement gagnant:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors du paiement du gagnant'
+    });
+  }
+});
+
 // Vérifier le statut des tirages
 app.get('/api/draws/status', async (req, res) => {
   try {
@@ -811,6 +985,16 @@ app.get('/api/draws/status', async (req, res) => {
   }
 });
 
+// Route pour vérifier la connexion
+app.get('/api/health', (req, res) => {
+  res.json({
+    success: true,
+    message: 'API LOTATO PRO fonctionne',
+    timestamp: new Date().toISOString(),
+    version: '2.0.0'
+  });
+});
+
 // Route de test
 app.get('/', (req, res) => {
   res.sendFile(__dirname + '/index.html');
@@ -827,6 +1011,14 @@ app.get('/supervisor.html', (req, res) => {
 
 app.get('/owner.html', (req, res) => {
   res.sendFile(__dirname + '/owner.html');
+});
+
+// Gestion des erreurs 404
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Rout pa jwenn'
+  });
 });
 
 // Démarrer le serveur
