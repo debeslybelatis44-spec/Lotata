@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="ht">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LOTATO PRO | Login</title>
+    <style>
+        :root {
+            --primary: #ad00f1;
+            --secondary: #00d4ff;
+            --accent: #ff007a;
+            --bg: #0a0b1e;
+            --surface: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(81, 6, 75, 0.699);
+            --text-main: #ffffff;
+            --text-dim: #a0a0b8;
+            --success: #00f190;
+            --danger: #ff4d4d;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: radial-gradient(circle at top right, #1a1b3a, #0a0b1e);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .login-container {
+            width: 100%;
+            max-width: 400px;
+            background: var(--surface);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 40px 30px;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo h1 {
+            font-size: 2.2rem;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin-bottom: 5px;
+        }
+
+        .logo span {
+            font-size: 0.9rem;
+            color: var(--text-dim);
+        }
+
+        .role-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+        }
+
+        .role-btn {
+            flex: 1;
+            padding: 12px 15px;
+            border: 1px solid var(--glass-border);
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-dim);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+            min-width: 120px;
+        }
+
+        .role-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .role-btn.active {
+            border-color: var(--primary);
+            background: rgba(173, 0, 241, 0.1);
+            color: white;
+            box-shadow: 0 0 15px rgba(173, 0, 241, 0.3);
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-dim);
+            font-size: 0.9rem;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 14px;
+            border-radius: 12px;
+            border: 1px solid var(--glass-border);
+            background: rgba(0, 0, 0, 0.2);
+            color: white;
+            font-size: 1rem;
+            transition: 0.3s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: var(--secondary);
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.2);
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            color: white;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 10px;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(173, 0, 241, 0.3);
+        }
+
+        .login-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .error-message {
+            background: rgba(255, 77, 77, 0.1);
+            border: 1px solid var(--danger);
+            color: var(--danger);
+            padding: 12px;
+            border-radius: 12px;
+            margin-top: 20px;
+            text-align: center;
+            display: none;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 25px;
+            color: var(--text-dim);
+            font-size: 0.8rem;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .animate-fade {
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        .role-icon {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container animate-fade">
+        <div class="logo">
+            <h1>LOTATO PRO</h1>
+            <span>Sistèm Kontwòl Lotri</span>
+        </div>
+
+        <div class="role-selector">
+            <button class="role-btn" data-role="agent" onclick="selectRole('agent')">
+                <i class="role-icon fas fa-user"></i>
+                Ajan
+            </button>
+            <button class="role-btn" data-role="supervisor" onclick="selectRole('supervisor')">
+                <i class="role-icon fas fa-user-shield"></i>
+                Vizè
+            </button>
+            <button class="role-btn" data-role="owner" onclick="selectRole('owner')">
+                <i class="role-icon fas fa-crown"></i>
+                Pwopriyetè
+            </button>
+        </div>
+
+        <form id="login-form">
+            <div class="input-group">
+                <label for="username">Non Itilizatè / Kòd Ajan</label>
+                <input type="text" id="username" placeholder="Rantre kòd ou" required>
+            </div>
+
+            <div class="input-group">
+                <label for="password">Modpas</label>
+                <input type="password" id="password" placeholder="Rantre modpas la" required>
+            </div>
+
+            <button type="submit" class="login-btn" id="login-button">
+                Konekte
+            </button>
+        </form>
+
+        <div class="error-message" id="error-message">
+            Non itilizatè oswa modpas pa kòrèk!
+        </div>
+
+        <div class="footer">
+            © 2024 LOTATO PRO. Tout dwa rezève.
+        </div>
+    </div>
+
+    <script>
+        let selectedRole = 'agent';
+        const ROLES_CONFIG = {
+            agent: {
+                endpoint: '/api/auth/login',
+                redirect: '/agent1.html',
+                defaultCode: 'AGENT123'
+            },
+            supervisor: {
+                endpoint: '/api/auth/supervisor-login',
+                redirect: '/supervisor.html',
+                defaultCode: 'SUPER123'
+            },
+            owner: {
+                endpoint: '/api/auth/owner-login',
+                redirect: '/owner.html',
+                defaultCode: 'OWNER123'
+            }
+        };
+
+        function selectRole(role) {
+            selectedRole = role;
+            
+            // Update active button
+            document.querySelectorAll('.role-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`[data-role="${role}"]`).classList.add('active');
+            
+            // Update placeholder based on role
+            const usernameInput = document.getElementById('username');
+            switch(role) {
+                case 'agent':
+                    usernameInput.placeholder = 'Kòd Ajan (egz: AGENT01)';
+                    break;
+                case 'supervisor':
+                    usernameInput.placeholder = 'Kòd Vizè';
+                    break;
+                case 'owner':
+                    usernameInput.placeholder = 'Kòd Pwopriyetè';
+                    break;
+            }
+        }
+
+        async function handleLogin(event) {
+            event.preventDefault();
+            
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const loginBtn = document.getElementById('login-button');
+            const errorDiv = document.getElementById('error-message');
+            
+            if (!username || !password) {
+                showError('Tanpri ranpli tout chan yo');
+                return;
+            }
+
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Ap Konekte...';
+            errorDiv.style.display = 'none';
+
+            try {
+                const config = ROLES_CONFIG[selectedRole];
+                const response = await fetch(config.endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        password: password,
+                        role: selectedRole
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Store authentication data
+                    localStorage.setItem('lotato_auth', JSON.stringify({
+                        role: selectedRole,
+                        username: username,
+                        token: data.token,
+                        timestamp: Date.now()
+                    }));
+                    
+                    // Redirect to appropriate page
+                    window.location.href = config.redirect;
+                } else {
+                    showError(data.message || 'Eche otantifikasyon');
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showError('Erè koneksyon sèvè');
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Konekte';
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            
+            // Shake animation
+            errorDiv.style.animation = 'none';
+            setTimeout(() => {
+                errorDiv.style.animation = 'shake 0.5s';
+            }, 10);
+        }
+
+        // CSS for shake animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes shake {
+                0%, 100% { transform: translateX(0); }
+                10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+                20%, 40%, 60%, 80% { transform: translateX(5px); }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Initialize with agent role selected
+        selectRole('agent');
+
+        // Form submission
+        document.getElementById('login-form').addEventListener('submit', handleLogin);
+
+        // Enter key support
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                handleLogin(e);
+            }
+        });
+
+        // Check if already logged in
+        function checkExistingSession() {
+            const auth = localStorage.getItem('lotato_auth');
+            if (auth) {
+                try {
+                    const authData = JSON.parse(auth);
+                    // Check if session is still valid (24 hours)
+                    if (Date.now() - authData.timestamp < 24 * 60 * 60 * 1000) {
+                        const config = ROLES_CONFIG[authData.role];
+                        if (config) {
+                            window.location.href = config.redirect;
+                        }
+                    }
+                } catch (e) {
+                    localStorage.removeItem('lotato_auth');
+                }
+            }
+        }
+
+        // Check session on load
+        checkExistingSession();
+    </script>
+
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</body>
+</html>
