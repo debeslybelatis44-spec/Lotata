@@ -11,27 +11,20 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static('.'));
+app.use(express.static('.')); // Serve static files from root
 
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || 'lotato-pro-super-secret-key-2024';
 
-// Connexion MongoDB Atlas
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/lotato';
-
-mongoose.connect(MONGODB_URI, {
+// Connexion MongoDB
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/lotato', {
   useNewUrlParser: true,
-  useUnifiedTopology: true,
-  serverSelectionTimeoutMS: 5000, // Timeout après 5 secondes
-  socketTimeoutMS: 45000, // Close sockets après 45s d'inactivité
+  useUnifiedTopology: true
 })
-.then(() => console.log('✅ Connecté à MongoDB Atlas'))
-.catch(err => {
-  console.error('❌ Erreur MongoDB:', err.message);
-  console.log('🔗 URI utilisée:', MONGODB_URI.replace(/mongodb\+srv:\/\/([^:]+):([^@]+)@/, 'mongodb+srv://USERNAME:PASSWORD@'));
-});
+.then(() => console.log('✅ Connecté à MongoDB'))
+.catch(err => console.error('❌ Erreur MongoDB:', err));
 
-// Schémas et Modèles (gardez les mêmes que précédemment)
+// Schémas et Modèles
 const ticketSchema = new mongoose.Schema({
   ticketId: { type: String, required: true, unique: true },
   agentId: { type: String, required: true },
@@ -55,6 +48,7 @@ const ticketSchema = new mongoose.Schema({
 const winnerSchema = new mongoose.Schema({
   ticketId: { type: String, required: true },
   agentId: { type: String, required: true },
+  agentName: { type: String, required: true },
   drawId: { type: String, required: true },
   drawName: { type: String, required: true },
   gameType: { type: String, required: true },
@@ -76,6 +70,10 @@ const agentSchema = new mongoose.Schema({
   lotteryAddress: { type: String, default: '' },
   lotteryPhone: { type: String, default: '' },
   isActive: { type: Boolean, default: true },
+  supervisorId: { type: String, required: true },
+  lastActivity: { type: Date, default: Date.now },
+  online: { type: Boolean, default: false },
+  location: { type: String, default: '' },
   createdAt: { type: Date, default: Date.now }
 });
 
@@ -85,6 +83,7 @@ const supervisorSchema = new mongoose.Schema({
   name: { type: String, required: true },
   role: { type: String, default: 'supervisor' },
   permissions: [String],
+  maxDeleteTime: { type: Number, default: 10 }, // minutes
   isActive: { type: Boolean, default: true },
   createdAt: { type: Date, default: Date.now }
 });
@@ -147,6 +146,7 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body;
     
+    // Chercher l'agent par son agentId
     const agent = await Agent.findOne({ 
       agentId: username.toUpperCase(),
       isActive: true 
@@ -159,6 +159,7 @@ app.post('/api/auth/login', async (req, res) => {
       });
     }
 
+    // Comparer les mots de passe (sans bcrypt)
     if (agent.password !== password) {
       return res.status(401).json({
         success: false,
@@ -166,6 +167,12 @@ app.post('/api/auth/login', async (req, res) => {
       });
     }
 
+    // Mettre à jour le statut en ligne
+    agent.online = true;
+    agent.lastActivity = new Date();
+    await agent.save();
+
+    // Créer le token JWT
     const token = jwt.sign(
       {
         id: agent._id,
@@ -202,6 +209,7 @@ app.post('/api/auth/supervisor-login', async (req, res) => {
   try {
     const { username, password } = req.body;
     
+    // Chercher le superviseur
     const supervisor = await Supervisor.findOne({ 
       username: username.toLowerCase(),
       isActive: true 
@@ -214,6 +222,7 @@ app.post('/api/auth/supervisor-login', async (req, res) => {
       });
     }
 
+    // Comparer les mots de passe (sans bcrypt)
     if (supervisor.password !== password) {
       return res.status(401).json({
         success: false,
@@ -221,13 +230,15 @@ app.post('/api/auth/supervisor-login', async (req, res) => {
       });
     }
 
+    // Créer le token JWT
     const token = jwt.sign(
       {
         id: supervisor._id,
         username: supervisor.username,
         name: supervisor.name,
         role: 'supervisor',
-        permissions: supervisor.permissions
+        permissions: supervisor.permissions,
+        maxDeleteTime: supervisor.maxDeleteTime
       },
       JWT_SECRET,
       { expiresIn: '24h' }
@@ -242,7 +253,8 @@ app.post('/api/auth/supervisor-login', async (req, res) => {
         username: supervisor.username,
         name: supervisor.name,
         role: 'supervisor',
-        permissions: supervisor.permissions
+        permissions: supervisor.permissions,
+        maxDeleteTime: supervisor.maxDeleteTime
       }
     });
   } catch (error) {
@@ -259,6 +271,7 @@ app.post('/api/auth/owner-login', async (req, res) => {
   try {
     const { username, password } = req.body;
     
+    // Chercher le propriétaire
     const owner = await Owner.findOne({ 
       username: username.toLowerCase(),
       isActive: true 
@@ -271,6 +284,7 @@ app.post('/api/auth/owner-login', async (req, res) => {
       });
     }
 
+    // Comparer les mots de passe (sans bcrypt)
     if (owner.password !== password) {
       return res.status(401).json({
         success: false,
@@ -278,6 +292,7 @@ app.post('/api/auth/owner-login', async (req, res) => {
       });
     }
 
+    // Créer le token JWT
     const token = jwt.sign(
       {
         id: owner._id,
@@ -309,7 +324,40 @@ app.post('/api/auth/owner-login', async (req, res) => {
   }
 });
 
-// 4. Initialiser les comptes par défaut
+// 4. Vérification de session
+app.get('/api/auth/verify', authenticate, async (req, res) => {
+  res.json({
+    success: true,
+    user: req.user
+  });
+});
+
+// 5. Déconnexion
+app.post('/api/auth/logout', authenticate, async (req, res) => {
+  try {
+    // Si c'est un agent, mettre hors ligne
+    if (req.user.role === 'agent') {
+      await Agent.findOneAndUpdate(
+        { agentId: req.user.agentId },
+        { online: false }
+      );
+    }
+    
+    res.json({
+      success: true,
+      message: 'Dekonekte avèk siksè'
+    });
+  } catch (error) {
+    res.json({
+      success: true,
+      message: 'Dekonekte avèk siksè'
+    });
+  }
+});
+
+// === ROUTES D'INITIALISATION ===
+
+// Initialiser les comptes par défaut
 app.post('/api/init/default-accounts', async (req, res) => {
   try {
     // Créer un agent par défaut
@@ -320,10 +368,10 @@ app.post('/api/init/default-accounts', async (req, res) => {
         agentName: 'Ajan Prensipal',
         password: '123456',
         role: 'agent',
-        funds: 50000
+        funds: 50000,
+        supervisorId: 'SUPER01'
       });
       await agent.save();
-      console.log('✅ Agent par défaut créé');
     }
 
     // Créer un superviseur par défaut
@@ -334,10 +382,10 @@ app.post('/api/init/default-accounts', async (req, res) => {
         password: '123456',
         name: 'Supervizè Prensipal',
         role: 'supervisor',
-        permissions: ['view_all', 'manage_agents', 'approve_funds', 'view_reports']
+        permissions: ['view_all', 'manage_agents', 'approve_funds', 'view_reports', 'delete_tickets', 'block_agents'],
+        maxDeleteTime: 10
       });
       await supervisor.save();
-      console.log('✅ Superviseur par défaut créé');
     }
 
     // Créer un propriétaire par défaut
@@ -350,7 +398,6 @@ app.post('/api/init/default-accounts', async (req, res) => {
         role: 'owner'
       });
       await owner.save();
-      console.log('✅ Propriétaire par défaut créé');
     }
 
     res.json({
@@ -366,49 +413,669 @@ app.post('/api/init/default-accounts', async (req, res) => {
   }
 });
 
-// 5. Test de connexion MongoDB
-app.get('/api/test-mongodb', async (req, res) => {
+// === ROUTES SUPERVISEUR ===
+
+// Dashboard superviseur
+app.get('/api/supervisor/dashboard', authenticate, requireRole(['supervisor']), async (req, res) => {
   try {
-    // Tester la connexion
-    const dbState = mongoose.connection.readyState;
-    const states = ['disconnected', 'connected', 'connecting', 'disconnecting'];
+    // Récupérer les agents assignés
+    const agents = await Agent.find({ supervisorId: req.user.username });
     
-    // Compter les documents
-    const agentCount = await Agent.countDocuments();
-    const ticketCount = await Ticket.countDocuments();
-    const winnerCount = await Winner.countDocuments();
+    // Calculer les statistiques
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const activeAgents = agents.filter(a => a.isActive).length;
+    const onlineAgents = agents.filter(a => a.online && a.isActive).length;
+    
+    // Récupérer les tickets d'aujourd'hui
+    const tickets = await Ticket.find({
+      agentId: { $in: agents.map(a => a.agentId) },
+      date: { $gte: today }
+    });
+    
+    const totalTickets = tickets.length;
+    const todaySales = tickets.reduce((sum, ticket) => sum + ticket.total, 0);
+    const totalCommission = todaySales * 0.05;
+    
+    // Récupérer les gains d'aujourd'hui
+    const winners = await Winner.find({
+      agentId: { $in: agents.map(a => a.agentId) },
+      date: { $gte: today }
+    });
+    
+    const totalWins = winners.reduce((sum, winner) => sum + winner.winningAmount, 0);
+    
+    // Agents récemment actifs (dernières 2 heures)
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    const recentAgents = await Agent.find({
+      supervisorId: req.user.username,
+      lastActivity: { $gte: twoHoursAgo },
+      isActive: true
+    }).limit(4);
+    
+    // Calculer les ventes par agent
+    const agentsWithStats = await Promise.all(recentAgents.map(async (agent) => {
+      const agentTickets = await Ticket.find({
+        agentId: agent.agentId,
+        date: { $gte: today }
+      });
+      
+      const agentWinners = await Winner.find({
+        agentId: agent.agentId,
+        date: { $gte: today }
+      });
+      
+      return {
+        agentId: agent.agentId,
+        agentName: agent.agentName,
+        online: agent.online,
+        isActive: agent.isActive,
+        lastActivity: agent.lastActivity,
+        location: agent.location,
+        funds: agent.funds,
+        todaySales: agentTickets.reduce((sum, t) => sum + t.total, 0),
+        ticketCount: agentTickets.length,
+        totalWins: agentWinners.reduce((sum, w) => sum + w.winningAmount, 0)
+      };
+    }));
     
     res.json({
       success: true,
-      mongodb: {
-        state: states[dbState],
-        readyState: dbState,
-        database: mongoose.connection.db?.databaseName || 'N/A',
-        collections: {
-          agents: agentCount,
-          tickets: ticketCount,
-          winners: winnerCount
-        }
-      }
+      activeAgents,
+      onlineAgents,
+      totalTickets,
+      todaySales,
+      totalCommission,
+      totalWins,
+      recentAgents: agentsWithStats
     });
+    
   } catch (error) {
+    console.error('Erreur dashboard superviseur:', error);
     res.status(500).json({
       success: false,
-      error: error.message,
-      mongodb: {
-        state: 'error',
-        readyState: mongoose.connection.readyState
-      }
+      message: 'Erè charjman dashboard'
     });
   }
 });
 
-// === ROUTES PRINCIPALES ===
+// Récupérer les agents assignés
+app.get('/api/supervisor/agents', authenticate, requireRole(['supervisor']), async (req, res) => {
+  try {
+    const agents = await Agent.find({ supervisorId: req.user.username });
+    
+    // Calculer les statistiques pour chaque agent
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const agentsWithStats = await Promise.all(agents.map(async (agent) => {
+      const agentTickets = await Ticket.find({
+        agentId: agent.agentId,
+        date: { $gte: today }
+      });
+      
+      const agentWinners = await Winner.find({
+        agentId: agent.agentId,
+        date: { $gte: today }
+      });
+      
+      return {
+        agentId: agent.agentId,
+        agentName: agent.agentName,
+        online: agent.online,
+        isActive: agent.isActive,
+        lastActivity: agent.lastActivity,
+        funds: agent.funds,
+        todaySales: agentTickets.reduce((sum, t) => sum + t.total, 0),
+        ticketCount: agentTickets.length,
+        totalWins: agentWinners.reduce((sum, w) => sum + w.winningAmount, 0),
+        location: agent.location
+      };
+    }));
+    
+    res.json({
+      success: true,
+      agents: agentsWithStats
+    });
+    
+  } catch (error) {
+    console.error('Erreur récupération agents superviseur:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erè récupération ajan yo'
+    });
+  }
+});
+
+// Récupérer les tickets d'un agent spécifique
+app.get('/api/supervisor/agents/:agentId/tickets', authenticate, requireRole(['supervisor']), async (req, res) => {
+  try {
+    const { agentId } = req.params;
+    const { limit = 50 } = req.query;
+    
+    // Vérifier que l'agent appartient au superviseur
+    const agent = await Agent.findOne({ 
+      agentId: agentId,
+      supervisorId: req.user.username 
+    });
+    
+    if (!agent) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ajan pa jwenn oswa ou pa gen aksè'
+      });
+    }
+    
+    const tickets = await Ticket.find({ agentId: agentId })
+      .sort({ date: -1 })
+      .limit(parseInt(limit));
+    
+    res.json({
+      success: true,
+      agent: {
+        agentId: agent.agentId,
+        agentName: agent.agentName,
+        isActive: agent.isActive,
+        funds: agent.funds
+      },
+      tickets: tickets
+    });
+    
+  } catch (error) {
+    console.error('Erreur récupération tickets agent:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erè récupération tikè ajan'
+    });
+  }
+});
+
+// Récupérer les rapports d'un agent
+app.get('/api/supervisor/agents/:agentId/reports', authenticate, requireRole(['supervisor']), async (req, res) => {
+  try {
+    const { agentId } = req.params;
+    const { period = 'today' } = req.query;
+    
+    // Vérifier que l'agent appartient au superviseur
+    const agent = await Agent.findOne({ 
+      agentId: agentId,
+      supervisorId: req.user.username 
+    });
+    
+    if (!agent) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ajan pa jwenn oswa ou pa gen aksè'
+      });
+    }
+    
+    // Définir la période
+    let startDate = new Date();
+    startDate.setHours(0, 0, 0, 0);
+    
+    if (period === 'week') {
+      startDate.setDate(startDate.getDate() - 7);
+    } else if (period === 'month') {
+      startDate.setMonth(startDate.getMonth() - 1);
+    } else if (period === 'year') {
+      startDate.setFullYear(startDate.getFullYear() - 1);
+    }
+    
+    // Récupérer les tickets
+    const tickets = await Ticket.find({ 
+      agentId: agentId,
+      date: { $gte: startDate }
+    });
+    
+    // Récupérer les gains
+    const winners = await Winner.find({
+      agentId: agentId,
+      date: { $gte: startDate }
+    });
+    
+    // Calculer les totaux
+    const totalTickets = tickets.length;
+    const totalBets = tickets.reduce((sum, ticket) => sum + ticket.total, 0);
+    const totalWins = winners.reduce((sum, winner) => sum + winner.winningAmount, 0);
+    const totalLoss = totalBets - totalWins;
+    const balance = totalWins - totalLoss;
+    const successRate = totalTickets > 0 ? (winners.length / totalTickets) * 100 : 0;
+    
+    res.json({
+      success: true,
+      totalTickets,
+      totalBets,
+      totalWins,
+      totalLoss,
+      balance,
+      successRate
+    });
+    
+  } catch (error) {
+    console.error('Erreur récupération rapports agent:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erè récupération rapò ajan'
+    });
+  }
+});
+
+// Récupérer les gains d'un agent
+app.get('/api/supervisor/agents/:agentId/winners', authenticate, requireRole(['supervisor']), async (req, res) => {
+  try {
+    const { agentId } = req.params;
+    const { limit = 20 } = req.query;
+    
+    // Vérifier que l'agent appartient au superviseur
+    const agent = await Agent.findOne({ 
+      agentId: agentId,
+      supervisorId: req.user.username 
+    });
+    
+    if (!agent) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ajan pa jwenn oswa ou pa gen aksè'
+      });
+    }
+    
+    const winners = await Winner.find({ agentId: agentId })
+      .sort({ date: -1 })
+      .limit(parseInt(limit));
+    
+    res.json({
+      success: true,
+      winners: winners
+    });
+    
+  } catch (error) {
+    console.error('Erreur récupération gains agent:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erè récupération ganyen ajan'
+    });
+  }
+});
+
+// Bloquer/débloquer un agent
+app.post('/api/supervisor/agents/:agentId/block', authenticate, requireRole(['supervisor']), async (req, res) => {
+  try {
+    const { agentId } = req.params;
+    const { block } = req.body; // true pour bloquer, false pour débloquer
+    
+    // Vérifier que l'agent appartient au superviseur
+    const agent = await Agent.findOne({ 
+      agentId: agentId,
+      supervisorId: req.user.username 
+    });
+    
+    if (!agent) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ajan pa jwenn oswa ou pa gen aksè'
+      });
+    }
+    
+    // Bloquer/débloquer l'agent
+    agent.isActive = !block;
+    await agent.save();
+    
+    res.json({
+      success: true,
+      message: `Ajan ${block ? 'bloke' : 'debloke'} avèk siksè`,
+      isActive: agent.isActive
+    });
+    
+  } catch (error) {
+    console.error('Erreur blocage agent:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erè bloke/debloke ajan'
+    });
+  }
+});
+
+// Supprimer les tickets récents d'un agent
+app.delete('/api/supervisor/tickets/recent', authenticate, requireRole(['supervisor']), async (req, res) => {
+  try {
+    const { agentId, maxAgeMinutes = 10 } = req.body;
+    
+    // Vérifier que l'agent appartient au superviseur
+    const agent = await Agent.findOne({ 
+      agentId: agentId,
+      supervisorId: req.user.username 
+    });
+    
+    if (!agent) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ajan pa jwenn oswa ou pa gen aksè'
+      });
+    }
+    
+    // Calculer la date limite
+    const maxAgeDate = new Date(Date.now() - maxAgeMinutes * 60 * 1000);
+    
+    // Supprimer les tickets récents
+    const result = await Ticket.deleteMany({
+      agentId: agentId,
+      date: { $gte: maxAgeDate }
+    });
+    
+    res.json({
+      success: true,
+      message: `${result.deletedCount} tikè resan yo efase`,
+      deletedCount: result.deletedCount
+    });
+    
+  } catch (error) {
+    console.error('Erreur suppression tickets récents:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erè efase tikè resan yo'
+    });
+  }
+});
+
+// Supprimer un ticket spécifique
+app.delete('/api/supervisor/tickets/:ticketId', authenticate, requireRole(['supervisor']), async (req, res) => {
+  try {
+    const { ticketId } = req.params;
+    const { agentId } = req.body;
+    
+    // Vérifier que l'agent appartient au superviseur
+    const agent = await Agent.findOne({ 
+      agentId: agentId,
+      supervisorId: req.user.username 
+    });
+    
+    if (!agent) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ajan pa jwenn oswa ou pa gen aksè'
+      });
+    }
+    
+    // Vérifier que le ticket existe et appartient à l'agent
+    const ticket = await Ticket.findOne({ 
+      ticketId: ticketId,
+      agentId: agentId 
+    });
+    
+    if (!ticket) {
+      return res.status(404).json({
+        success: false,
+        message: 'Tikè pa jwenn'
+      });
+    }
+    
+    // Vérifier l'âge du ticket
+    const ticketAge = (Date.now() - new Date(ticket.date).getTime()) / (1000 * 60);
+    const maxDeleteTime = req.user.maxDeleteTime || 10;
+    
+    if (ticketAge > maxDeleteTime) {
+      return res.status(400).json({
+        success: false,
+        message: `Tikè a twò vye pou efase (max: ${maxDeleteTime} minit)`
+      });
+    }
+    
+    // Supprimer le ticket
+    await Ticket.deleteOne({ ticketId: ticketId });
+    
+    res.json({
+      success: true,
+      message: 'Tikè efase avèk siksè'
+    });
+    
+  } catch (error) {
+    console.error('Erreur suppression ticket:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erè efase tikè'
+    });
+  }
+});
+
+// Mettre à jour les paramètres du superviseur
+app.post('/api/supervisor/settings', authenticate, requireRole(['supervisor']), async (req, res) => {
+  try {
+    const { maxDeleteTime } = req.body;
+    
+    if (maxDeleteTime && (maxDeleteTime < 1 || maxDeleteTime > 60)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Tan maksimòm dwe ant 1 ak 60 minit'
+      });
+    }
+    
+    // Mettre à jour les paramètres
+    await Supervisor.findByIdAndUpdate(req.user.id, {
+      maxDeleteTime: maxDeleteTime
+    });
+    
+    // Mettre à jour le token si nécessaire
+    const updatedSupervisor = await Supervisor.findById(req.user.id);
+    const token = jwt.sign(
+      {
+        id: updatedSupervisor._id,
+        username: updatedSupervisor.username,
+        name: updatedSupervisor.name,
+        role: 'supervisor',
+        permissions: updatedSupervisor.permissions,
+        maxDeleteTime: updatedSupervisor.maxDeleteTime
+      },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+    
+    res.json({
+      success: true,
+      message: 'Anviwònman mete ajou',
+      token: token,
+      maxDeleteTime: updatedSupervisor.maxDeleteTime
+    });
+    
+  } catch (error) {
+    console.error('Erreur mise à jour paramètres:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erè mete ajou anviwònman'
+    });
+  }
+});
+
+// === ROUTES EXISTANTES (conservées) ===
+
+// Gestion des agents (accessible par superviseur et propriétaire)
+app.get('/api/agents', authenticate, requireRole(['supervisor', 'owner']), async (req, res) => {
+  try {
+    let query = {};
+    
+    // Si c'est un superviseur, ne voir que ses agents
+    if (req.user.role === 'supervisor') {
+      query.supervisorId = req.user.username;
+    }
+    
+    const agents = await Agent.find(query, 'agentId agentName funds isActive supervisorId online lastActivity createdAt')
+      .sort({ createdAt: -1 });
+    
+    res.json({
+      success: true,
+      agents: agents
+    });
+  } catch (error) {
+    console.error('Erreur récupération agents:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erè récupération ajan yo'
+    });
+  }
+});
+
+// Créer un nouvel agent
+app.post('/api/agents', authenticate, requireRole(['supervisor', 'owner']), async (req, res) => {
+  try {
+    const { agentId, agentName, password, initialFunds, location } = req.body;
+    
+    // Vérifier si l'agent existe déjà
+    const existingAgent = await Agent.findOne({ agentId: agentId.toUpperCase() });
+    if (existingAgent) {
+      return res.status(400).json({
+        success: false,
+        message: 'Kòd ajan sa deja egziste'
+      });
+    }
+    
+    // Déterminer le superviseur
+    let supervisorId = req.user.username;
+    if (req.user.role === 'owner' && req.body.supervisorId) {
+      supervisorId = req.body.supervisorId;
+    }
+    
+    const agent = new Agent({
+      agentId: agentId.toUpperCase(),
+      agentName: agentName,
+      password: password || '123456',
+      role: 'agent',
+      funds: initialFunds || 10000,
+      isActive: true,
+      supervisorId: supervisorId,
+      location: location || '',
+      online: false
+    });
+    
+    await agent.save();
+    
+    res.json({
+      success: true,
+      message: 'Ajan kreye avèk siksè',
+      agent: {
+        agentId: agent.agentId,
+        agentName: agent.agentName,
+        funds: agent.funds,
+        supervisorId: agent.supervisorId
+      }
+    });
+  } catch (error) {
+    console.error('Erreur création agent:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erè kreye ajan'
+    });
+  }
+});
+
+// Mettre à jour les fonds d'un agent
+app.post('/api/agents/:agentId/funds', authenticate, requireRole(['supervisor', 'owner']), async (req, res) => {
+  try {
+    const { agentId } = req.params;
+    const { amount, type } = req.body;
+    
+    let query = { agentId: agentId };
+    
+    // Si c'est un superviseur, vérifier que l'agent lui appartient
+    if (req.user.role === 'supervisor') {
+      query.supervisorId = req.user.username;
+    }
+    
+    const agent = await Agent.findOne(query);
+    if (!agent) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ajan pa jwenn oswa ou pa gen aksè'
+      });
+    }
+    
+    let newBalance;
+    if (type === 'add') {
+      newBalance = agent.funds + amount;
+    } else if (type === 'subtract') {
+      newBalance = agent.funds - amount;
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Tip operasyon pa valab'
+      });
+    }
+    
+    agent.funds = newBalance;
+    await agent.save();
+    
+    res.json({
+      success: true,
+      message: 'Fonds ajan mete ajou',
+      newBalance: newBalance
+    });
+  } catch (error) {
+    console.error('Erreur mise à jour fonds agent:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erè mete ajou fonds'
+    });
+  }
+});
+
+// Modifier le mot de passe d'un agent
+app.post('/api/agents/:agentId/password', authenticate, requireRole(['supervisor', 'owner']), async (req, res) => {
+  try {
+    const { agentId } = req.params;
+    const { newPassword } = req.body;
+    
+    let query = { agentId: agentId };
+    
+    // Si c'est un superviseur, vérifier que l'agent lui appartient
+    if (req.user.role === 'supervisor') {
+      query.supervisorId = req.user.username;
+    }
+    
+    const agent = await Agent.findOne(query);
+    if (!agent) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ajan pa jwenn oswa ou pa gen aksè'
+      });
+    }
+    
+    agent.password = newPassword;
+    await agent.save();
+    
+    res.json({
+      success: true,
+      message: 'Modpas ajan mete ajou'
+    });
+  } catch (error) {
+    console.error('Erreur modification mot de passe:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erè mete ajou modpas'
+    });
+  }
+});
 
 // Sauvegarder un ticket
 app.post('/api/tickets/save', authenticate, requireRole(['agent']), async (req, res) => {
   try {
     const ticketData = req.body;
+    
+    // Vérifier que l'agent a assez de fonds
+    const agent = await Agent.findOne({ agentId: ticketData.agentId });
+    if (!agent) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ajan pa jwenn'
+      });
+    }
+    
+    if (agent.funds < ticketData.total) {
+      return res.status(400).json({
+        success: false,
+        message: 'Fonds ensifizan'
+      });
+    }
+    
+    // Générer un ID de ticket unique
     const ticketId = `T${Date.now()}${Math.floor(Math.random() * 1000)}`;
     
     const ticket = new Ticket({
@@ -419,11 +1086,10 @@ app.post('/api/tickets/save', authenticate, requireRole(['agent']), async (req, 
     
     await ticket.save();
     
-    // Mettre à jour les fonds de l'agent
-    await Agent.findOneAndUpdate(
-      { agentId: ticketData.agentId },
-      { $inc: { funds: -ticketData.total } }
-    );
+    // Mettre à jour les fonds de l'agent (déduire le total)
+    agent.funds -= ticketData.total;
+    agent.lastActivity = new Date();
+    await agent.save();
     
     res.status(201).json({
       success: true,
@@ -444,11 +1110,27 @@ app.get('/api/tickets', authenticate, async (req, res) => {
   try {
     const { agentId } = req.query;
     
+    // Vérifier les permissions
     if (req.user.role === 'agent' && req.user.agentId !== agentId) {
       return res.status(403).json({
         success: false,
         message: 'Ou pa gen aksè a istorik ajan sa a'
       });
+    }
+    
+    // Si c'est un superviseur, vérifier que l'agent lui appartient
+    if (req.user.role === 'supervisor') {
+      const agent = await Agent.findOne({ 
+        agentId: agentId,
+        supervisorId: req.user.username 
+      });
+      
+      if (!agent) {
+        return res.status(403).json({
+          success: false,
+          message: 'Ou pa gen aksè a istorik ajan sa a'
+        });
+      }
     }
     
     const tickets = await Ticket.find({ agentId: agentId })
@@ -468,11 +1150,57 @@ app.get('/api/tickets', authenticate, async (req, res) => {
   }
 });
 
-// Récupérer les rapports
+// Récupérer TOUS les tickets (pour superviseur/propriétaire)
+app.get('/api/tickets/all', authenticate, requireRole(['supervisor', 'owner']), async (req, res) => {
+  try {
+    const { startDate, endDate, drawId, agentId } = req.query;
+    
+    let query = {};
+    
+    if (startDate && endDate) {
+      query.date = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+      };
+    }
+    
+    if (drawId) {
+      query.drawId = drawId;
+    }
+    
+    // Si c'est un superviseur, ne voir que ses agents
+    if (req.user.role === 'supervisor') {
+      const agents = await Agent.find({ supervisorId: req.user.username }, 'agentId');
+      query.agentId = { $in: agents.map(a => a.agentId) };
+    }
+    
+    if (agentId) {
+      query.agentId = agentId;
+    }
+    
+    const tickets = await Ticket.find(query)
+      .sort({ date: -1 })
+      .limit(500);
+    
+    res.json({
+      success: true,
+      tickets: tickets
+    });
+  } catch (error) {
+    console.error('Erreur récupération tous les tickets:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la récupération des tickets'
+    });
+  }
+});
+
+// Récupérer les rapports d'un agent
 app.get('/api/reports', authenticate, async (req, res) => {
   try {
     const { agentId } = req.query;
     
+    // Vérifier les permissions
     if (req.user.role === 'agent' && req.user.agentId !== agentId) {
       return res.status(403).json({
         success: false,
@@ -480,16 +1208,40 @@ app.get('/api/reports', authenticate, async (req, res) => {
       });
     }
     
+    // Si c'est un superviseur, vérifier que l'agent lui appartient
+    if (req.user.role === 'supervisor') {
+      const agent = await Agent.findOne({ 
+        agentId: agentId,
+        supervisorId: req.user.username 
+      });
+      
+      if (!agent) {
+        return res.status(403).json({
+          success: false,
+          message: 'Ou pa gen aksè a rapò ajan sa a'
+        });
+      }
+    }
+    
+    // Récupérer tous les tickets de l'agent
     const tickets = await Ticket.find({ agentId: agentId });
+    
+    // Calculer les totaux
     const totalTickets = tickets.length;
     const totalBets = tickets.reduce((sum, ticket) => sum + ticket.total, 0);
     
-    const winners = await Winner.find({ agentId: agentId });
-    const totalWins = winners.reduce((sum, winner) => sum + (winner.winningAmount || 0), 0);
+    // Calculer les gains (à partir des tickets vérifiés)
+    const checkedTickets = tickets.filter(t => t.checked);
+    const totalWins = checkedTickets.reduce((sum, ticket) => {
+      const ticketGains = ticket.bets.reduce((betSum, bet) => betSum + (bet.gain || 0), 0);
+      return sum + ticketGains;
+    }, 0);
     
+    // Calculer les pertes (total des paris - gains)
     const totalLoss = totalBets - totalWins;
     const balance = totalWins - totalLoss;
     
+    // Breakdown par jeu
     const gameBreakdown = {};
     tickets.forEach(ticket => {
       ticket.bets.forEach(bet => {
@@ -520,11 +1272,229 @@ app.get('/api/reports', authenticate, async (req, res) => {
   }
 });
 
+// Récupérer les rapports généraux (pour superviseur/propriétaire)
+app.get('/api/reports/all', authenticate, requireRole(['supervisor', 'owner']), async (req, res) => {
+  try {
+    const { startDate, endDate, period = 'today' } = req.query;
+    
+    let query = {};
+    
+    // Définir la période si spécifiée
+    if (period === 'today') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      query.date = { $gte: today };
+    } else if (period === 'yesterday') {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      yesterday.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      query.date = { $gte: yesterday, $lt: today };
+    } else if (period === 'week') {
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      query.date = { $gte: weekAgo };
+    } else if (period === 'month') {
+      const monthAgo = new Date();
+      monthAgo.setMonth(monthAgo.getMonth() - 1);
+      query.date = { $gte: monthAgo };
+    }
+    
+    if (startDate && endDate) {
+      query.date = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+      };
+    }
+    
+    // Si c'est un superviseur, ne voir que ses agents
+    let agentFilter = {};
+    if (req.user.role === 'supervisor') {
+      const agents = await Agent.find({ supervisorId: req.user.username }, 'agentId agentName');
+      const agentIds = agents.map(a => a.agentId);
+      query.agentId = { $in: agentIds };
+      agentFilter = agents.reduce((obj, agent) => {
+        obj[agent.agentId] = agent.agentName;
+        return obj;
+      }, {});
+    }
+    
+    // Récupérer tous les tickets
+    const tickets = await Ticket.find(query);
+    
+    // Récupérer tous les gagnants avec le même filtre
+    let winnerQuery = {};
+    if (query.date) {
+      winnerQuery.date = query.date;
+    }
+    if (query.agentId) {
+      winnerQuery.agentId = query.agentId;
+    }
+    
+    const winners = await Winner.find(winnerQuery);
+    
+    // Calculer les totaux généraux
+    const totalTickets = tickets.length;
+    const totalBets = tickets.reduce((sum, ticket) => sum + ticket.total, 0);
+    const totalWins = winners.reduce((sum, winner) => sum + (winner.winningAmount || 0), 0);
+    
+    // Calculer les pertes
+    const totalLoss = totalBets - totalWins;
+    const balance = totalWins - totalLoss;
+    
+    // Breakdown par agent
+    const agentBreakdown = {};
+    tickets.forEach(ticket => {
+      const agentId = ticket.agentId;
+      if (!agentBreakdown[agentId]) {
+        agentBreakdown[agentId] = { 
+          agentName: agentFilter[agentId] || ticket.agentName,
+          tickets: 0, 
+          amount: 0,
+          wins: 0
+        };
+      }
+      agentBreakdown[agentId].tickets += 1;
+      agentBreakdown[agentId].amount += ticket.total;
+    });
+    
+    // Ajouter les gains par agent
+    winners.forEach(winner => {
+      if (agentBreakdown[winner.agentId]) {
+        agentBreakdown[winner.agentId].wins += winner.winningAmount;
+      }
+    });
+    
+    // Calculer la balance pour chaque agent
+    Object.keys(agentBreakdown).forEach(agentId => {
+      agentBreakdown[agentId].balance = agentBreakdown[agentId].wins - (agentBreakdown[agentId].amount - agentBreakdown[agentId].wins);
+    });
+    
+    res.json({
+      success: true,
+      totalTickets: totalTickets,
+      totalBets: totalBets,
+      totalWins: totalWins,
+      totalLoss: totalLoss,
+      balance: balance,
+      agentBreakdown: agentBreakdown,
+      activeAgents: Object.keys(agentBreakdown).length
+    });
+  } catch (error) {
+    console.error('Erreur récupération rapports généraux:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la récupération des rapports généraux'
+    });
+  }
+});
+
+// Récupérer les gagnants
+app.get('/api/winners', authenticate, async (req, res) => {
+  try {
+    const { agentId } = req.query;
+    
+    // Vérifier les permissions
+    if (req.user.role === 'agent' && req.user.agentId !== agentId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Ou pa gen aksè a ganyen ajan sa a'
+      });
+    }
+    
+    // Si c'est un superviseur, vérifier que l'agent lui appartient
+    if (req.user.role === 'supervisor' && agentId) {
+      const agent = await Agent.findOne({ 
+        agentId: agentId,
+        supervisorId: req.user.username 
+      });
+      
+      if (!agent) {
+        return res.status(403).json({
+          success: false,
+          message: 'Ou pa gen aksè a ganyen ajan sa a'
+        });
+      }
+    }
+    
+    let query = {};
+    if (agentId) {
+      query.agentId = agentId;
+    } else if (req.user.role === 'supervisor') {
+      // Pour superviseur sans agentId spécifique, voir tous ses agents
+      const agents = await Agent.find({ supervisorId: req.user.username }, 'agentId');
+      query.agentId = { $in: agents.map(a => a.agentId) };
+    }
+    
+    const winners = await Winner.find(query)
+      .sort({ date: -1 })
+      .limit(50);
+    
+    res.json({
+      success: true,
+      winners: winners
+    });
+  } catch (error) {
+    console.error('Erreur récupération gagnants:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la récupération des gagnants'
+    });
+  }
+});
+
+// Récupérer TOUS les gagnants (pour superviseur/propriétaire)
+app.get('/api/winners/all', authenticate, requireRole(['supervisor', 'owner']), async (req, res) => {
+  try {
+    const { period = 'today' } = req.query;
+    
+    let query = {};
+    
+    // Définir la période
+    if (period === 'today') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      query.date = { $gte: today };
+    } else if (period === 'week') {
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      query.date = { $gte: weekAgo };
+    } else if (period === 'month') {
+      const monthAgo = new Date();
+      monthAgo.setMonth(monthAgo.getMonth() - 1);
+      query.date = { $gte: monthAgo };
+    }
+    
+    // Si c'est un superviseur, ne voir que ses agents
+    if (req.user.role === 'supervisor') {
+      const agents = await Agent.find({ supervisorId: req.user.username }, 'agentId');
+      query.agentId = { $in: agents.map(a => a.agentId) };
+    }
+    
+    const winners = await Winner.find(query)
+      .sort({ date: -1 })
+      .limit(200);
+    
+    res.json({
+      success: true,
+      winners: winners
+    });
+  } catch (error) {
+    console.error('Erreur récupération tous les gagnants:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la récupération des gagnants'
+    });
+  }
+});
+
 // Sauvegarder les gagnants
 app.post('/api/winners/save', authenticate, requireRole(['agent']), async (req, res) => {
   try {
     const winnerData = req.body;
     
+    // Vérifier si le gagnant existe déjà
     const existingWinner = await Winner.findOne({
       ticketId: winnerData.ticketId,
       drawId: winnerData.drawId
@@ -556,40 +1526,12 @@ app.post('/api/winners/save', authenticate, requireRole(['agent']), async (req, 
   }
 });
 
-// Récupérer les gagnants
-app.get('/api/winners', authenticate, async (req, res) => {
-  try {
-    const { agentId } = req.query;
-    
-    if (req.user.role === 'agent' && req.user.agentId !== agentId) {
-      return res.status(403).json({
-        success: false,
-        message: 'Ou pa gen aksè a ganyen ajan sa a'
-      });
-    }
-    
-    const winners = await Winner.find({ agentId: agentId })
-      .sort({ date: -1 })
-      .limit(50);
-    
-    res.json({
-      success: true,
-      winners: winners
-    });
-  } catch (error) {
-    console.error('Erreur récupération gagnants:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erreur lors de la récupération des gagnants'
-    });
-  }
-});
-
-// Mettre à jour les fonds
+// Mettre à jour les fonds d'un agent
 app.post('/api/agent/funds', authenticate, requireRole(['agent']), async (req, res) => {
   try {
     const { agentId, amount, type } = req.body;
     
+    // Vérifier que l'agent ne modifie que ses propres fonds
     if (req.user.role === 'agent' && req.user.agentId !== agentId) {
       return res.status(403).json({
         success: false,
@@ -634,6 +1576,74 @@ app.post('/api/agent/funds', authenticate, requireRole(['agent']), async (req, r
   }
 });
 
+// Marquer un gagnant comme payé
+app.post('/api/winners/:id/pay', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const winner = await Winner.findById(id);
+    if (!winner) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ganyen pa jwenn'
+      });
+    }
+    
+    // Vérifier les permissions
+    if (req.user.role === 'agent' && req.user.agentId !== winner.agentId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Ou pa ka peye ganyen sa a'
+      });
+    }
+    
+    // Si c'est un superviseur, vérifier que l'agent lui appartient
+    if (req.user.role === 'supervisor') {
+      const agent = await Agent.findOne({ 
+        agentId: winner.agentId,
+        supervisorId: req.user.username 
+      });
+      
+      if (!agent) {
+        return res.status(403).json({
+          success: false,
+          message: 'Ou pa gen aksè a ganyen ajan sa a'
+        });
+      }
+    }
+    
+    // Vérifier si l'agent a assez de fonds (pour les agents)
+    if (req.user.role === 'agent') {
+      const agent = await Agent.findOne({ agentId: req.user.agentId });
+      if (agent.funds < winner.winningAmount) {
+        return res.status(400).json({
+          success: false,
+          message: 'Ou pa gen ase fonds pou peye ganyen sa a'
+        });
+      }
+      
+      // Déduire les fonds
+      agent.funds -= winner.winningAmount;
+      await agent.save();
+    }
+    
+    // Marquer comme payé
+    winner.paid = true;
+    await winner.save();
+    
+    res.json({
+      success: true,
+      message: 'Ganyen peye avèk siksè'
+    });
+  } catch (error) {
+    console.error('Erreur paiement gagnant:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors du paiement du gagnant'
+    });
+  }
+});
+
 // Vérifier le statut des tirages
 app.get('/api/draws/status', async (req, res) => {
   try {
@@ -650,6 +1660,7 @@ app.get('/api/draws/status', async (req, res) => {
       { id: 'tn_soir', name: 'Tunisia Soir', time: '17:00', blocked: false }
     ];
     
+    // Vérifier si un tirage est bloqué (3 minutes avant l'heure)
     const now = new Date();
     draws.forEach(draw => {
       const [hours, minutes] = draw.time.split(':').map(Number);
@@ -674,29 +1685,14 @@ app.get('/api/draws/status', async (req, res) => {
   }
 });
 
-// Route santé
-app.get('/api/health', async (req, res) => {
-  try {
-    const dbState = mongoose.connection.readyState;
-    const isConnected = dbState === 1;
-    
-    res.json({
-      success: true,
-      message: 'API LOTATO PRO fonctionne',
-      mongodb: {
-        connected: isConnected,
-        state: ['disconnected', 'connected', 'connecting', 'disconnecting'][dbState]
-      },
-      timestamp: new Date().toISOString(),
-      version: '2.0.0'
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Problème de connexion',
-      error: error.message
-    });
-  }
+// Route pour vérifier la connexion
+app.get('/api/health', (req, res) => {
+  res.json({
+    success: true,
+    message: 'API LOTATO PRO fonctionne',
+    timestamp: new Date().toISOString(),
+    version: '2.0.0'
+  });
 });
 
 // Route de test
@@ -704,61 +1700,39 @@ app.get('/', (req, res) => {
   res.sendFile(__dirname + '/index.html');
 });
 
-// Routes pour les pages
-app.get('/agent1.html', (req, res) => {
-  res.sendFile(__dirname + '/agent1.html');
-});
-
-app.get('/supervisor.html', (req, res) => {
-  res.sendFile(__dirname + '/supervisor.html');
-});
-
-app.get('/owner.html', (req, res) => {
-  res.sendFile(__dirname + '/owner.html');
-});
-
-// Initialiser les comptes au démarrage
-async function initializeDefaultAccounts() {
-  try {
-    // Vérifier si la base est déjà initialisée
-    const agentCount = await Agent.countDocuments();
-    
-    if (agentCount === 0) {
-      console.log('🔄 Initialisation des comptes par défaut...');
-      
-      // Créer les comptes par défaut
-      const agent = new Agent({
-        agentId: 'AGENT01',
-        agentName: 'Ajan Prensipal',
-        password: '123456',
-        role: 'agent',
-        funds: 50000
-      });
-      await agent.save();
-      
-      const supervisor = new Supervisor({
-        username: 'supervisor',
-        password: '123456',
-        name: 'Supervizè Prensipal',
-        role: 'supervisor',
-        permissions: ['view_all', 'manage_agents', 'approve_funds', 'view_reports']
-      });
-      await supervisor.save();
-      
-      const owner = new Owner({
-        username: 'owner',
-        password: '123456',
-        name: 'Pwopriyetè',
-        role: 'owner'
-      });
-      await owner.save();
-      
-      console.log('✅ Comptes par défaut créés');
-    }
-  } catch (error) {
-    console.error('❌ Erreur initialisation comptes:', error.message);
+// Routes pour les pages protégées
+app.get('/agent1.html', authenticate, (req, res) => {
+  if (req.user.role === 'agent') {
+    res.sendFile(__dirname + '/agent1.html');
+  } else {
+    res.status(403).send('Accès non autorisé');
   }
-}
+});
+
+app.get('/supervisor.html', authenticate, (req, res) => {
+  if (req.user.role === 'supervisor') {
+    res.sendFile(__dirname + '/supervisor.html');
+  } else {
+    res.status(403).send('Accès non autorisé');
+  }
+});
+
+app.get('/owner.html', authenticate, (req, res) => {
+  if (req.user.role === 'owner') {
+    res.sendFile(__dirname + '/owner.html');
+  } else {
+    res.status(403).send('Accès non autorisé');
+  }
+});
+
+// Redirection pour responsable.html (alias de supervisor.html)
+app.get('/responsable.html', authenticate, (req, res) => {
+  if (req.user.role === 'supervisor') {
+    res.sendFile(__dirname + '/supervisor.html');
+  } else {
+    res.status(403).send('Accès non autorisé');
+  }
+});
 
 // Gestion des erreurs 404
 app.use((req, res) => {
@@ -769,20 +1743,12 @@ app.use((req, res) => {
 });
 
 // Démarrer le serveur
-app.listen(PORT, async () => {
+app.listen(PORT, () => {
   console.log(`🚀 Serveur démarré sur le port ${PORT}`);
   console.log(`📡 API disponible à http://localhost:${PORT}`);
   console.log(`🔐 Page de connexion: http://localhost:${PORT}/`);
-  console.log(`🗄️  MongoDB URI: ${MONGODB_URI ? 'Configurée' : 'Non configurée'}`);
-  
-  // Initialiser les comptes après connexion MongoDB réussie
-  mongoose.connection.once('open', async () => {
-    console.log('✅ Connexion MongoDB établie');
-    await initializeDefaultAccounts();
-    
-    console.log(`👤 Comptes par défaut:`);
-    console.log(`   - Agent: AGENT01 / 123456`);
-    console.log(`   - Superviseur: supervisor / 123456`);
-    console.log(`   - Propriétaire: owner / 123456`);
-  });
+  console.log(`👤 Comptes par défaut:`);
+  console.log(`   - Agent: AGENT01 / 123456`);
+  console.log(`   - Superviseur: supervisor / 123456`);
+  console.log(`   - Propriétaire: owner / 123456`);
 });
