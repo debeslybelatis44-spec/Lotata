@@ -133,7 +133,7 @@ const ownerSchema = new mongoose.Schema({
   name: { type: String, required: true },
   role: { type: String, default: 'owner' },
   isActive: { type: Boolean, default: true },
-  createdAt: { type: Date, default: Date.now })
+  createdAt: { type: Date, default: Date.now }
 });
 
 const Ticket = mongoose.model('Ticket', ticketSchema);
