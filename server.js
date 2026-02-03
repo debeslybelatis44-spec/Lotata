@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(__dirname)); // Sert les fichiers statiques depuis le répertoire courant
+app.use(express.static('.'));
 
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || 'lotato-pro-super-secret-key-2024';
@@ -40,10 +40,7 @@ pool.on('error', (err) => {
 // Middleware d'authentification
 const authenticate = async (req, res, next) => {
   try {
-    // Récupérer le token des headers ou du cookie
-    const token = req.headers.authorization?.replace('Bearer ', '') || 
-                  req.cookies?.token || 
-                  req.query?.token;
+    const token = req.headers.authorization?.replace('Bearer ', '');
     
     if (!token) {
       return res.status(401).json({
@@ -56,10 +53,9 @@ const authenticate = async (req, res, next) => {
     req.user = decoded;
     next();
   } catch (error) {
-    console.error('Erreur vérification token:', error.message);
     return res.status(401).json({
       success: false,
-      message: 'Token pa valab oswa ekspire'
+      message: 'Token pa valab'
     });
   }
 };
@@ -90,45 +86,12 @@ const db = {
   }
 };
 
-// === ROUTES PUBLIQUES ===
-
-// Route racine - page de connexion
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// Route de santé
-app.get('/api/health', async (req, res) => {
-  try {
-    await db.query('SELECT 1');
-    res.json({
-      success: true,
-      message: 'API LOTATO PRO fonctionne avec PostgreSQL/Neon',
-      timestamp: new Date().toISOString(),
-      version: '2.0.0',
-      database: 'PostgreSQL/Neon - Connecté'
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Erreur de connexion à la base de données'
-    });
-  }
-});
-
 // === ROUTES D'AUTHENTIFICATION ===
 
-// Connexion Agent
+// 1. Connexion Agent
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body;
-    
-    if (!username || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Kòd ajan ak modpas obligatwa'
-      });
-    }
     
     const result = await db.query(
       'SELECT * FROM agents WHERE agent_id = $1 AND is_active = true',
@@ -138,7 +101,7 @@ app.post('/api/auth/login', async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(401).json({
         success: false,
-        message: 'Kòd ajan pa egziste oswa pa aktif'
+        message: 'Kòd ajan pa egziste'
       });
     }
 
@@ -151,13 +114,11 @@ app.post('/api/auth/login', async (req, res) => {
       });
     }
 
-    // Mettre à jour le statut en ligne
     await db.query(
       'UPDATE agents SET online = true, last_activity = CURRENT_TIMESTAMP WHERE id = $1',
       [agent.id]
     );
 
-    // Créer le token JWT
     const token = jwt.sign(
       {
         id: agent.id,
@@ -191,17 +152,10 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Connexion Superviseur
+// 2. Connexion Superviseur
 app.post('/api/auth/supervisor-login', async (req, res) => {
   try {
     const { username, password } = req.body;
-    
-    if (!username || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Kòd vizè ak modpas obligatwa'
-      });
-    }
     
     const result = await db.query(
       'SELECT * FROM supervisors WHERE username = $1 AND is_active = true',
@@ -211,7 +165,7 @@ app.post('/api/auth/supervisor-login', async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(401).json({
         success: false,
-        message: 'Kòd vizè pa egziste'
+        message: 'Supervizè pa egziste'
       });
     }
 
@@ -259,17 +213,10 @@ app.post('/api/auth/supervisor-login', async (req, res) => {
   }
 });
 
-// Connexion Propriétaire
+// 3. Connexion Propriétaire
 app.post('/api/auth/owner-login', async (req, res) => {
   try {
     const { username, password } = req.body;
-    
-    if (!username || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Kòd pwopriyetè ak modpas obligatwa'
-      });
-    }
     
     const result = await db.query(
       'SELECT * FROM owners WHERE username = $1 AND is_active = true',
@@ -279,7 +226,7 @@ app.post('/api/auth/owner-login', async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(401).json({
         success: false,
-        message: 'Kòd pwopriyetè pa egziste'
+        message: 'Pwopriyetè pa egziste'
       });
     }
 
@@ -353,31 +300,77 @@ app.post('/api/auth/logout', authenticate, async (req, res) => {
   }
 });
 
-// === ROUTES PROTÉGÉES (FICHIERS HTML) ===
-
-// Interface Agent
-app.get('/agent', authenticate, requireRole(['agent']), (req, res) => {
-  res.sendFile(path.join(__dirname, 'agent1.html'));
+// Initialiser les comptes par défaut
+app.post('/api/init/default-accounts', async (req, res) => {
+  try {
+    const result = await db.query(`
+      DO $$
+      BEGIN
+        -- Créer agent par défaut
+        INSERT INTO agents (agent_id, agent_name, password, funds, supervisor_id) 
+        VALUES ('AGENT01', 'Ajan Prensipal', '123456', 50000, 'supervisor')
+        ON CONFLICT (agent_id) DO NOTHING;
+        
+        -- Créer superviseur par défaut
+        INSERT INTO supervisors (username, password, name, permissions, max_delete_time) 
+        VALUES ('supervisor', '123456', 'Supervizè Prensipal', 
+                ARRAY['view_all', 'manage_agents', 'approve_funds', 'view_reports', 'delete_tickets', 'block_agents'], 10)
+        ON CONFLICT (username) DO NOTHING;
+        
+        -- Créer propriétaire par défaut
+        INSERT INTO owners (username, password, name) 
+        VALUES ('owner', '123456', 'Pwopriyetè')
+        ON CONFLICT (username) DO NOTHING;
+      END $$;
+    `);
+    
+    res.json({
+      success: true,
+      message: 'Kont default kreye avèk siksè'
+    });
+  } catch (error) {
+    console.error('Erreur initialisation:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erè initializasyon'
+    });
+  }
 });
 
-// Interface Superviseur
-app.get('/supervisor', authenticate, requireRole(['supervisor']), (req, res) => {
-  res.sendFile(path.join(__dirname, 'supervisor.html'));
-});
+// === ROUTES AGENT ===
 
-// Interface Propriétaire
-app.get('/owner', authenticate, requireRole(['owner']), (req, res) => {
-  res.sendFile(path.join(__dirname, 'owner.html'));
+// Récupérer les tirages actifs
+app.get('/api/draws/active', authenticate, requireRole(['agent']), async (req, res) => {
+  try {
+    const result = await db.query(
+      'SELECT * FROM draws WHERE is_active = true ORDER BY draw_time'
+    );
+    
+    const draws = result.rows.map(draw => ({
+      drawId: draw.draw_id,
+      drawName: draw.draw_name,
+      drawTime: draw.draw_time,
+      isActive: draw.is_active
+    }));
+    
+    res.json({
+      success: true,
+      draws
+    });
+  } catch (error) {
+    console.error('Erreur récupération tirages:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la récupération des tirages'
+    });
+  }
 });
-
-// === ROUTES API AGENT ===
 
 // Sauvegarder un ticket
 app.post('/api/tickets/save', authenticate, requireRole(['agent']), async (req, res) => {
   try {
     const ticketData = req.body;
     
-    // Vérifier l'agent
     const agentResult = await db.query(
       'SELECT * FROM agents WHERE agent_id = $1 AND is_active = true',
       [req.user.agentId]
@@ -392,7 +385,34 @@ app.post('/api/tickets/save', authenticate, requireRole(['agent']), async (req, 
     
     const agent = agentResult.rows[0];
     
-    // Vérifier les fonds
+    // Vérifier si le tirage est bloqué (3 minutes avant)
+    const drawResult = await db.query(
+      'SELECT * FROM draws WHERE draw_id = $1',
+      [ticketData.drawId]
+    );
+    
+    if (drawResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Tiraj pa jwenn'
+      });
+    }
+    
+    const draw = drawResult.rows[0];
+    const drawTime = new Date(`1970-01-01T${draw.draw_time}`);
+    const now = new Date();
+    const currentTime = new Date(`1970-01-01T${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:00`);
+    
+    // Bloquer 3 minutes avant
+    const blockedTime = new Date(drawTime.getTime() - (3 * 60 * 1000));
+    
+    if (currentTime >= blockedTime && currentTime < drawTime) {
+      return res.status(400).json({
+        success: false,
+        message: 'Tiraj sa a ap rantre nan 3 minit. Ou pa ka ajoute paray.'
+      });
+    }
+    
     if (parseFloat(agent.funds) < ticketData.total) {
       return res.status(400).json({
         success: false,
@@ -400,10 +420,8 @@ app.post('/api/tickets/save', authenticate, requireRole(['agent']), async (req, 
       });
     }
     
-    // Générer ID unique
     const ticketId = `T${Date.now()}${Math.floor(Math.random() * 1000)}`;
     
-    // Sauvegarder le ticket
     const result = await db.query(
       `INSERT INTO tickets (ticket_id, agent_id, agent_name, draw_id, draw_name, bets, total, checked) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
@@ -420,7 +438,6 @@ app.post('/api/tickets/save', authenticate, requireRole(['agent']), async (req, 
       ]
     );
     
-    // Mettre à jour les fonds de l'agent
     const newFunds = parseFloat(agent.funds) - ticketData.total;
     await db.query(
       'UPDATE agents SET funds = $1, last_activity = CURRENT_TIMESTAMP WHERE agent_id = $2',
@@ -441,36 +458,64 @@ app.post('/api/tickets/save', authenticate, requireRole(['agent']), async (req, 
   }
 });
 
-// Récupérer les tickets de l'agent
-app.get('/api/tickets', authenticate, requireRole(['agent']), async (req, res) => {
+// Récupérer les tickets d'un agent
+app.get('/api/tickets', authenticate, async (req, res) => {
   try {
-    const { period = 'today' } = req.query;
+    const { agentId, period } = req.query;
+    const user = req.user;
     
-    let dateFilter = '';
-    let params = [req.user.agentId];
-    
-    switch(period) {
-      case 'today':
-        dateFilter = 'AND DATE(created_at) = CURRENT_DATE';
-        break;
-      case 'yesterday':
-        dateFilter = 'AND DATE(created_at) = CURRENT_DATE - INTERVAL \'1 day\'';
-        break;
-      case 'week':
-        dateFilter = 'AND created_at >= CURRENT_DATE - INTERVAL \'7 days\'';
-        break;
-      case 'month':
-        dateFilter = 'AND created_at >= CURRENT_DATE - INTERVAL \'30 days\'';
-        break;
+    // Vérifier les permissions
+    if (user.role === 'agent' && user.agentId !== agentId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Ou pa gen aksè a istorik ajan sa a'
+      });
     }
     
-    const result = await db.query(
-      `SELECT * FROM tickets 
-       WHERE agent_id = $1 ${dateFilter}
-       ORDER BY created_at DESC 
-       LIMIT 100`,
-      params
-    );
+    if (user.role === 'supervisor' && agentId) {
+      const agentResult = await db.query(
+        'SELECT * FROM agents WHERE agent_id = $1 AND supervisor_id = $2',
+        [agentId, user.username]
+      );
+      
+      if (agentResult.rows.length === 0) {
+        return res.status(403).json({
+          success: false,
+          message: 'Ou pa gen aksè a istorik ajan sa a'
+        });
+      }
+    }
+    
+    let query = 'SELECT * FROM tickets WHERE agent_id = $1';
+    let params = [agentId];
+    
+    if (period) {
+      const now = new Date();
+      let startDate = new Date();
+      
+      switch(period) {
+        case 'today':
+          startDate.setHours(0, 0, 0, 0);
+          break;
+        case 'yesterday':
+          startDate.setDate(startDate.getDate() - 1);
+          startDate.setHours(0, 0, 0, 0);
+          break;
+        case 'week':
+          startDate.setDate(startDate.getDate() - 7);
+          break;
+        case 'month':
+          startDate.setMonth(startDate.getMonth() - 1);
+          break;
+      }
+      
+      query += ` AND created_at >= $2`;
+      params.push(startDate.toISOString());
+    }
+    
+    query += ' ORDER BY created_at DESC LIMIT 100';
+    
+    const result = await db.query(query, params);
     
     res.json({
       success: true,
@@ -485,44 +530,70 @@ app.get('/api/tickets', authenticate, requireRole(['agent']), async (req, res) =
   }
 });
 
-// Récupérer les rapports de l'agent
-app.get('/api/reports', authenticate, requireRole(['agent']), async (req, res) => {
+// Récupérer les rapports d'un agent
+app.get('/api/reports', authenticate, async (req, res) => {
   try {
-    const { period = 'today' } = req.query;
+    const { agentId, period = 'today' } = req.query;
+    const user = req.user;
     
-    let dateFilter = '';
+    // Vérifier les permissions
+    if (user.role === 'agent' && user.agentId !== agentId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Ou pa gen aksè a rapò ajan sa a'
+      });
+    }
+    
+    const startDate = new Date();
     switch(period) {
       case 'today':
-        dateFilter = 'AND DATE(created_at) = CURRENT_DATE';
+        startDate.setHours(0, 0, 0, 0);
         break;
       case 'yesterday':
-        dateFilter = 'AND DATE(created_at) = CURRENT_DATE - INTERVAL \'1 day\'';
+        startDate.setDate(startDate.getDate() - 1);
+        startDate.setHours(0, 0, 0, 0);
         break;
       case 'week':
-        dateFilter = 'AND created_at >= CURRENT_DATE - INTERVAL \'7 days\'';
+        startDate.setDate(startDate.getDate() - 7);
         break;
       case 'month':
-        dateFilter = 'AND created_at >= CURRENT_DATE - INTERVAL \'30 days\'';
+        startDate.setMonth(startDate.getMonth() - 1);
         break;
     }
     
-    // Statistiques générales
-    const statsResult = await db.query(
+    // Tickets vendus
+    const ticketsResult = await db.query(
       `SELECT 
         COUNT(*) as total_tickets,
-        COALESCE(SUM(total), 0) as total_bets,
-        (SELECT COALESCE(SUM(winning_amount), 0) FROM winners WHERE agent_id = $1 ${dateFilter}) as total_wins
+        COALESCE(SUM(total), 0) as total_bets
        FROM tickets 
-       WHERE agent_id = $1 ${dateFilter}`,
-      [req.user.agentId]
+       WHERE agent_id = $1 AND created_at >= $2`,
+      [agentId, startDate]
     );
     
-    const stats = statsResult.rows[0];
-    const totalBets = parseFloat(stats.total_bets);
-    const totalWins = parseFloat(stats.total_wins);
+    // Gains
+    const winsResult = await db.query(
+      `SELECT 
+        COALESCE(SUM(winning_amount), 0) as total_wins
+       FROM winners 
+       WHERE agent_id = $1 AND created_at >= $2 AND paid = true`,
+      [agentId, startDate]
+    );
+    
+    // Agent info
+    const agentResult = await db.query(
+      'SELECT funds, agent_name FROM agents WHERE agent_id = $1',
+      [agentId]
+    );
+    
+    const agent = agentResult.rows[0];
+    const totalTickets = parseInt(ticketsResult.rows[0].total_tickets);
+    const totalBets = parseFloat(ticketsResult.rows[0].total_bets);
+    const totalWins = parseFloat(winsResult.rows[0].total_wins);
+    const totalLoss = totalBets - totalWins;
     const balance = totalBets - totalWins;
     
-    // Détails par type de jeu
+    // Breakdown par type de jeu
     const breakdownResult = await db.query(
       `SELECT 
         game_type,
@@ -530,13 +601,13 @@ app.get('/api/reports', authenticate, requireRole(['agent']), async (req, res) =
         SUM(amount) as amount
        FROM (
          SELECT 
-           jsonb_array_elements(bets::jsonb)->>'game' as game_type,
-           CAST(jsonb_array_elements(bets::jsonb)->>'amount' as DECIMAL) as amount
+           jsonb_array_elements(bets)->>'game' as game_type,
+           CAST(jsonb_array_elements(bets)->>'amount' AS DECIMAL) as amount
          FROM tickets 
-         WHERE agent_id = $1 ${dateFilter}
-       ) as bet_details
+         WHERE agent_id = $1 AND created_at >= $2
+       ) sub
        GROUP BY game_type`,
-      [req.user.agentId]
+      [agentId, startDate]
     );
     
     const breakdown = {};
@@ -549,15 +620,12 @@ app.get('/api/reports', authenticate, requireRole(['agent']), async (req, res) =
     
     res.json({
       success: true,
-      report: {
-        totalTickets: parseInt(stats.total_tickets),
-        totalBets: totalBets,
-        totalWins: totalWins,
-        totalLoss: totalBets - totalWins,
-        balance: balance,
-        period: period,
-        breakdown: breakdown
-      }
+      totalTickets,
+      totalBets,
+      totalWins,
+      totalLoss,
+      balance,
+      breakdown
     });
   } catch (error) {
     console.error('Erreur récupération rapports:', error);
@@ -568,198 +636,43 @@ app.get('/api/reports', authenticate, requireRole(['agent']), async (req, res) =
   }
 });
 
-// Récupérer les gains de l'agent
-app.get('/api/winners', authenticate, requireRole(['agent']), async (req, res) => {
-  try {
-    const result = await db.query(
-      `SELECT * FROM winners 
-       WHERE agent_id = $1 
-       ORDER BY created_at DESC 
-       LIMIT 20`,
-      [req.user.agentId]
-    );
-    
-    res.json({
-      success: true,
-      winners: result.rows
-    });
-  } catch (error) {
-    console.error('Erreur récupération gains:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erreur lors de la récupération des gains'
-    });
-  }
-});
+// === ROUTES SUPERVISEUR (simplifiées pour cet exemple) ===
 
-// Récupérer tous les gains (pour superviseur/propriétaire)
-app.get('/api/winners/all', authenticate, async (req, res) => {
-  try {
-    let query = 'SELECT * FROM winners';
-    let params = [];
-    
-    // Filtrage par rôle
-    if (req.user.role === 'supervisor') {
-      query = `SELECT w.* FROM winners w
-               INNER JOIN agents a ON w.agent_id = a.agent_id
-               WHERE a.supervisor_id = $1`;
-      params = [req.user.username];
-    } else if (req.user.role === 'agent') {
-      query = 'SELECT * FROM winners WHERE agent_id = $1';
-      params = [req.user.agentId];
-    }
-    
-    query += ' ORDER BY created_at DESC LIMIT 50';
-    
-    const result = await db.query(query, params);
-    
-    res.json({
-      success: true,
-      winners: result.rows
-    });
-  } catch (error) {
-    console.error('Erreur récupération tous les gains:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erreur lors de la récupération des gains'
-    });
-  }
-});
-
-// Marquer un gain comme payé
-app.post('/api/winners/:id/pay', authenticate, requireRole(['supervisor', 'owner']), async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    // Vérifier les permissions
-    if (req.user.role === 'supervisor') {
-      const winnerCheck = await db.query(
-        `SELECT w.* FROM winners w
-         INNER JOIN agents a ON w.agent_id = a.agent_id
-         WHERE w.id = $1 AND a.supervisor_id = $2`,
-        [id, req.user.username]
-      );
-      
-      if (winnerCheck.rows.length === 0) {
-        return res.status(403).json({
-          success: false,
-          message: 'Ou pa gen aksè a gain sa a'
-        });
-      }
-    }
-    
-    const result = await db.query(
-      'UPDATE winners SET paid = true WHERE id = $1 RETURNING *',
-      [id]
-    );
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Gain pa jwenn'
-      });
-    }
-    
-    res.json({
-      success: true,
-      message: 'Gain make kòm peye',
-      winner: result.rows[0]
-    });
-  } catch (error) {
-    console.error('Erreur marquage payé:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erreur lors du marquage du gain'
-    });
-  }
-});
-
-// === ROUTES SUPERVISEUR ===
-
-// Dashboard superviseur
 app.get('/api/supervisor/dashboard', authenticate, requireRole(['supervisor']), async (req, res) => {
   try {
-    // Statistiques agents
+    const supervisorId = req.user.username;
+    
     const agentsResult = await db.query(
       `SELECT 
         COUNT(*) as total_agents,
-        COUNT(CASE WHEN online = true THEN 1 END) as online_agents,
+        COUNT(CASE WHEN online = true AND is_active = true THEN 1 END) as online_agents,
         SUM(funds) as total_funds
        FROM agents 
-       WHERE supervisor_id = $1 AND is_active = true`,
-      [req.user.username]
+       WHERE supervisor_id = $1`,
+      [supervisorId]
     );
     
-    // Ventes aujourd'hui
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
     const salesResult = await db.query(
       `SELECT 
         COALESCE(SUM(total), 0) as today_sales,
         COUNT(*) as total_tickets
        FROM tickets 
        WHERE agent_id IN (SELECT agent_id FROM agents WHERE supervisor_id = $1)
-       AND DATE(created_at) = CURRENT_DATE`,
-      [req.user.username]
+       AND created_at >= $2`,
+      [supervisorId, today]
     );
-    
-    // Gains aujourd'hui
-    const winsResult = await db.query(
-      `SELECT 
-        COALESCE(SUM(winning_amount), 0) as total_wins
-       FROM winners 
-       WHERE agent_id IN (SELECT agent_id FROM agents WHERE supervisor_id = $1)
-       AND DATE(created_at) = CURRENT_DATE`,
-      [req.user.username]
-    );
-    
-    // Agents récents
-    const recentAgentsResult = await db.query(
-      `SELECT 
-        a.agent_id, 
-        a.agent_name, 
-        a.online, 
-        a.funds,
-        COALESCE(t.today_sales, 0) as today_sales,
-        COALESCE(w.total_wins, 0) as total_wins
-       FROM agents a
-       LEFT JOIN (
-         SELECT agent_id, SUM(total) as today_sales
-         FROM tickets 
-         WHERE DATE(created_at) = CURRENT_DATE
-         GROUP BY agent_id
-       ) t ON a.agent_id = t.agent_id
-       LEFT JOIN (
-         SELECT agent_id, SUM(winning_amount) as total_wins
-         FROM winners 
-         WHERE DATE(created_at) = CURRENT_DATE
-         GROUP BY agent_id
-       ) w ON a.agent_id = w.agent_id
-       WHERE a.supervisor_id = $1 AND a.is_active = true
-       ORDER BY a.last_activity DESC
-       LIMIT 5`,
-      [req.user.username]
-    );
-    
-    const todaySales = parseFloat(salesResult.rows[0].today_sales);
-    const commission = todaySales * 0.05; // 5% de commission
     
     res.json({
       success: true,
-      dashboard: {
-        totalAgents: parseInt(agentsResult.rows[0].total_agents),
-        onlineAgents: parseInt(agentsResult.rows[0].online_agents),
-        todaySales: todaySales,
+      data: {
+        totalAgents: agentsResult.rows[0].total_agents,
+        onlineAgents: agentsResult.rows[0].online_agents,
+        todaySales: parseFloat(salesResult.rows[0].today_sales),
         totalTickets: salesResult.rows[0].total_tickets,
-        totalWins: parseFloat(winsResult.rows[0].total_wins),
-        totalCommission: commission,
-        totalFunds: parseFloat(agentsResult.rows[0].total_funds),
-        recentAgents: recentAgentsResult.rows.map(agent => ({
-          agentId: agent.agent_id,
-          agentName: agent.agent_name,
-          online: agent.online,
-          funds: parseFloat(agent.funds),
-          todaySales: parseFloat(agent.today_sales),
-          totalWins: parseFloat(agent.total_wins)
-        }))
+        totalFunds: parseFloat(agentsResult.rows[0].total_funds)
       }
     });
   } catch (error) {
@@ -771,20 +684,17 @@ app.get('/api/supervisor/dashboard', authenticate, requireRole(['supervisor']), 
   }
 });
 
-// === ROUTES PROPRIÉTAIRE ===
+// === ROUTES PROPRIÉTAIRE (simplifiées pour cet exemple) ===
 
-// Dashboard propriétaire
 app.get('/api/owner/dashboard', authenticate, requireRole(['owner']), async (req, res) => {
   try {
-    // Statistiques agents
     const agentsResult = await db.query(
       `SELECT 
         COUNT(*) as total_agents,
         COUNT(CASE WHEN online = true THEN 1 END) as online_agents
-       FROM agents WHERE is_active = true`
+       FROM agents`
     );
     
-    // Statistiques superviseurs
     const supervisorsResult = await db.query(
       `SELECT 
         COUNT(*) as total_supervisors,
@@ -792,26 +702,22 @@ app.get('/api/owner/dashboard', authenticate, requireRole(['owner']), async (req
        FROM supervisors`
     );
     
-    // Ventes aujourd'hui
-    const salesResult = await db.query(
-      `SELECT COALESCE(SUM(total), 0) as today_sales FROM tickets WHERE DATE(created_at) = CURRENT_DATE`
-    );
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     
-    // Gains aujourd'hui
-    const winsResult = await db.query(
-      `SELECT COALESCE(SUM(winning_amount), 0) as today_wins FROM winners WHERE DATE(created_at) = CURRENT_DATE`
+    const salesResult = await db.query(
+      `SELECT COALESCE(SUM(total), 0) as today_sales FROM tickets WHERE created_at >= $1`,
+      [today]
     );
     
     res.json({
       success: true,
-      dashboard: {
+      stats: {
         totalAgents: parseInt(agentsResult.rows[0].total_agents),
         onlineAgents: parseInt(agentsResult.rows[0].online_agents),
         totalSupervisors: parseInt(supervisorsResult.rows[0].total_supervisors),
         activeSupervisors: parseInt(supervisorsResult.rows[0].active_supervisors),
-        todaySales: parseFloat(salesResult.rows[0].today_sales),
-        todayWins: parseFloat(winsResult.rows[0].today_wins),
-        profit: parseFloat(salesResult.rows[0].today_sales) - parseFloat(winsResult.rows[0].today_wins)
+        todaySales: parseFloat(salesResult.rows[0].today_sales)
       }
     });
   } catch (error) {
@@ -823,80 +729,42 @@ app.get('/api/owner/dashboard', authenticate, requireRole(['owner']), async (req
   }
 });
 
-// === ROUTES UTILITAIRES ===
+// === ROUTES FICHIERS STATIQUES ===
 
-// Initialiser les comptes par défaut
-app.post('/api/init/default-accounts', async (req, res) => {
-  try {
-    await db.query(`
-      INSERT INTO agents (agent_id, agent_name, password, funds, supervisor_id, is_active) 
-      VALUES ('AGENT01', 'Ajan Prensipal', '123456', 50000, 'supervisor', true)
-      ON CONFLICT (agent_id) DO NOTHING;
-      
-      INSERT INTO supervisors (username, password, name, permissions, max_delete_time, is_active) 
-      VALUES ('supervisor', '123456', 'Supervizè Prensipal', 
-              ARRAY['view_all', 'manage_agents', 'approve_funds', 'view_reports', 'delete_tickets', 'block_agents']::text[], 10, true)
-      ON CONFLICT (username) DO NOTHING;
-      
-      INSERT INTO owners (username, password, name, is_active) 
-      VALUES ('owner', '123456', 'Pwopriyetè', true)
-      ON CONFLICT (username) DO NOTHING;
-    `);
-    
-    res.json({
-      success: true,
-      message: 'Kont default kreye avèk siksè'
-    });
-  } catch (error) {
-    console.error('Erreur initialisation:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erreur initializasyon'
-    });
-  }
+// Route pour la page de connexion
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Initialiser les données par défaut (tirages, boules, règles)
-app.post('/api/init/default-data', authenticate, requireRole(['owner']), async (req, res) => {
+// Route pour l'interface agent (protégée)
+app.get('/agent1.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'agent1.html'));
+});
+
+// Route pour l'interface superviseur (à créer)
+app.get('/supervisor.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'supervisor.html'));
+});
+
+// Route pour l'interface propriétaire (à créer)
+app.get('/owner.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'owner.html'));
+});
+
+// Route de santé
+app.get('/api/health', async (req, res) => {
   try {
-    // Créer les tirages par défaut
-    await db.query(`
-      INSERT INTO draws (draw_id, draw_name, draw_time, is_active) VALUES
-        ('D001', 'Matin', '08:00:00', true),
-        ('D002', 'Midday', '12:00:00', true),
-        ('D003', 'Soir', '16:00:00', true),
-        ('D004', 'Night', '20:00:00', true)
-      ON CONFLICT (draw_id) DO NOTHING;
-    `);
-    
-    // Créer les boules 0-99
-    for (let i = 0; i < 100; i++) {
-      const ballNumber = i.toString().padStart(2, '0');
-      await db.query(
-        'INSERT INTO balls (ball_number) VALUES ($1) ON CONFLICT (ball_number) DO NOTHING',
-        [ballNumber]
-      );
-    }
-    
-    // Créer les règles de jeu
-    await db.query(`
-      INSERT INTO game_rules (game_type, game_name, pouts, is_active) VALUES
-        ('borlette', '2 Chiffres', '{"direct": 80, "permutation": 40}', true),
-        ('lotto3', '3 Chiffres', '{"direct": 600, "permutation": 300}', true),
-        ('lotto4', '4 Chiffres', '{"direct": 5000, "permutation": 2500}', true),
-        ('lotto5', '5 Chiffres', '{"direct": 40000, "permutation": 20000}', true)
-      ON CONFLICT (game_type) DO NOTHING;
-    `);
-    
+    await db.query('SELECT 1');
     res.json({
       success: true,
-      message: 'Données par défaut initialisées avec succès'
+      message: 'API LOTATO PRO fonctionne',
+      timestamp: new Date().toISOString(),
+      database: 'PostgreSQL/Neon - Connecté'
     });
   } catch (error) {
-    console.error('Erreur initialisation données:', error);
     res.status(500).json({
       success: false,
-      message: 'Erreur lors de l\'initialisation'
+      message: 'Erreur de connexion à la base de données'
     });
   }
 });
@@ -927,6 +795,4 @@ app.listen(PORT, () => {
   console.log(`   - Agent: AGENT01 / 123456`);
   console.log(`   - Superviseur: supervisor / 123456`);
   console.log(`   - Propriétaire: owner / 123456`);
-  console.log(`\n⚠️ IMPORTANT: Exécutez d'abord /api/init/default-accounts pour créer les comptes`);
-  console.log(`⚠️ IMPORTANT: Puis /api/init/default-data pour initialiser les données`);
 });

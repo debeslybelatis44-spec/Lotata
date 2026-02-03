@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LOTATO PRO | Login</title>
+    <title>LOTATO PRO | Connexion</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
             --primary: #ad00f1;
@@ -11,7 +13,6 @@
             --accent: #ff007a;
             --bg: #0a0b1e;
             --surface: rgba(255, 255, 255, 0.05);
-            --glass-border: rgba(81, 6, 75, 0.699);
             --text-main: #ffffff;
             --text-dim: #a0a0b8;
             --success: #00f190;
@@ -19,129 +20,116 @@
         }
 
         * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0; padding: 0; box-sizing: border-box;
+            font-family: 'Plus Jakarta Sans', sans-serif;
         }
 
         body {
-            background: radial-gradient(circle at top right, #1a1b3a, #0a0b1e);
+            background-color: var(--bg);
             color: var(--text-main);
             min-height: 100vh;
             display: flex;
-            align-items: center;
             justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle at top right, #1a1b3a, #0a0b1e);
             padding: 20px;
         }
 
         .login-container {
-            width: 100%;
             max-width: 400px;
+            width: 100%;
             background: var(--surface);
-            border: 1px solid var(--glass-border);
-            border-radius: 24px;
-            padding: 40px 30px;
             backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 40px;
+            border: 1px solid rgba(81, 6, 75, 0.7);
+            text-align: center;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
         }
 
         .logo {
-            text-align: center;
-            margin-bottom: 30px;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            color: var(--primary);
         }
 
-        .logo h1 {
-            font-size: 2.2rem;
+        .logo-text {
+            font-size: 2rem;
+            font-weight: 800;
+            margin-bottom: 30px;
             background: linear-gradient(135deg, var(--primary), var(--accent));
             -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-            margin-bottom: 5px;
-        }
-
-        .logo span {
-            font-size: 0.9rem;
-            color: var(--text-dim);
+            -webkit-text-fill-color: transparent;
         }
 
         .role-selector {
             display: flex;
             gap: 10px;
-            margin-bottom: 25px;
-            flex-wrap: wrap;
+            margin-bottom: 30px;
         }
 
         .role-btn {
             flex: 1;
-            padding: 12px 15px;
-            border: 1px solid var(--glass-border);
-            background: rgba(255, 255, 255, 0.05);
+            padding: 12px;
+            border: 1px solid rgba(81, 6, 75, 0.7);
+            background: transparent;
             color: var(--text-dim);
             border-radius: 12px;
             cursor: pointer;
             transition: all 0.3s;
-            text-align: center;
-            min-width: 120px;
-        }
-
-        .role-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            font-weight: 600;
         }
 
         .role-btn.active {
-            border-color: var(--primary);
-            background: rgba(173, 0, 241, 0.1);
+            background: var(--primary);
             color: white;
-            box-shadow: 0 0 15px rgba(173, 0, 241, 0.3);
+            border-color: var(--primary);
         }
 
-        .input-group {
+        .form-group {
             margin-bottom: 20px;
+            text-align: left;
         }
 
-        .input-group label {
+        .form-group label {
             display: block;
             margin-bottom: 8px;
             color: var(--text-dim);
             font-size: 0.9rem;
         }
 
-        .input-group input {
+        .form-group input {
             width: 100%;
-            padding: 14px;
+            padding: 15px;
             border-radius: 12px;
-            border: 1px solid var(--glass-border);
             background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(81, 6, 75, 0.7);
             color: white;
             font-size: 1rem;
+            outline: none;
             transition: 0.3s;
         }
 
-        .input-group input:focus {
-            outline: none;
-            border-color: var(--secondary);
-            box-shadow: 0 0 10px rgba(0, 212, 255, 0.2);
+        .form-group input:focus {
+            border-color: var(--primary);
         }
 
         .login-btn {
             width: 100%;
             padding: 16px;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
             border: none;
             border-radius: 12px;
-            background: linear-gradient(135deg, var(--primary), var(--accent));
             color: white;
             font-size: 1.1rem;
-            font-weight: bold;
+            font-weight: 700;
             cursor: pointer;
-            transition: all 0.3s;
-            margin-top: 10px;
+            margin-top: 20px;
+            transition: transform 0.3s;
         }
 
         .login-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(173, 0, 241, 0.3);
         }
 
         .login-btn:disabled {
@@ -155,179 +143,147 @@
             border: 1px solid var(--danger);
             color: var(--danger);
             padding: 12px;
-            border-radius: 12px;
-            margin-top: 20px;
-            text-align: center;
+            border-radius: 10px;
+            margin-bottom: 20px;
             display: none;
         }
 
-        .footer {
-            text-align: center;
-            margin-top: 25px;
+        .success-message {
+            background: rgba(0, 241, 144, 0.1);
+            border: 1px solid var(--success);
+            color: var(--success);
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .loading {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .spinner {
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .demo-credentials {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            font-size: 0.9rem;
+        }
+
+        .demo-credentials h4 {
+            margin-bottom: 15px;
+            color: var(--secondary);
+        }
+
+        .demo-item {
+            margin-bottom: 10px;
+            text-align: left;
+            padding-left: 10px;
+            border-left: 3px solid var(--secondary);
+        }
+
+        .copyright {
+            margin-top: 30px;
             color: var(--text-dim);
             font-size: 0.8rem;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .animate-fade {
-            animation: fadeIn 0.5s ease-out;
-        }
-
-        .role-icon {
-            font-size: 1.5rem;
-            margin-bottom: 8px;
-            display: block;
         }
     </style>
 </head>
 <body>
-    <div class="login-container animate-fade">
+    <div class="login-container">
         <div class="logo">
-            <h1>LOTATO PRO</h1>
-            <span>Sistèm Kontwòl Lotri</span>
+            <i class="fas fa-dice"></i>
         </div>
+        <h1 class="logo-text">LOTATO PRO</h1>
+        <p style="color: var(--text-dim); margin-bottom: 30px;">System Lotri Entèlijans</p>
 
         <div class="role-selector">
-            <button class="role-btn" data-role="agent" onclick="selectRole('agent')">
-                <i class="role-icon fas fa-user"></i>
+            <button class="role-btn active" data-role="agent" onclick="selectRole('agent')">
                 Ajan
             </button>
             <button class="role-btn" data-role="supervisor" onclick="selectRole('supervisor')">
-                <i class="role-icon fas fa-user-shield"></i>
-                Vizè
+                Supervizè
             </button>
             <button class="role-btn" data-role="owner" onclick="selectRole('owner')">
-                <i class="role-icon fas fa-crown"></i>
                 Pwopriyetè
             </button>
         </div>
 
-        <form id="login-form">
-            <div class="input-group">
-                <label for="username">Non Itilizatè / Kòd Ajan</label>
-                <input type="text" id="username" placeholder="Rantre kòd ou" required>
-            </div>
+        <div id="error-message" class="error-message"></div>
+        <div id="success-message" class="success-message"></div>
 
-            <div class="input-group">
-                <label for="password">Modpas</label>
-                <input type="password" id="password" placeholder="Rantre modpas la" required>
-            </div>
-
-            <button type="submit" class="login-btn" id="login-button">
-                Konekte
-            </button>
-        </form>
-
-        <div class="error-message" id="error-message">
-            Non itilizatè oswa modpas pa kòrèk!
+        <div class="form-group">
+            <label for="username">Kòd Itilizatè</label>
+            <input type="text" id="username" placeholder="Eg: AGENT01">
         </div>
 
-        <div class="footer">
-            © 2024 LOTATO PRO. Tout dwa rezève.
+        <div class="form-group">
+            <label for="password">Modpas</label>
+            <input type="password" id="password" placeholder="Antre modpas ou">
+        </div>
+
+        <button class="login-btn" onclick="login()">
+            <span id="login-text">KONEKTE</span>
+        </button>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Ap konekte...</p>
+        </div>
+
+        <div class="demo-credentials">
+            <h4>Kòd Demonstrasyon:</h4>
+            <div class="demo-item">
+                <strong>Ajan:</strong> AGENT01 / 123456
+            </div>
+            <div class="demo-item">
+                <strong>Supervizè:</strong> supervisor / 123456
+            </div>
+            <div class="demo-item">
+                <strong>Pwopriyetè:</strong> owner / 123456
+            </div>
+        </div>
+
+        <div class="copyright">
+            © 2024 LOTATO PRO v6 | Powered by Nova System
         </div>
     </div>
 
     <script>
+        const API_BASE_URL = window.location.origin + '/api';
         let selectedRole = 'agent';
-        const ROLES_CONFIG = {
-            agent: {
-                endpoint: '/api/auth/login',
-                redirect: '/agent1.html',
-                defaultCode: 'AGENT123'
-            },
-            supervisor: {
-                endpoint: '/api/auth/supervisor-login',
-                redirect: '/supervisor.html',
-                defaultCode: 'SUPER123'
-            },
-            owner: {
-                endpoint: '/api/auth/owner-login',
-                redirect: '/owner.html',
-                defaultCode: 'OWNER123'
-            }
-        };
 
         function selectRole(role) {
             selectedRole = role;
-            
-            // Update active button
             document.querySelectorAll('.role-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
             document.querySelector(`[data-role="${role}"]`).classList.add('active');
             
-            // Update placeholder based on role
+            // Ajuster le placeholder
             const usernameInput = document.getElementById('username');
-            switch(role) {
-                case 'agent':
-                    usernameInput.placeholder = 'Kòd Ajan (egz: AGENT01)';
-                    break;
-                case 'supervisor':
-                    usernameInput.placeholder = 'Kòd Vizè';
-                    break;
-                case 'owner':
-                    usernameInput.placeholder = 'Kòd Pwopriyetè';
-                    break;
-            }
-        }
-
-        async function handleLogin(event) {
-            event.preventDefault();
-            
-            const username = document.getElementById('username').value.trim();
-            const password = document.getElementById('password').value;
-            const loginBtn = document.getElementById('login-button');
-            const errorDiv = document.getElementById('error-message');
-            
-            if (!username || !password) {
-                showError('Tanpri ranpli tout chan yo');
-                return;
-            }
-
-            loginBtn.disabled = true;
-            loginBtn.textContent = 'Ap Konekte...';
-            errorDiv.style.display = 'none';
-
-            try {
-                const config = ROLES_CONFIG[selectedRole];
-                const response = await fetch(config.endpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        username: username,
-                        password: password,
-                        role: selectedRole
-                    })
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    // Store authentication data
-                    localStorage.setItem('lotato_auth', JSON.stringify({
-                        role: selectedRole,
-                        username: username,
-                        token: data.token,
-                        timestamp: Date.now()
-                    }));
-                    
-                    // Redirect to appropriate page
-                    window.location.href = config.redirect;
-                } else {
-                    showError(data.message || 'Eche otantifikasyon');
-                }
-            } catch (error) {
-                console.error('Login error:', error);
-                showError('Erè koneksyon sèvè');
-            } finally {
-                loginBtn.disabled = false;
-                loginBtn.textContent = 'Konekte';
+            if (role === 'agent') {
+                usernameInput.placeholder = 'Eg: AGENT01';
+            } else if (role === 'supervisor') {
+                usernameInput.placeholder = 'Eg: supervisor';
+            } else {
+                usernameInput.placeholder = 'Eg: owner';
             }
         }
 
@@ -335,62 +291,140 @@
             const errorDiv = document.getElementById('error-message');
             errorDiv.textContent = message;
             errorDiv.style.display = 'block';
-            
-            // Shake animation
-            errorDiv.style.animation = 'none';
             setTimeout(() => {
-                errorDiv.style.animation = 'shake 0.5s';
-            }, 10);
+                errorDiv.style.display = 'none';
+            }, 5000);
         }
 
-        // CSS for shake animation
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes shake {
-                0%, 100% { transform: translateX(0); }
-                10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-                20%, 40%, 60%, 80% { transform: translateX(5px); }
+        function showSuccess(message) {
+            const successDiv = document.getElementById('success-message');
+            successDiv.textContent = message;
+            successDiv.style.display = 'block';
+            setTimeout(() => {
+                successDiv.style.display = 'none';
+            }, 3000);
+        }
+
+        async function login() {
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value.trim();
+            const loginBtn = document.querySelector('.login-btn');
+            const loadingDiv = document.getElementById('loading');
+            const loginText = document.getElementById('login-text');
+
+            if (!username || !password) {
+                showError('Tanpri ranpli tout chan yo');
+                return;
             }
-        `;
-        document.head.appendChild(style);
 
-        // Initialize with agent role selected
-        selectRole('agent');
+            // Désactiver le bouton et montrer le chargement
+            loginBtn.disabled = true;
+            loginText.textContent = 'AP KONEKTE...';
+            loadingDiv.style.display = 'block';
 
-        // Form submission
-        document.getElementById('login-form').addEventListener('submit', handleLogin);
+            try {
+                let endpoint;
+                if (selectedRole === 'agent') {
+                    endpoint = '/api/auth/login';
+                } else if (selectedRole === 'supervisor') {
+                    endpoint = '/api/auth/supervisor-login';
+                } else {
+                    endpoint = '/api/auth/owner-login';
+                }
 
-        // Enter key support
-        document.addEventListener('keypress', function(e) {
+                const response = await fetch(API_BASE_URL + endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        password: password
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!data.success) {
+                    showError(data.message || 'Erè koneksyon');
+                    return;
+                }
+
+                // Sauvegarder le token
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('user', JSON.stringify(data.user));
+
+                showSuccess('Koneksyon reyisi!');
+
+                // Rediriger vers l'interface appropriée
+                setTimeout(() => {
+                    if (selectedRole === 'agent') {
+                        window.location.href = '/agent1.html';
+                    } else if (selectedRole === 'supervisor') {
+                        window.location.href = '/supervisor.html';
+                    } else {
+                        window.location.href = '/owner.html';
+                    }
+                }, 1000);
+
+            } catch (error) {
+                console.error('Erreur:', error);
+                showError('Erè sou sèvè a. Tanpri eseye ankò.');
+            } finally {
+                // Réactiver le bouton
+                loginBtn.disabled = false;
+                loginText.textContent = 'KONEKTE';
+                loadingDiv.style.display = 'none';
+            }
+        }
+
+        // Permettre l'appui sur Entrée
+        document.getElementById('password').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
-                handleLogin(e);
+                login();
             }
         });
 
-        // Check if already logged in
-        function checkExistingSession() {
-            const auth = localStorage.getItem('lotato_auth');
-            if (auth) {
-                try {
-                    const authData = JSON.parse(auth);
-                    // Check if session is still valid (24 hours)
-                    if (Date.now() - authData.timestamp < 24 * 60 * 60 * 1000) {
-                        const config = ROLES_CONFIG[authData.role];
-                        if (config) {
-                            window.location.href = config.redirect;
-                        }
-                    }
-                } catch (e) {
-                    localStorage.removeItem('lotato_auth');
+        // Vérifier si l'utilisateur est déjà connecté
+        const token = localStorage.getItem('token');
+        if (token) {
+            // Vérifier la validité du token
+            fetch(API_BASE_URL + '/api/auth/verify', {
+                headers: {
+                    'Authorization': 'Bearer ' + token
                 }
-            }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Rediriger selon le rôle
+                    const user = JSON.parse(localStorage.getItem('user'));
+                    if (user.role === 'agent') {
+                        window.location.href = '/agent1.html';
+                    } else if (user.role === 'supervisor') {
+                        window.location.href = '/supervisor.html';
+                    } else if (user.role === 'owner') {
+                        window.location.href = '/owner.html';
+                    }
+                }
+            })
+            .catch(() => {
+                // Token invalide, rester sur la page de login
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+            });
         }
 
-        // Check session on load
-        checkExistingSession();
+        // Initialiser les comptes par défaut
+        window.addEventListener('load', async () => {
+            try {
+                await fetch(API_BASE_URL + '/api/init/default-accounts', {
+                    method: 'POST'
+                });
+            } catch (error) {
+                console.log('Erreur initialisation, mais application continue');
+            }
+        });
     </script>
-
-    <!-- Font Awesome for icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </body>
 </html>
