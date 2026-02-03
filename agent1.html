@@ -926,12 +926,29 @@
         input:checked + .slider:before {
             transform: translateX(26px);
         }
+        
+        /* Delete button for cart items */
+        .delete-btn {
+            background: var(--danger);
+            border: none;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            margin-left: 10px;
+        }
+        
+        .delete-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
     <div class="app-shell">
         <!-- Login Screen -->
-        <section id="login-screen" class="screen active">
+        <section id="login-screen" class="screen">
             <div class="login-screen">
                 <div class="login-card">
                     <h1 style="margin-bottom: 5px;">LOTATO PRO</h1>
@@ -1021,32 +1038,32 @@
 
                 <!-- Lotto 4 Options -->
                 <div id="lotto4-options" class="lotto-options">
-                    <div class="option-chip active" data-option="1" onclick="toggleLottoOption(4, 1)">
-                        <input type="checkbox" id="opt1-4" checked>
+                    <div class="option-chip" data-option="1" onclick="toggleLottoOption(4, 1)">
+                        <input type="checkbox" id="opt1-4">
                         <label for="opt1-4">1e Opsyon (2e & 3e)</label>
                     </div>
-                    <div class="option-chip active" data-option="2" onclick="toggleLottoOption(4, 2)">
-                        <input type="checkbox" id="opt2-4" checked>
+                    <div class="option-chip" data-option="2" onclick="toggleLottoOption(4, 2)">
+                        <input type="checkbox" id="opt2-4">
                         <label for="opt2-4">2e Opsyon (1e & 2e)</label>
                     </div>
-                    <div class="option-chip active" data-option="3" onclick="toggleLottoOption(4, 3)">
-                        <input type="checkbox" id="opt3-4" checked>
+                    <div class="option-chip" data-option="3" onclick="toggleLottoOption(4, 3)">
+                        <input type="checkbox" id="opt3-4">
                         <label for="opt3-4">3e Opsyon (1e & 3e)</label>
                     </div>
                 </div>
 
                 <!-- Lotto 5 Options -->
                 <div id="lotto5-options" class="lotto-options">
-                    <div class="option-chip active" data-option="1" onclick="toggleLottoOption(5, 1)">
-                        <input type="checkbox" id="opt1-5" checked>
+                    <div class="option-chip" data-option="1" onclick="toggleLottoOption(5, 1)">
+                        <input type="checkbox" id="opt1-5">
                         <label for="opt1-5">1e Opsyon (1e lot & 2e lot)</label>
                     </div>
-                    <div class="option-chip active" data-option="2" onclick="toggleLottoOption(5, 2)">
-                        <input type="checkbox" id="opt2-5" checked>
+                    <div class="option-chip" data-option="2" onclick="toggleLottoOption(5, 2)">
+                        <input type="checkbox" id="opt2-5">
                         <label for="opt2-5">2e Opsyon (1e lot & 3e lot)</label>
                     </div>
-                    <div class="option-chip active" data-option="3" onclick="toggleLottoOption(5, 3)">
-                        <input type="checkbox" id="opt3-5" checked>
+                    <div class="option-chip" data-option="3" onclick="toggleLottoOption(5, 3)">
+                        <input type="checkbox" id="opt3-5">
                         <label for="opt3-5">3e Opsyon (1e lot & 1e lot)</label>
                     </div>
                 </div>
@@ -1236,7 +1253,8 @@
                 VERIFY: '/auth/verify',
                 SAVE_TICKET: '/tickets/save',
                 GET_TICKETS: '/tickets',
-                GET_WINNERS: '/winners'
+                GET_WINNERS: '/winners',
+                DELETE_TICKET: '/tickets/delete'
             }
         };
 
@@ -1274,8 +1292,8 @@
             currentCart: [],
             ticketsHistory: [],
             winningTickets: [],
-            lotto4Options: [true, true, true],
-            lotto5Options: [true, true, true],
+            lotto4Options: [false, false, false],
+            lotto5Options: [false, false, false],
             showNumericChips: false,
             showLottoGames: false,
             showSpecialGames: false,
@@ -1631,6 +1649,10 @@
                 return await this.makeRequest(API_CONFIG.ENDPOINTS.SAVE_TICKET, 'POST', ticket);
             },
 
+            async deleteTicket(ticketId) {
+                return await this.makeRequest(`${API_CONFIG.ENDPOINTS.DELETE_TICKET}/${ticketId}`, 'DELETE');
+            },
+
             async getTickets() {
                 const data = await this.makeRequest(`${API_CONFIG.ENDPOINTS.GET_TICKETS}?agentId=${APP_STATE.agentId}`);
                 APP_STATE.ticketsHistory = data.tickets || [];
@@ -1724,6 +1746,8 @@
                     statusClass = 'badge-wait';
                 }
                 
+                const canDelete = canDeleteTicket(ticket.created_at);
+                
                 return `
                     <div class="history-card">
                         <div class="card-header">
@@ -1737,13 +1761,46 @@
                         </div>
                         <div class="card-footer">
                             <span class="badge ${statusClass}">${status}</span>
-                            <button class="btn-small" onclick="viewTicketDetails('${ticket.ticket_id}')">
-                                <i class="fas fa-eye"></i> Detay
-                            </button>
+                            <div>
+                                ${canDelete ? `<button class="btn-small" onclick="deleteHistoryTicket('${ticket.ticket_id}')" style="background:var(--danger);">
+                                    <i class="fas fa-trash"></i> Efase
+                                </button>` : ''}
+                                <button class="btn-small" onclick="viewTicketDetails('${ticket.ticket_id}')">
+                                    <i class="fas fa-eye"></i> Detay
+                                </button>
+                            </div>
                         </div>
                     </div>
                 `;
             }).join('');
+        }
+
+        function canDeleteTicket(ticketDate) {
+            const ticketTime = new Date(ticketDate);
+            const now = new Date();
+            const diffMinutes = (now - ticketTime) / (1000 * 60);
+            return diffMinutes <= 5; // 5 minutes
+        }
+
+        async function deleteHistoryTicket(ticketId) {
+            if (!confirm("Èske ou vle efase tikè sa a? Aksyon sa a pa ka anile.")) {
+                return;
+            }
+            
+            try {
+                const result = await APIService.deleteTicket(ticketId);
+                if (result.success) {
+                    APP_STATE.ticketsHistory = APP_STATE.ticketsHistory.filter(t => t.ticket_id !== ticketId);
+                    renderHistory();
+                    loadReports();
+                    alert("Tikè efase avèk siksè!");
+                } else {
+                    alert("Erè nan efasman tikè a: " + (result.message || "Tanpri eseye ankò"));
+                }
+            } catch (error) {
+                console.error('Erreur suppression ticket:', error);
+                alert("Erè nan efasman tikè a. Tanpri eseye ankò.");
+            }
         }
 
         async function loadReports() {
@@ -2250,6 +2307,7 @@
                     return;
                 }
 
+                // Gestion des jeux spéciaux
                 if (APP_STATE.selectedGame === 'bo') {
                     const boBets = SpecialGames.generateBOBets(amt);
                     
@@ -2335,6 +2393,7 @@
                     return;
                 }
 
+                // Gestion des jeux auto
                 if (APP_STATE.selectedGame.includes('auto')) {
                     if (isNaN(amt) || amt <= 0) {
                         alert("Tanpri antre yon montan ki valid");
@@ -2375,6 +2434,99 @@
                     return;
                 }
 
+                // Gestion de Lotto 4 avec options
+                if (APP_STATE.selectedGame === 'lotto4') {
+                    if (!GameEngine.validateEntry('lotto4', num)) {
+                        alert("Nimewo sa pa bon pou Lotto 4");
+                        return;
+                    }
+                    
+                    num = GameEngine.getCleanNumber(num);
+                    const displayNum = num.slice(0, 2) + '-' + num.slice(2, 4);
+                    
+                    // Vérifier si au moins une option est cochée
+                    const selectedOptions = APP_STATE.lotto4Options.filter(opt => opt);
+                    if (selectedOptions.length === 0) {
+                        alert("Tanpri chwazi omwen yon opsyon pou Lotto 4");
+                        return;
+                    }
+                    
+                    const draws = APP_STATE.multiDrawMode ? APP_STATE.selectedDraws : [APP_STATE.selectedDraw];
+                    
+                    draws.forEach(drawId => {
+                        APP_STATE.lotto4Options.forEach((isChecked, index) => {
+                            if (isChecked) {
+                                const bet = {
+                                    id: Date.now() + Math.random(),
+                                    game: 'lotto4',
+                                    option: index + 1,
+                                    number: displayNum,
+                                    cleanNumber: num,
+                                    amount: amt,
+                                    drawId: drawId,
+                                    drawName: CONFIG.DRAWS.find(d => d.id === drawId).name,
+                                    timestamp: new Date().toISOString(),
+                                    isAutoGenerated: false
+                                };
+                                APP_STATE.currentCart.push(bet);
+                            }
+                        });
+                    });
+                    
+                    this.renderCart();
+                    numInput.value = '';
+                    amtInput.value = '';
+                    numInput.focus();
+                    return;
+                }
+
+                // Gestion de Lotto 5 avec options
+                if (APP_STATE.selectedGame === 'lotto5') {
+                    if (!GameEngine.validateEntry('lotto5', num)) {
+                        alert("Nimewo sa pa bon pou Lotto 5");
+                        return;
+                    }
+                    
+                    num = GameEngine.getCleanNumber(num);
+                    const displayNum = num.slice(0, 3) + '-' + num.slice(3, 5);
+                    
+                    // Vérifier si au moins une option est cochée
+                    const selectedOptions = APP_STATE.lotto5Options.filter(opt => opt);
+                    if (selectedOptions.length === 0) {
+                        alert("Tanpri chwazi omwen yon opsyon pou Lotto 5");
+                        return;
+                    }
+                    
+                    const draws = APP_STATE.multiDrawMode ? APP_STATE.selectedDraws : [APP_STATE.selectedDraw];
+                    
+                    draws.forEach(drawId => {
+                        APP_STATE.lotto5Options.forEach((isChecked, index) => {
+                            if (isChecked) {
+                                const bet = {
+                                    id: Date.now() + Math.random(),
+                                    game: 'lotto5',
+                                    option: index + 1,
+                                    number: displayNum,
+                                    cleanNumber: num,
+                                    amount: amt,
+                                    drawId: drawId,
+                                    drawName: CONFIG.DRAWS.find(d => d.id === drawId).name,
+                                    timestamp: new Date().toISOString(),
+                                    isAutoGenerated: false
+                                };
+                                APP_STATE.currentCart.push(bet);
+                            }
+                        });
+                    });
+                    
+                    this.renderCart();
+                    numInput.value = '';
+                    amtInput.value = '';
+                    numInput.focus();
+                    return;
+                }
+
+                // Gestion des autres jeux (borlette, lotto3, mariage)
                 if (!GameEngine.validateEntry(APP_STATE.selectedGame, num)) {
                     alert("Nimewo sa pa bon pou " + APP_STATE.selectedGame);
                     return;
@@ -2446,6 +2598,8 @@
                         gameName = item.specialType.toUpperCase();
                     } else if (item.isAutoGenerated) {
                         gameName = `${item.game.replace('_', ' ').toUpperCase()}*`;
+                    } else if (item.game === 'lotto4' || item.game === 'lotto5') {
+                        gameName = `${item.game.toUpperCase()} Opsyon ${item.option}`;
                     } else {
                         gameName = item.game.toUpperCase();
                     }
@@ -2460,8 +2614,8 @@
                             </div>
                             <div class="item-price">
                                 <span>${item.amount} ${CONFIG.CURRENCY}</span>
-                                <button onclick="CartManager.removeBet(${item.id})" style="background:none; border:none; color:var(--danger); cursor:pointer;">
-                                    <i class="fas fa-times"></i>
+                                <button onclick="CartManager.removeBet(${item.id})" class="delete-btn">
+                                    <i class="fas fa-times"></i> Efase
                                 </button>
                             </div>
                         </div>
@@ -2554,7 +2708,9 @@
             
             let betsHtml = (Array.isArray(ticket.bets) ? ticket.bets : []).map(b => {
                 let gameName = '';
-                if (b.isAutoGenerated && b.specialType) {
+                if (b.game === 'lotto4' || b.game === 'lotto5') {
+                    gameName = `${b.game.toUpperCase()} Opsyon ${b.option}`;
+                } else if (b.isAutoGenerated && b.specialType) {
                     gameName = b.specialType.toUpperCase();
                 } else if (b.isAutoGenerated) {
                     gameName = `${b.game.replace('_', ' ').toUpperCase()}*`;
@@ -2563,7 +2719,7 @@
                 }
                 
                 return `
-                    <div style="display:flex; justify-content:space-between; font-size:14px;">
+                    <div style="display:flex; justify-content:space-between; font-size:14px; margin-bottom:5px;">
                         <span>${gameName} ${b.number}</span>
                         <span>${b.amount}G</span>
                     </div>
@@ -2574,23 +2730,57 @@
                 <html>
                 <head>
                     <title>Ticket #${ticket.ticket_id}</title>
+                    <style>
+                        @media print {
+                            @page { margin: 0; size: 80mm 200mm; }
+                            body { margin: 0; padding: 0; }
+                        }
+                        body { font-family: 'Courier New', monospace; }
+                        .header { text-align: center; margin-bottom: 10px; }
+                        .lottery-name { font-size: 20px; font-weight: bold; }
+                        .address { font-size: 12px; margin-bottom: 5px; }
+                        .divider { border-top: 2px dashed #000; margin: 10px 0; }
+                        .ticket-info { font-size: 14px; margin-bottom: 10px; }
+                        .bets { margin-bottom: 10px; }
+                        .total { font-size: 18px; font-weight: bold; text-align: center; margin-top: 10px; }
+                    </style>
                 </head>
-                <body style="font-family:'Courier New', monospace; width:100%; padding:0; margin:0; text-align:center;">
-                    <h2 style="margin-bottom:5px;">LOTATO PRO</h2>
-                    <p style="font-size:12px; margin:5px 0;">--------------------------</p>
-                    <p style="font-size:14px; font-weight:bold;">TIRAJ: ${ticket.draw_name.toUpperCase()}</p>
-                    <p style="font-size:12px;">TICKET: #${ticket.ticket_id}</p>
-                    <p style="font-size:12px;">DATE: ${new Date(ticket.created_at).toLocaleString('fr-FR')}</p>
-                    <p style="font-size:12px;">AJAN: ${ticket.agent_name}</p>
-                    <p style="font-size:12px;">--------------------------</p>
-                    <div style="text-align:left; padding:0 10px;">
+                <body>
+                    <div class="header">
+                        <div class="lottery-name">LOTATO PRO</div>
+                        <div class="address">Sistèm Lotri Modèn</div>
+                        <div class="address">Port-au-Prince, Haïti</div>
+                        <div class="address">Tel: +509 1234 5678</div>
+                    </div>
+                    
+                    <div class="divider"></div>
+                    
+                    <div class="ticket-info">
+                        <div><strong>ID Ajan:</strong> ${ticket.agent_id}</div>
+                        <div><strong>Non Ajan:</strong> ${ticket.agent_name}</div>
+                        <div><strong># Tikè:</strong> ${ticket.ticket_id}</div>
+                        <div><strong>Dat:</strong> ${new Date(ticket.created_at).toLocaleDateString('fr-FR')}</div>
+                        <div><strong>Lè:</strong> ${new Date(ticket.created_at).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}</div>
+                        <div><strong>Tiraj:</strong> ${ticket.draw_name}</div>
+                    </div>
+                    
+                    <div class="divider"></div>
+                    
+                    <div class="bets">
+                        <div style="font-weight: bold; margin-bottom: 5px;">Detay Pari yo:</div>
                         ${betsHtml}
                     </div>
-                    <p style="font-size:12px;">--------------------------</p>
-                    <h3 style="margin-top:5px;">TOTAL: ${ticket.total} Gdes</h3>
-                    <p style="font-size:10px; margin-top:15px;">Mèci paske ou chwazi nou!</p>
-                    <p style="font-size:10px;">Bòn Chans!</p>
-                    <br><br>
+                    
+                    <div class="divider"></div>
+                    
+                    <div class="total">
+                        TOTAL: ${ticket.total} Gdes
+                    </div>
+                    
+                    <div style="text-align: center; margin-top: 20px; font-size: 12px;">
+                        Mèsi pou konfyans ou!<br>
+                        Bon chans!
+                    </div>
                 </body>
                 </html>
             `;
@@ -2678,8 +2868,8 @@
                     currentCart: [],
                     ticketsHistory: [],
                     winningTickets: [],
-                    lotto4Options: [true, true, true],
-                    lotto5Options: [true, true, true],
+                    lotto4Options: [false, false, false],
+                    lotto5Options: [false, false, false],
                     showNumericChips: false,
                     showLottoGames: false,
                     showSpecialGames: false,
@@ -2700,29 +2890,35 @@
             const savedToken = localStorage.getItem('lotato_token');
             const savedAgent = localStorage.getItem('lotato_agent');
             
-            if (savedToken && savedAgent) {
-                try {
-                    const agent = JSON.parse(savedAgent);
-                    APP_STATE.token = savedToken;
-                    APP_STATE.agentId = agent.agentId;
-                    APP_STATE.agentName = agent.name;
-                    
-                    // Cacher l'écran de connexion
-                    document.getElementById('login-screen').classList.remove('active');
-                    
-                    // Afficher l'interface principale
-                    document.querySelector('header').style.display = 'flex';
-                    document.querySelector('main').style.display = 'block';
-                    document.querySelector('.nav-bar').style.display = 'flex';
-                    document.getElementById('sync-status-bar').style.display = 'block';
-                    
-                    // Mettre à jour le nom de l'agent
-                    document.getElementById('agent-name').textContent = APP_STATE.agentName;
-                } catch (e) {
-                    console.error('Erreur chargement session:', e);
-                    localStorage.removeItem('lotato_token');
-                    localStorage.removeItem('lotato_agent');
-                }
+            if (!savedToken || !savedAgent) {
+                // Si pas de token, rediriger vers la page de connexion principale
+                window.location.href = '/';
+                return;
+            }
+            
+            try {
+                const agent = JSON.parse(savedAgent);
+                APP_STATE.token = savedToken;
+                APP_STATE.agentId = agent.agentId;
+                APP_STATE.agentName = agent.name;
+                
+                // Cacher l'écran de connexion
+                document.getElementById('login-screen').classList.remove('active');
+                
+                // Afficher l'interface principale
+                document.querySelector('header').style.display = 'flex';
+                document.querySelector('main').style.display = 'block';
+                document.querySelector('.nav-bar').style.display = 'flex';
+                document.getElementById('sync-status-bar').style.display = 'block';
+                
+                // Mettre à jour le nom de l'agent
+                document.getElementById('agent-name').textContent = APP_STATE.agentName;
+            } catch (e) {
+                console.error('Erreur chargement session:', e);
+                localStorage.removeItem('lotato_token');
+                localStorage.removeItem('lotato_agent');
+                window.location.href = '/';
+                return;
             }
             
             // Charger l'historique depuis PostgreSQL
@@ -2745,12 +2941,19 @@
             
             updateGameSelector();
             
+            // Initialiser les options de loto (toutes décochées par défaut)
             document.querySelectorAll('#lotto4-options .option-chip').forEach((chip, index) => {
                 chip.querySelector('input').checked = APP_STATE.lotto4Options[index];
+                if (APP_STATE.lotto4Options[index]) {
+                    chip.classList.add('active');
+                }
             });
             
             document.querySelectorAll('#lotto5-options .option-chip').forEach((chip, index) => {
                 chip.querySelector('input').checked = APP_STATE.lotto5Options[index];
+                if (APP_STATE.lotto5Options[index]) {
+                    chip.classList.add('active');
+                }
             });
             
             // Calculer le profit/pertes initial
