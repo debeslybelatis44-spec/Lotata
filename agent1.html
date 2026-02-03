@@ -498,33 +498,6 @@
             font-weight: bold;
             flex: 1;
         }
-        
-        .agent-funds {
-            background: linear-gradient(135deg, #1a1b3a, #0a0b1e);
-            border-radius: 16px;
-            padding: 15px;
-            margin-bottom: 20px;
-            border: 1px solid var(--primary);
-            text-align: center;
-        }
-        
-        .funds-amount {
-            font-size: 2rem;
-            font-weight: bold;
-            margin: 10px 0;
-            color: var(--secondary);
-        }
-        
-        .add-funds-btn {
-            background: var(--primary);
-            border: none;
-            border-radius: 12px;
-            color: white;
-            padding: 10px 20px;
-            cursor: pointer;
-            margin-top: 10px;
-            width: 100%;
-        }
 
         /* Modal Winner */
         .modal-overlay {
@@ -562,46 +535,102 @@
             cursor: pointer;
         }
         
-        /* Modal Funds */
-        .funds-modal {
+        /* Configuration button */
+        .config-btn {
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 5px;
+        }
+        
+        /* Lottery configuration */
+        .lottery-config {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 3000;
+        }
+        
+        .config-modal {
             background: var(--bg);
             border-radius: 24px;
             padding: 30px;
             max-width: 90%;
             width: 400px;
-            border: 2px solid var(--secondary);
+            border: 2px solid var(--primary);
         }
         
-        .modal-input {
-            width: 100%;
+        .config-item {
             margin: 15px 0;
-            padding: 15px;
-            font-size: 1.2rem;
         }
         
-        .modal-buttons {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
+        .config-label {
+            display: block;
+            margin-bottom: 5px;
+            color: var(--text-dim);
         }
         
-        .modal-btn {
-            flex: 1;
-            padding: 12px;
-            border-radius: 12px;
-            border: none;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        
-        .modal-btn.confirm {
-            background: var(--success);
-            color: black;
-        }
-        
-        .modal-btn.cancel {
-            background: var(--danger);
+        .config-input {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--glass-border);
             color: white;
+        }
+
+        /* Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--success);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
         }
 
         /* Sync Bar */
@@ -855,104 +884,6 @@
             align-items: center;
             gap: 10px;
         }
-
-        /* Switch */
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 50px;
-            height: 24px;
-        }
-
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #ccc;
-            transition: .4s;
-            border-radius: 24px;
-        }
-
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 16px;
-            width: 16px;
-            left: 4px;
-            bottom: 4px;
-            background-color: white;
-            transition: .4s;
-            border-radius: 50%;
-        }
-
-        input:checked + .slider {
-            background-color: var(--success);
-        }
-
-        input:checked + .slider:before {
-            transform: translateX(26px);
-        }
-        
-        /* Configuration button */
-        .config-btn {
-            background: none;
-            border: none;
-            color: var(--text-dim);
-            font-size: 1.2rem;
-            cursor: pointer;
-            padding: 5px;
-        }
-        
-        /* Lottery configuration */
-        .lottery-config {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.8);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 3000;
-        }
-        
-        .config-modal {
-            background: var(--bg);
-            border-radius: 24px;
-            padding: 30px;
-            max-width: 90%;
-            width: 400px;
-            border: 2px solid var(--primary);
-        }
-        
-        .config-item {
-            margin: 15px 0;
-        }
-        
-        .config-label {
-            display: block;
-            margin-bottom: 5px;
-            color: var(--text-dim);
-        }
-        
-        .config-input {
-            width: 100%;
-            padding: 10px;
-            border-radius: 8px;
-            background: rgba(255,255,255,0.05);
-            border: 1px solid var(--glass-border);
-            color: white;
-        }
     </style>
 </head>
 <body>
@@ -1177,14 +1108,6 @@
             <section id="winners-screen" class="screen">
                 <div style="padding: 20px;">
                     <h2 class="section-title">Jere Ganyen</h2>
-                    
-                    <div class="agent-funds">
-                        <div>Fonds Ajan</div>
-                        <div class="funds-amount" id="agent-funds">10,000 Gdes</div>
-                        <button onclick="openAddFundsModal()" class="add-funds-btn">
-                            <i class="fas fa-plus-circle"></i> Ajoute Fonds
-                        </button>
-                    </div>
 
                     <div class="winners-summary">
                         <h3 style="margin-bottom: 15px;">Rekapitilatif Tiraj</h3>
@@ -1217,19 +1140,6 @@
                 <h2>OU GENYEN !</h2>
                 <div id="winner-details"></div>
                 <button onclick="closeWinnerModal()" class="btn-close">OK</button>
-            </div>
-        </div>
-        
-        <div id="funds-overlay" class="modal-overlay">
-            <div class="funds-modal">
-                <h2>Ajoute Fonds</h2>
-                <p style="margin: 15px 0; color: var(--text-dim);">Antre montan an pou ajoute nan fonds ou.</p>
-                <input type="number" id="funds-amount" class="modal-input" placeholder="Montan an Gdes" min="0">
-                <p style="margin: 10px 0; color: var(--text-dim); font-size: 0.9rem;">Supervizè ap konfime tranzaksyon an.</p>
-                <div class="modal-buttons">
-                    <button onclick="addFunds()" class="modal-btn confirm">Konfime</button>
-                    <button onclick="closeFundsModal()" class="modal-btn cancel">Anile</button>
-                </div>
             </div>
         </div>
         
@@ -1278,42 +1188,23 @@
     <script>
         // Configuration de l'API
         const API_CONFIG = {
-            BASE_URL: 'http://localhost:3000/api', // À changer pour votre serveur
+            BASE_URL: 'http://localhost:3000/api',
             ENDPOINTS: {
                 SAVE_TICKET: '/tickets/save',
                 GET_TICKETS: '/tickets',
                 GET_REPORTS: '/reports',
-                SAVE_AGENT: '/agent/save',
-                CHECK_DRAW_STATUS: '/draws/status',
-                SAVE_WINNERS: '/winners/save',
-                GET_WINNERS: '/winners',
-                UPDATE_FUNDS: '/agent/funds'
+                GET_WINNERS: '/winners/all',
+                MARK_PAID: '/winners/:id/pay'
             }
         };
 
         const CONFIG = {
             CURRENCY: 'Gdes',
-            GAMING_RULES: {
-                BORLETTE: { lot1: 60, lot2: 20, lot3: 10 },
-                LOTTO3: 500,
-                LOTTO4: 1000,
-                LOTTO5: 5000,
-                MARIAGE: 1000,
-                AUTO_MARRIAGE: 1000,
-                AUTO_LOTTO4: 1000,
-                AUTO_LOTTO5: 5000
-            },
             DRAWS: [
-                { id: 'mia_matin', name: 'Miami Matin', time: '13:30', color: 'var(--miami)' },
-                { id: 'mia_soir', name: 'Miami Soir', time: '21:50', color: 'var(--miami)' },
-                { id: 'ny_matin', name: 'New York Matin', time: '14:30', color: 'var(--newyork)' },
-                { id: 'ny_soir', name: 'New York Soir', time: '20:00', color: 'var(--newyork)' },
-                { id: 'ga_matin', name: 'Georgia Matin', time: '12:30', color: 'var(--georgia)' },
-                { id: 'ga_soir', name: 'Georgia Soir', time: '19:00', color: 'var(--georgia)' },
-                { id: 'tx_matin', name: 'Texas Matin', time: '11:30', color: 'var(--texas)' },
-                { id: 'tx_soir', name: 'Texas Soir', time: '18:30', color: 'var(--texas)' },
-                { id: 'tn_matin', name: 'Tunisia Matin', time: '10:00', color: 'var(--tunisia)' },
-                { id: 'tn_soir', name: 'Tunisia Soir', time: '17:00', color: 'var(--tunisia)' }
+                { id: 'D001', name: 'Matin', time: '08:00', color: 'var(--miami)' },
+                { id: 'D002', name: 'Midday', time: '12:00', color: 'var(--newyork)' },
+                { id: 'D003', name: 'Soir', time: '16:00', color: 'var(--georgia)' },
+                { id: 'D004', name: 'Night', time: '20:00', color: 'var(--texas)' }
             ],
             LOTTERY_NAME: 'LOTATO PRO',
             LOTTERY_LOGO: '',
@@ -1322,39 +1213,41 @@
         };
 
         let APP_STATE = {
-            selectedDraw: 'mia_matin',
-            selectedDraws: ['mia_matin'],
+            selectedDraw: 'D001',
+            selectedDraws: ['D001'],
             multiDrawMode: false,
             selectedGame: 'borlette',
             currentCart: [],
             ticketsHistory: [],
             winningTickets: [],
-            lotto4Options: [true, true, true],
-            lotto5Options: [true, true, true],
+            lotto4Options: [true, true, true], // Par défaut, les 3 options sont cochées
+            lotto5Options: [true, true, true], // Par défaut, les 3 options sont cochées
             showNumericChips: false,
             showLottoGames: false,
             showSpecialGames: false,
             currentTab: 'home',
             isDrawBlocked: false,
-            agentId: 'agent-01',
-            agentFunds: 10000,
+            agentId: 'AGENT01',
             salesTotal: 0,
             winningsTotal: 0,
-            profitLoss: 0
+            profitLoss: 0,
+            token: localStorage.getItem('token') || ''
         };
 
         // Fonction pour vérifier si un tirage est bloqué (3 minutes avant)
         function isDrawBlocked(drawTime) {
             const now = new Date();
-            const [hours, minutes] = drawTime.split(':').map(Number);
+            const currentHours = now.getHours();
+            const currentMinutes = now.getMinutes();
+            const currentTime = currentHours * 60 + currentMinutes;
             
-            const drawDate = new Date();
-            drawDate.setHours(hours, minutes, 0, 0);
+            const [hours, minutes] = drawTime.split(':').map(Number);
+            const drawTimeInMinutes = hours * 60 + minutes;
             
             // Bloquer 3 minutes avant
-            const blockedTime = new Date(drawDate.getTime() - (3 * 60 * 1000));
+            const blockedTime = drawTimeInMinutes - 3;
             
-            return now >= blockedTime && now < drawDate;
+            return currentTime >= blockedTime && currentTime < drawTimeInMinutes;
         }
 
         // Fonction pour vérifier le tirage sélectionné
@@ -1393,7 +1286,7 @@
                     if (num[0] === num[1]) {
                         bets.push({
                             id: Date.now() + Math.random(),
-                            game: 'borlette',
+                            game: '2-chiffres',
                             number: num,
                             cleanNumber: num,
                             amount: amount,
@@ -1414,7 +1307,7 @@
                     if (num[1] === digit.toString()) {
                         bets.push({
                             id: Date.now() + Math.random(),
-                            game: 'borlette',
+                            game: '2-chiffres',
                             number: num,
                             cleanNumber: num,
                             amount: amount,
@@ -1434,7 +1327,7 @@
                     const num = i.toString().repeat(3);
                     bets.push({
                         id: Date.now() + Math.random(),
-                        game: 'lotto3',
+                        game: '3-chiffres',
                         number: num,
                         cleanNumber: num,
                         amount: amount,
@@ -1605,119 +1498,62 @@
 
         // Fonctions API
         const APIService = {
-            async saveTicket(ticket) {
-                try {
-                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.SAVE_TICKET}`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            ...ticket,
-                            agentId: APP_STATE.agentId,
-                            date: new Date().toISOString()
-                        })
-                    });
-                    
-                    if (!response.ok) throw new Error('Erreur réseau');
-                    
-                    const data = await response.json();
-                    return data;
-                } catch (error) {
-                    console.error('Erreur sauvegarde ticket:', error);
-                    throw error;
+            async makeRequest(endpoint, method = 'GET', data = null) {
+                const url = `${API_CONFIG.BASE_URL}${endpoint}`;
+                const options = {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${APP_STATE.token}`
+                    }
+                };
+                
+                if (data) {
+                    options.body = JSON.stringify(data);
                 }
-            },
-
-            async getTickets() {
+                
                 try {
-                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.GET_TICKETS}?agentId=${APP_STATE.agentId}`);
+                    const response = await fetch(url, options);
                     
-                    if (!response.ok) throw new Error('Erreur réseau');
-                    
-                    const data = await response.json();
-                    APP_STATE.ticketsHistory = data.tickets || [];
-                    return data;
-                } catch (error) {
-                    console.error('Erreur récupération tickets:', error);
-                    return { tickets: [] };
-                }
-            },
-
-            async getReports() {
-                try {
-                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.GET_REPORTS}?agentId=${APP_STATE.agentId}`);
-                    
-                    if (!response.ok) throw new Error('Erreur réseau');
-                    
-                    const data = await response.json();
-                    return data;
-                } catch (error) {
-                    console.error('Erreur récupération rapports:', error);
-                    return { totalTickets: 0, totalBets: 0, totalWins: 0, totalLoss: 0, balance: 0 };
-                }
-            },
-
-            async saveAgentConfig(config) {
-                try {
-                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.SAVE_AGENT}`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            agentId: APP_STATE.agentId,
-                            ...config
-                        })
-                    });
-                    
-                    if (!response.ok) throw new Error('Erreur réseau');
+                    if (!response.ok) {
+                        if (response.status === 401) {
+                            // Token invalide, rediriger vers la page de login
+                            localStorage.removeItem('token');
+                            window.location.href = '/';
+                        }
+                        throw new Error('Erreur réseau');
+                    }
                     
                     return await response.json();
                 } catch (error) {
-                    console.error('Erreur sauvegarde agent:', error);
+                    console.error('Erreur API:', error);
                     throw error;
                 }
             },
-            
+
+            async saveTicket(ticket) {
+                return await this.makeRequest(API_CONFIG.ENDPOINTS.SAVE_TICKET, 'POST', ticket);
+            },
+
+            async getTickets() {
+                const data = await this.makeRequest(`${API_CONFIG.ENDPOINTS.GET_TICKETS}?agentId=${APP_STATE.agentId}`);
+                APP_STATE.ticketsHistory = data.tickets || [];
+                return data;
+            },
+
+            async getReports() {
+                return await this.makeRequest(`${API_CONFIG.ENDPOINTS.GET_REPORTS}?agentId=${APP_STATE.agentId}`);
+            },
+
             async getWinningTickets() {
-                try {
-                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.GET_WINNERS}?agentId=${APP_STATE.agentId}`);
-                    
-                    if (!response.ok) throw new Error('Erreur réseau');
-                    
-                    const data = await response.json();
-                    APP_STATE.winningTickets = data.winners || [];
-                    return data;
-                } catch (error) {
-                    console.error('Erreur récupération gagnants:', error);
-                    return { winners: [] };
-                }
+                const data = await this.makeRequest(API_CONFIG.ENDPOINTS.GET_WINNERS);
+                APP_STATE.winningTickets = data.winners || [];
+                return data;
             },
-            
-            async updateAgentFunds(amount) {
-                try {
-                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.UPDATE_FUNDS}`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            agentId: APP_STATE.agentId,
-                            amount: amount,
-                            type: 'add'
-                        })
-                    });
-                    
-                    if (!response.ok) throw new Error('Erreur réseau');
-                    
-                    const data = await response.json();
-                    APP_STATE.agentFunds = data.newBalance;
-                    return data;
-                } catch (error) {
-                    console.error('Erreur mise à jour fonds:', error);
-                    throw error;
-                }
+
+            async markWinnerAsPaid(winnerId) {
+                const endpoint = API_CONFIG.ENDPOINTS.MARK_PAID.replace(':id', winnerId);
+                return await this.makeRequest(endpoint, 'POST');
             }
         };
 
@@ -1786,8 +1622,7 @@
                 let statusClass = '';
                 
                 if (ticket.checked) {
-                    const totalBet = ticket.bets.reduce((sum, bet) => sum + bet.amount, 0);
-                    const hasWin = ticket.bets.some(bet => bet.gain > 0);
+                    const hasWin = ticket.winning_amount > 0;
                     
                     if (hasWin) {
                         status = 'GANYEN';
@@ -1804,17 +1639,16 @@
                 return `
                     <div class="history-card">
                         <div class="card-header">
-                            <span>#${ticket.id}</span>
-                            <span>${new Date(ticket.date).toLocaleDateString('fr-FR')}</span>
+                            <span>#${ticket.ticket_id}</span>
+                            <span>${new Date(ticket.created_at).toLocaleDateString('fr-FR')}</span>
                         </div>
                         <div>
-                            <p><strong>Tiraj:</strong> ${ticket.drawName}</p>
+                            <p><strong>Tiraj:</strong> ${ticket.draw_name}</p>
                             <p><strong>Total:</strong> ${ticket.total} Gdes</p>
-                            <p><strong>Nimewo:</strong> ${ticket.bets.length}</p>
                         </div>
                         <div class="card-footer">
                             <span class="badge ${statusClass}">${status}</span>
-                            <button class="btn-small" onclick="viewTicketDetails('${ticket._id || ticket.id}')">
+                            <button class="btn-small" onclick="viewTicketDetails('${ticket.ticket_id}')">
                                 <i class="fas fa-eye"></i> Detay
                             </button>
                         </div>
@@ -1834,7 +1668,6 @@
                 document.getElementById('balance').textContent = (reports.balance || 0) + ' Gdes';
                 document.getElementById('balance').style.color = (reports.balance >= 0) ? 'var(--success)' : 'var(--danger)';
                 
-                // Game breakdown - à adapter selon votre API
                 const breakdownContainer = document.getElementById('game-breakdown');
                 if (reports.breakdown) {
                     breakdownContainer.innerHTML = Object.entries(reports.breakdown).map(([game, data]) => `
@@ -1863,10 +1696,6 @@
         
         function updateWinnersDisplay() {
             const container = document.getElementById('winners-container');
-            const fundsDisplay = document.getElementById('agent-funds');
-            
-            // Mettre à jour les fonds
-            fundsDisplay.textContent = APP_STATE.agentFunds.toLocaleString() + ' Gdes';
             
             if (APP_STATE.winningTickets.length === 0) {
                 container.innerHTML = '<div class="empty-msg">Pa gen tikè ganyen pou kounye a</div>';
@@ -1874,34 +1703,29 @@
             }
             
             container.innerHTML = APP_STATE.winningTickets.map(ticket => {
-                const canPay = APP_STATE.agentFunds >= ticket.winningAmount;
                 const isPaid = ticket.paid || false;
                 
                 return `
                     <div class="winner-ticket">
                         <div class="winner-header">
                             <div>
-                                <strong>Tikè #${ticket.ticketId}</strong>
-                                <div style="font-size: 0.8rem; color: var(--text-dim);">${ticket.drawName} - ${new Date(ticket.date).toLocaleDateString('fr-FR')}</div>
+                                <strong>Tikè #${ticket.ticket_id}</strong>
+                                <div style="font-size: 0.8rem; color: var(--text-dim);">${ticket.draw_name} - ${new Date(ticket.created_at).toLocaleDateString('fr-FR')}</div>
                             </div>
                             <div style="font-weight: bold; color: var(--success);">
-                                ${ticket.winningAmount.toLocaleString()} Gdes
+                                ${ticket.winning_amount.toLocaleString()} Gdes
                             </div>
                         </div>
                         <div>
-                            <p><strong>Nimewo Ganyen:</strong> ${ticket.winningNumber}</p>
-                            <p><strong>Jwèt:</strong> ${ticket.gameType.toUpperCase()}</p>
-                            <p><strong>Kliyan:</strong> ${ticket.customerName || 'Pa defini'}</p>
+                            <p><strong>Nimewo Ganyen:</strong> ${ticket.winning_number}</p>
+                            <p><strong>Jwèt:</strong> ${ticket.game_type.toUpperCase()}</p>
+                            <p><strong>Kliyan:</strong> ${ticket.customer_name || 'Pa defini'}</p>
                         </div>
                         <div class="winner-actions">
                             ${isPaid ? 
                                 '<button class="btn-paid" disabled><i class="fas fa-check"></i> Peye</button>' :
-                                canPay ?
                                 `<button class="btn-pay" onclick="payWinner('${ticket.id}')">
                                     <i class="fas fa-money-bill-wave"></i> Peye
-                                </button>` :
-                                `<button class="btn-need-funds" onclick="requestSupervisorFunds(${ticket.winningAmount})">
-                                    <i class="fas fa-exclamation-triangle"></i> Bezwen Fonds
                                 </button>`
                             }
                         </div>
@@ -1918,7 +1742,7 @@
             
             // Calculer le total des gains
             const totalWinnings = APP_STATE.winningTickets.reduce((sum, ticket) => {
-                return sum + (ticket.winningAmount || 0);
+                return sum + (ticket.winning_amount || 0);
             }, 0);
             
             // Calculer profit/perte
@@ -1945,62 +1769,37 @@
             }
         }
         
-        async function payWinner(ticketId) {
-            const ticket = APP_STATE.winningTickets.find(t => t.id === ticketId);
-            if (!ticket) return;
-            
-            if (APP_STATE.agentFunds < ticket.winningAmount) {
-                alert("Ou pa gen ase fonds pou peye tikè sa a. Tanpri ajoute fonds oswa mande vizè.");
-                return;
-            }
-            
-            if (confirm(`Èske ou vle peye ${ticket.winningAmount} Gdes pou Tikè #${ticket.ticketId}?`)) {
+        async function payWinner(winnerId) {
+            if (confirm(`Èske ou vle peye tikè sa a?`)) {
                 try {
-                    // Simuler le paiement
-                    APP_STATE.agentFunds -= ticket.winningAmount;
-                    ticket.paid = true;
+                    await APIService.markWinnerAsPaid(winnerId);
                     
-                    // Mettre à jour l'affichage
+                    // Mettre à jour l'affichage local
+                    const winnerIndex = APP_STATE.winningTickets.findIndex(t => t.id === winnerId);
+                    if (winnerIndex !== -1) {
+                        APP_STATE.winningTickets[winnerIndex].paid = true;
+                    }
+                    
                     updateWinnersDisplay();
-                    calculateProfitLoss();
-                    
-                    alert(`Tikè #${ticket.ticketId} peye siksè!`);
-                    
-                    // Ici vous devriez appeler l'API pour mettre à jour le statut du ticket
-                    // await APIService.markTicketAsPaid(ticketId);
+                    alert(`Tikè peye siksè!`);
                 } catch (error) {
                     console.error('Erreur paiement:', error);
                     alert('Erè nan peman an');
                 }
             }
         }
-        
-        function requestSupervisorFunds(amountNeeded) {
-            const needed = amountNeeded - APP_STATE.agentFunds;
-            if (needed > 0) {
-                alert(`Ou bezwen ${needed.toLocaleString()} Gdes plis nan fonds ou. Tanpri kontakte vizè a pou rechargeman.`);
-                openAddFundsModal();
-            }
-        }
 
         function viewTicketDetails(ticketId) {
-            const ticket = APP_STATE.ticketsHistory.find(t => t._id === ticketId || t.id === ticketId);
+            const ticket = APP_STATE.ticketsHistory.find(t => t.ticket_id === ticketId);
             if (!ticket) return;
             
             let details = `
-                <h3>Detay Tikè #${ticket.id}</h3>
-                <p><strong>Tiraj:</strong> ${ticket.drawName}</p>
-                <p><strong>Dat:</strong> ${new Date(ticket.date).toLocaleString('fr-FR')}</p>
+                <h3>Detay Tikè #${ticket.ticket_id}</h3>
+                <p><strong>Tiraj:</strong> ${ticket.draw_name}</p>
+                <p><strong>Dat:</strong> ${new Date(ticket.created_at).toLocaleString('fr-FR')}</p>
                 <p><strong>Total:</strong> ${ticket.total} Gdes</p>
                 <hr>
-                <h4>Paray yo:</h4>
             `;
-            
-            ticket.bets.forEach(bet => {
-                let gameName = bet.game.toUpperCase();
-                if (bet.specialType) gameName = bet.specialType;
-                details += `<p>${gameName} ${bet.number} - ${bet.amount} Gdes ${bet.gain ? `(Ganyen: ${bet.gain} Gdes)` : ''}</p>`;
-            });
             
             alert(details);
         }
@@ -2455,6 +2254,66 @@
                     return;
                 }
 
+                // Pour Lotto 4 et 5, créer des paris séparés pour chaque option cochée
+                if (APP_STATE.selectedGame === 'lotto4' || APP_STATE.selectedGame === 'lotto5') {
+                    const gameType = APP_STATE.selectedGame;
+                    const options = gameType === 'lotto4' ? APP_STATE.lotto4Options : APP_STATE.lotto5Options;
+                    const activeOptions = options.filter(opt => opt).length;
+                    
+                    if (activeOptions === 0) {
+                        alert("Tanpri chwazi omwen yon opsyon pou " + gameType);
+                        return;
+                    }
+
+                    if (!GameEngine.validateEntry(gameType, num)) {
+                        alert("Nimewo sa pa bon pou " + gameType);
+                        return;
+                    }
+
+                    num = GameEngine.getCleanNumber(num);
+                    
+                    let displayNum = num;
+                    if (gameType === 'lotto4' && num.length === 4) {
+                        displayNum = num.slice(0, 2) + '-' + num.slice(2, 4);
+                    } else if (gameType === 'lotto5' && num.length === 5) {
+                        displayNum = num.slice(0, 3) + '-' + num.slice(3, 5);
+                    }
+
+                    const draws = APP_STATE.multiDrawMode ? APP_STATE.selectedDraws : [APP_STATE.selectedDraw];
+                    const totalAmount = amt * activeOptions;
+                    
+                    if (confirm(`Ou chwazi ${activeOptions} opsyon. Montan total la ap fè ${totalAmount} Gdes. Kontinye?`)) {
+                        draws.forEach(drawId => {
+                            // Créer un pari pour chaque option cochée
+                            for (let i = 0; i < options.length; i++) {
+                                if (options[i]) {
+                                    const bet = {
+                                        id: Date.now() + Math.random(),
+                                        game: gameType,
+                                        number: displayNum,
+                                        cleanNumber: num,
+                                        amount: amt,
+                                        drawId: drawId,
+                                        drawName: CONFIG.DRAWS.find(d => d.id === drawId).name,
+                                        timestamp: new Date().toISOString(),
+                                        isAutoGenerated: false,
+                                        isSpecial: false,
+                                        option: i + 1 // 1, 2 ou 3
+                                    };
+
+                                    APP_STATE.currentCart.push(bet);
+                                }
+                            }
+                        });
+                        
+                        this.renderCart();
+                        numInput.value = '';
+                        amtInput.value = '';
+                        numInput.focus();
+                    }
+                    return;
+                }
+
                 if (!GameEngine.validateEntry(APP_STATE.selectedGame, num)) {
                     alert("Nimewo sa pa bon pou " + APP_STATE.selectedGame);
                     return;
@@ -2528,6 +2387,9 @@
                         gameName = `${item.game.replace('_', ' ').toUpperCase()}*`;
                     } else {
                         gameName = item.game.toUpperCase();
+                        if (item.option) {
+                            gameName += ` (Opsyon ${item.option})`;
+                        }
                     }
                     
                     const drawName = APP_STATE.multiDrawMode ? item.drawName : '';
@@ -2585,7 +2447,6 @@
                     const draw = CONFIG.DRAWS.find(d => d.id === drawId);
                     
                     const ticket = {
-                        id: Math.floor(100000 + Math.random() * 900000),
                         agentId: APP_STATE.agentId,
                         agentName: document.getElementById('agent-name').textContent,
                         drawId: drawId,
@@ -2596,17 +2457,21 @@
                         checked: false
                     };
 
-                    // Sauvegarde dans MongoDB via API
+                    // Sauvegarde dans PostgreSQL via API
                     const savedTicket = await APIService.saveTicket(ticket);
                     tickets.push(savedTicket);
                     
                     // Mise à jour de l'historique local
-                    APP_STATE.ticketsHistory.unshift(savedTicket);
+                    if (savedTicket.ticket) {
+                        APP_STATE.ticketsHistory.unshift(savedTicket.ticket);
+                    }
                 }
                 
                 // Impression des tickets
                 tickets.forEach(ticket => {
-                    printThermalTicket(ticket);
+                    if (ticket.ticket) {
+                        printThermalTicket(ticket.ticket);
+                    }
                 });
                 
                 // Réinitialisation du panier
@@ -2614,9 +2479,9 @@
                 CartManager.renderCart();
                 
                 if (tickets.length === 1) {
-                    alert("Fich sove ak siksè nan MongoDB! #" + tickets[0].id);
+                    alert("Fich sove ak siksè! #" + tickets[0].ticket?.ticket_id);
                 } else {
-                    alert(`${tickets.length} fich sove ak siksè nan MongoDB!`);
+                    alert(`${tickets.length} fich sove ak siksè!`);
                 }
                 
                 // Recalculer les profits/pertes
@@ -2630,23 +2495,34 @@
         function printThermalTicket(ticket) {
             const printWindow = window.open('', '_blank', 'width=300,height=600');
             
-            let betsHtml = ticket.bets.map(b => {
-                let gameName = '';
-                if (b.isAutoGenerated && b.specialType) {
-                    gameName = b.specialType.toUpperCase();
-                } else if (b.isAutoGenerated) {
-                    gameName = `${b.game.replace('_', ' ').toUpperCase()}*`;
-                } else {
-                    gameName = b.game.toUpperCase();
+            let betsHtml = '';
+            if (ticket.bets && typeof ticket.bets === 'string') {
+                try {
+                    const bets = JSON.parse(ticket.bets);
+                    betsHtml = bets.map(b => {
+                        let gameName = '';
+                        if (b.isAutoGenerated && b.specialType) {
+                            gameName = b.specialType.toUpperCase();
+                        } else if (b.isAutoGenerated) {
+                            gameName = `${b.game.replace('_', ' ').toUpperCase()}*`;
+                        } else {
+                            gameName = b.game.toUpperCase();
+                            if (b.option) {
+                                gameName += ` (Opsyon ${b.option})`;
+                            }
+                        }
+                        
+                        return `
+                            <div style="display:flex; justify-content:space-between; font-size:14px;">
+                                <span>${gameName} ${b.number}</span>
+                                <span>${b.amount}G</span>
+                            </div>
+                        `;
+                    }).join('');
+                } catch (e) {
+                    betsHtml = `<div style="font-size:14px;">${ticket.bets}</div>`;
                 }
-                
-                return `
-                    <div style="display:flex; justify-content:space-between; font-size:14px;">
-                        <span>${gameName} ${b.number}</span>
-                        <span>${b.amount}G</span>
-                    </div>
-                `;
-            }).join('');
+            }
 
             const lotteryName = CONFIG.LOTTERY_NAME;
             const logoHtml = CONFIG.LOTTERY_LOGO ? 
@@ -2658,7 +2534,7 @@
             const content = `
                 <html>
                 <head>
-                    <title>Ticket #${ticket.id}</title>
+                    <title>Ticket #${ticket.ticket_id}</title>
                 </head>
                 <body style="font-family:'Courier New', monospace; width:100%; padding:0; margin:0; text-align:center;">
                     ${logoHtml}
@@ -2666,10 +2542,10 @@
                     ${addressHtml}
                     ${phoneHtml}
                     <p style="font-size:12px; margin:5px 0;">--------------------------</p>
-                    <p style="font-size:14px; font-weight:bold;">TIRAJ: ${ticket.drawName.toUpperCase()}</p>
-                    <p style="font-size:12px;">TICKET: #${ticket.id}</p>
-                    <p style="font-size:12px;">DATE: ${new Date(ticket.date).toLocaleString('fr-FR')}</p>
-                    <p style="font-size:12px;">AJAN: ${ticket.agentName}</p>
+                    <p style="font-size:14px; font-weight:bold;">TIRAJ: ${ticket.draw_name.toUpperCase()}</p>
+                    <p style="font-size:12px;">TICKET: #${ticket.ticket_id}</p>
+                    <p style="font-size:12px;">DATE: ${new Date(ticket.created_at).toLocaleString('fr-FR')}</p>
+                    <p style="font-size:12px;">AJAN: ${ticket.agent_name}</p>
                     <p style="font-size:12px;">--------------------------</p>
                     <div style="text-align:left; padding:0 10px;">
                         ${betsHtml}
@@ -2690,44 +2566,6 @@
                 printWindow.print();
                 printWindow.close();
             }, 500);
-        }
-
-        function openAddFundsModal() {
-            document.getElementById('funds-overlay').style.display = 'flex';
-            document.getElementById('funds-amount').focus();
-        }
-        
-        function closeFundsModal() {
-            document.getElementById('funds-overlay').style.display = 'none';
-            document.getElementById('funds-amount').value = '';
-        }
-        
-        async function addFunds() {
-            const amountInput = document.getElementById('funds-amount');
-            const amount = parseFloat(amountInput.value);
-            
-            if (isNaN(amount) || amount <= 0) {
-                alert("Tanpri antre yon montan ki valid");
-                return;
-            }
-            
-            try {
-                // Simuler l'ajout de fonds
-                APP_STATE.agentFunds += amount;
-                
-                // Mettre à jour l'affichage
-                document.getElementById('agent-funds').textContent = APP_STATE.agentFunds.toLocaleString() + ' Gdes';
-                updateWinnersDisplay();
-                
-                // Ici vous devriez appeler l'API pour mettre à jour les fonds
-                // await APIService.updateAgentFunds(amount);
-                
-                alert(`${amount.toLocaleString()} Gdes ajoute nan fonds ou!`);
-                closeFundsModal();
-            } catch (error) {
-                console.error('Erreur ajout fonds:', error);
-                alert('Erè nan ajout fonds');
-            }
         }
         
         function openLotteryConfig() {
@@ -2768,6 +2606,12 @@
         }
 
         async function initApp() {
+            // Vérifier l'authentification
+            if (!APP_STATE.token) {
+                window.location.href = '/';
+                return;
+            }
+
             // Charger la configuration du lottery
             const savedConfig = localStorage.getItem('lotteryConfig');
             if (savedConfig) {
@@ -2784,7 +2628,7 @@
                 }
             }
             
-            // Charger l'historique depuis MongoDB
+            // Charger l'historique depuis PostgreSQL
             await APIService.getTickets();
             
             // Charger les tickets gagnants
@@ -2796,26 +2640,13 @@
             // Vérifier le statut des tirages
             checkSelectedDrawStatus();
             
-            console.log("LOTATO PRO Ready - MongoDB Mode");
+            console.log("LOTATO PRO Ready - PostgreSQL Mode");
 
             setupInputAutoMove();
             
             document.getElementById('add-bet-btn').addEventListener('click', () => CartManager.addBet());
             
             updateGameSelector();
-            
-            document.getElementById('agent-input').addEventListener('change', function() {
-                document.getElementById('agent-name').textContent = this.value;
-                APP_STATE.agentId = this.value.toLowerCase().replace(/\s+/g, '-');
-            });
-            
-            document.querySelectorAll('#lotto4-options .option-chip').forEach((chip, index) => {
-                chip.querySelector('input').checked = APP_STATE.lotto4Options[index];
-            });
-            
-            document.querySelectorAll('#lotto5-options .option-chip').forEach((chip, index) => {
-                chip.querySelector('input').checked = APP_STATE.lotto5Options[index];
-            });
             
             // Calculer le profit/pertes initial
             calculateProfitLoss();
