@@ -25,7 +25,7 @@
             --warning: #ffa502;
             --profit: #00ff88;
             --loss: #ff4757;
-            --florida: #ff4757;
+            --miami: #ff4757;
             --newyork: #ffa502;
             --georgia: #2ed573;
             --texas: #ff6b35;
@@ -97,58 +97,6 @@
             display: flex;
             align-items: center;
             gap: 8px;
-        }
-
-        /* Login Screen */
-        .login-screen {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            padding: 40px 20px;
-            min-height: 100vh;
-            text-align: center;
-        }
-
-        .login-card {
-            background: var(--surface);
-            border: 1px solid var(--glass-border);
-            border-radius: 24px;
-            padding: 30px;
-            width: 100%;
-            max-width: 400px;
-            animation: fadeIn 0.5s ease;
-        }
-
-        .login-input {
-            width: 100%;
-            padding: 15px;
-            margin: 10px 0;
-            background: rgba(255,255,255,0.05);
-            border: 1px solid var(--glass-border);
-            border-radius: 12px;
-            color: white;
-            font-size: 1rem;
-        }
-
-        .login-btn {
-            width: 100%;
-            padding: 15px;
-            margin-top: 20px;
-            background: linear-gradient(135deg, var(--primary), var(--accent));
-            border: none;
-            border-radius: 12px;
-            color: white;
-            font-weight: bold;
-            font-size: 1.1rem;
-            cursor: pointer;
-        }
-
-        .login-error {
-            color: var(--danger);
-            margin-top: 10px;
-            font-size: 0.9rem;
-            display: none;
         }
 
         /* Tirages */
@@ -551,6 +499,33 @@
             flex: 1;
         }
         
+        .agent-funds {
+            background: linear-gradient(135deg, #1a1b3a, #0a0b1e);
+            border-radius: 16px;
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 1px solid var(--primary);
+            text-align: center;
+        }
+        
+        .funds-amount {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 10px 0;
+            color: var(--secondary);
+        }
+        
+        .add-funds-btn {
+            background: var(--primary);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            padding: 10px 20px;
+            cursor: pointer;
+            margin-top: 10px;
+            width: 100%;
+        }
+
         /* Modal Winner */
         .modal-overlay {
             position: fixed;
@@ -926,40 +901,67 @@
         input:checked + .slider:before {
             transform: translateX(26px);
         }
+        
+        /* Configuration button */
+        .config-btn {
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 5px;
+        }
+        
+        /* Lottery configuration */
+        .lottery-config {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 3000;
+        }
+        
+        .config-modal {
+            background: var(--bg);
+            border-radius: 24px;
+            padding: 30px;
+            max-width: 90%;
+            width: 400px;
+            border: 2px solid var(--primary);
+        }
+        
+        .config-item {
+            margin: 15px 0;
+        }
+        
+        .config-label {
+            display: block;
+            margin-bottom: 5px;
+            color: var(--text-dim);
+        }
+        
+        .config-input {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--glass-border);
+            color: white;
+        }
     </style>
 </head>
 <body>
     <div class="app-shell">
-        <!-- Login Screen -->
-        <section id="login-screen" class="screen active">
-            <div class="login-screen">
-                <div class="login-card">
-                    <h1 style="margin-bottom: 5px;">LOTATO PRO</h1>
-                    <p style="color: var(--text-dim); margin-bottom: 30px;">Konekte pou kontinye</p>
-                    
-                    <input type="text" id="login-agent-id" class="login-input" placeholder="Kòd Ajan (ex: AGENT01)" value="AGENT01">
-                    <input type="password" id="login-password" class="login-input" placeholder="Modpas" value="123456">
-                    
-                    <div id="login-error" class="login-error">
-                        <i class="fas fa-exclamation-circle"></i> Kòd ajan oswa modpas pa kòrèk
-                    </div>
-                    
-                    <button id="login-btn" class="login-btn" onclick="loginAgent()">
-                        <i class="fas fa-sign-in-alt"></i> Konekte
-                    </button>
-                    
-                    <p style="margin-top: 20px; font-size: 0.8rem; color: var(--text-dim);">
-                        Kòd default: AGENT01 / 123456
-                    </p>
-                </div>
-            </div>
-        </section>
-
-        <div id="sync-status-bar" class="sync-idle" style="display: none;">
+        <div id="sync-status-bar" class="sync-idle">
             <span id="sync-text">Vérification des résultats...</span>
         </div>
 
-        <header style="display: none;">
+        <header>
             <div class="brand">
                 <h1 class="logo-text" id="lottery-name">LOTATO PRO <span class="pro-badge">vession 6</span></h1>
                 <div id="live-clock">00:00:00</div>
@@ -967,15 +969,15 @@
             <div class="user-profile">
                 <i class="fas fa-user-circle"></i>
                 <span id="agent-name">Agent-01</span>
-                <button class="config-btn" onclick="logoutAgent()">
-                    <i class="fas fa-sign-out-alt"></i>
+                <button class="config-btn" onclick="openLotteryConfig()">
+                    <i class="fas fa-cog"></i>
                 </button>
             </div>
         </header>
 
-        <main class="content-area" style="display: none;">
+        <main class="content-area">
             <!-- Screen 1: Draw Selection -->
-            <section id="draw-selection-screen" class="screen">
+            <section id="draw-selection-screen" class="screen active">
                 <button class="back-button" onclick="goBackToDraws()" style="display:none;">
                     <i class="fas fa-arrow-left"></i> Retounen
                 </button>
@@ -1007,7 +1009,7 @@
                 <button class="back-button" onclick="goBackToDraws()">
                     <i class="fas fa-arrow-left"></i> Retounen
                 </button>
-                <h2 class="section-title" id="current-draw-title">Florida Matin</h2>
+                <h2 class="section-title" id="current-draw-title">Miami Matin</h2>
                 
                 <div id="draw-blocked-warning" class="warning-message">
                     <i class="fas fa-exclamation-triangle"></i>
@@ -1175,6 +1177,14 @@
             <section id="winners-screen" class="screen">
                 <div style="padding: 20px;">
                     <h2 class="section-title">Jere Ganyen</h2>
+                    
+                    <div class="agent-funds">
+                        <div>Fonds Ajan</div>
+                        <div class="funds-amount" id="agent-funds">10,000 Gdes</div>
+                        <button onclick="openAddFundsModal()" class="add-funds-btn">
+                            <i class="fas fa-plus-circle"></i> Ajoute Fonds
+                        </button>
+                    </div>
 
                     <div class="winners-summary">
                         <h3 style="margin-bottom: 15px;">Rekapitilatif Tiraj</h3>
@@ -1209,8 +1219,47 @@
                 <button onclick="closeWinnerModal()" class="btn-close">OK</button>
             </div>
         </div>
+        
+        <div id="funds-overlay" class="modal-overlay">
+            <div class="funds-modal">
+                <h2>Ajoute Fonds</h2>
+                <p style="margin: 15px 0; color: var(--text-dim);">Antre montan an pou ajoute nan fonds ou.</p>
+                <input type="number" id="funds-amount" class="modal-input" placeholder="Montan an Gdes" min="0">
+                <p style="margin: 10px 0; color: var(--text-dim); font-size: 0.9rem;">Supervizè ap konfime tranzaksyon an.</p>
+                <div class="modal-buttons">
+                    <button onclick="addFunds()" class="modal-btn confirm">Konfime</button>
+                    <button onclick="closeFundsModal()" class="modal-btn cancel">Anile</button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="lottery-config" class="lottery-config">
+            <div class="config-modal">
+                <h2>Konfigirasyon Lotri</h2>
+                <div class="config-item">
+                    <label class="config-label">Non Lotri:</label>
+                    <input type="text" id="config-lottery-name" class="config-input" value="LOTATO PRO">
+                </div>
+                <div class="config-item">
+                    <label class="config-label">URL Logo:</label>
+                    <input type="text" id="config-logo-url" class="config-input" placeholder="https://example.com/logo.png">
+                </div>
+                <div class="config-item">
+                    <label class="config-label">Adrès:</label>
+                    <input type="text" id="config-address" class="config-input" placeholder="Adrès biznis la">
+                </div>
+                <div class="config-item">
+                    <label class="config-label">Telefòn:</label>
+                    <input type="text" id="config-phone" class="config-input" placeholder="+509XXXXXXXX">
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button onclick="saveLotteryConfig()" style="flex: 1; padding: 12px; background: var(--success); color: black; border: none; border-radius: 12px; font-weight: bold;">Sove</button>
+                    <button onclick="closeLotteryConfig()" style="flex: 1; padding: 12px; background: var(--danger); color: white; border: none; border-radius: 12px; font-weight: bold;">Fèmen</button>
+                </div>
+            </div>
+        </div>
 
-        <nav class="nav-bar" style="display: none;">
+        <nav class="nav-bar">
             <a href="#" class="nav-item active" onclick="switchTab('home')">
                 <i class="fas fa-dice"></i><span>Jwèt</span>
             </a>
@@ -1229,14 +1278,16 @@
     <script>
         // Configuration de l'API
         const API_CONFIG = {
-            BASE_URL: window.location.origin + '/api',
+            BASE_URL: 'http://localhost:3000/api', // À changer pour votre serveur
             ENDPOINTS: {
-                LOGIN: '/auth/login',
-                LOGOUT: '/auth/logout',
-                VERIFY: '/auth/verify',
                 SAVE_TICKET: '/tickets/save',
                 GET_TICKETS: '/tickets',
-                GET_WINNERS: '/winners'
+                GET_REPORTS: '/reports',
+                SAVE_AGENT: '/agent/save',
+                CHECK_DRAW_STATUS: '/draws/status',
+                SAVE_WINNERS: '/winners/save',
+                GET_WINNERS: '/winners',
+                UPDATE_FUNDS: '/agent/funds'
             }
         };
 
@@ -1253,8 +1304,8 @@
                 AUTO_LOTTO5: 5000
             },
             DRAWS: [
-                { id: 'fl_matin', name: 'Florida Matin', time: '13:30', color: 'var(--florida)' },
-                { id: 'fl_soir', name: 'Florida Soir', time: '21:50', color: 'var(--florida)' },
+                { id: 'mia_matin', name: 'Miami Matin', time: '13:30', color: 'var(--miami)' },
+                { id: 'mia_soir', name: 'Miami Soir', time: '21:50', color: 'var(--miami)' },
                 { id: 'ny_matin', name: 'New York Matin', time: '14:30', color: 'var(--newyork)' },
                 { id: 'ny_soir', name: 'New York Soir', time: '20:00', color: 'var(--newyork)' },
                 { id: 'ga_matin', name: 'Georgia Matin', time: '12:30', color: 'var(--georgia)' },
@@ -1263,12 +1314,16 @@
                 { id: 'tx_soir', name: 'Texas Soir', time: '18:30', color: 'var(--texas)' },
                 { id: 'tn_matin', name: 'Tunisia Matin', time: '10:00', color: 'var(--tunisia)' },
                 { id: 'tn_soir', name: 'Tunisia Soir', time: '17:00', color: 'var(--tunisia)' }
-            ]
+            ],
+            LOTTERY_NAME: 'LOTATO PRO',
+            LOTTERY_LOGO: '',
+            LOTTERY_ADDRESS: '',
+            LOTTERY_PHONE: ''
         };
 
         let APP_STATE = {
-            selectedDraw: 'fl_matin',
-            selectedDraws: ['fl_matin'],
+            selectedDraw: 'mia_matin',
+            selectedDraws: ['mia_matin'],
             multiDrawMode: false,
             selectedGame: 'borlette',
             currentCart: [],
@@ -1281,9 +1336,8 @@
             showSpecialGames: false,
             currentTab: 'home',
             isDrawBlocked: false,
-            agentId: '',
-            agentName: '',
-            token: null,
+            agentId: 'agent-01',
+            agentFunds: 10000,
             salesTotal: 0,
             winningsTotal: 0,
             profitLoss: 0
@@ -1292,21 +1346,15 @@
         // Fonction pour vérifier si un tirage est bloqué (3 minutes avant)
         function isDrawBlocked(drawTime) {
             const now = new Date();
-            const currentHours = now.getHours();
-            const currentMinutes = now.getMinutes();
-            const currentSeconds = now.getSeconds();
-            
             const [hours, minutes] = drawTime.split(':').map(Number);
             
-            // Convertir tout en minutes pour faciliter la comparaison
-            const drawTotalMinutes = hours * 60 + minutes;
-            const currentTotalMinutes = currentHours * 60 + currentMinutes;
-            const currentTotalSeconds = currentTotalMinutes * 60 + currentSeconds;
+            const drawDate = new Date();
+            drawDate.setHours(hours, minutes, 0, 0);
             
-            // Bloquer 3 minutes avant (180 secondes)
-            const blockedTime = drawTotalMinutes * 60 - 180;
+            // Bloquer 3 minutes avant
+            const blockedTime = new Date(drawDate.getTime() - (3 * 60 * 1000));
             
-            return currentTotalSeconds >= blockedTime && currentTotalSeconds < drawTotalMinutes * 60;
+            return now >= blockedTime && now < drawDate;
         }
 
         // Fonction pour vérifier le tirage sélectionné
@@ -1557,90 +1605,119 @@
 
         // Fonctions API
         const APIService = {
-            async makeRequest(endpoint, method = 'GET', body = null) {
-                const headers = {
-                    'Content-Type': 'application/json'
-                };
-                
-                if (APP_STATE.token) {
-                    headers['Authorization'] = `Bearer ${APP_STATE.token}`;
-                }
-                
-                const config = {
-                    method,
-                    headers
-                };
-                
-                if (body) {
-                    config.body = JSON.stringify(body);
-                }
-                
+            async saveTicket(ticket) {
                 try {
-                    const response = await fetch(`${API_CONFIG.BASE_URL}${endpoint}`, config);
-                    
-                    if (!response.ok) {
-                        const error = await response.json();
-                        throw new Error(error.message || 'Erreur réseau');
-                    }
-                    
-                    return await response.json();
-                } catch (error) {
-                    console.error(`Erreur ${method} ${endpoint}:`, error);
-                    throw error;
-                }
-            },
-
-            async login(agentId, password) {
-                try {
-                    const data = await this.makeRequest(API_CONFIG.ENDPOINTS.LOGIN, 'POST', {
-                        username: agentId,
-                        password: password
+                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.SAVE_TICKET}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            ...ticket,
+                            agentId: APP_STATE.agentId,
+                            date: new Date().toISOString()
+                        })
                     });
                     
-                    if (data.success) {
-                        APP_STATE.token = data.token;
-                        APP_STATE.agentId = data.user.agentId;
-                        APP_STATE.agentName = data.user.name;
-                        
-                        localStorage.setItem('lotato_token', data.token);
-                        localStorage.setItem('lotato_agent', JSON.stringify({
-                            agentId: data.user.agentId,
-                            name: data.user.name
-                        }));
-                    }
+                    if (!response.ok) throw new Error('Erreur réseau');
                     
+                    const data = await response.json();
                     return data;
                 } catch (error) {
+                    console.error('Erreur sauvegarde ticket:', error);
                     throw error;
                 }
-            },
-
-            async logout() {
-                try {
-                    await this.makeRequest(API_CONFIG.ENDPOINTS.LOGOUT, 'POST');
-                } catch (error) {
-                    // Ignorer les erreurs de déconnexion
-                } finally {
-                    localStorage.removeItem('lotato_token');
-                    localStorage.removeItem('lotato_agent');
-                    APP_STATE.token = null;
-                }
-            },
-
-            async saveTicket(ticket) {
-                return await this.makeRequest(API_CONFIG.ENDPOINTS.SAVE_TICKET, 'POST', ticket);
             },
 
             async getTickets() {
-                const data = await this.makeRequest(`${API_CONFIG.ENDPOINTS.GET_TICKETS}?agentId=${APP_STATE.agentId}`);
-                APP_STATE.ticketsHistory = data.tickets || [];
-                return data;
+                try {
+                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.GET_TICKETS}?agentId=${APP_STATE.agentId}`);
+                    
+                    if (!response.ok) throw new Error('Erreur réseau');
+                    
+                    const data = await response.json();
+                    APP_STATE.ticketsHistory = data.tickets || [];
+                    return data;
+                } catch (error) {
+                    console.error('Erreur récupération tickets:', error);
+                    return { tickets: [] };
+                }
             },
 
-            async getWinners() {
-                const data = await this.makeRequest(`${API_CONFIG.ENDPOINTS.GET_WINNERS}?agentId=${APP_STATE.agentId}`);
-                APP_STATE.winningTickets = data.winners || [];
-                return data;
+            async getReports() {
+                try {
+                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.GET_REPORTS}?agentId=${APP_STATE.agentId}`);
+                    
+                    if (!response.ok) throw new Error('Erreur réseau');
+                    
+                    const data = await response.json();
+                    return data;
+                } catch (error) {
+                    console.error('Erreur récupération rapports:', error);
+                    return { totalTickets: 0, totalBets: 0, totalWins: 0, totalLoss: 0, balance: 0 };
+                }
+            },
+
+            async saveAgentConfig(config) {
+                try {
+                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.SAVE_AGENT}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            agentId: APP_STATE.agentId,
+                            ...config
+                        })
+                    });
+                    
+                    if (!response.ok) throw new Error('Erreur réseau');
+                    
+                    return await response.json();
+                } catch (error) {
+                    console.error('Erreur sauvegarde agent:', error);
+                    throw error;
+                }
+            },
+            
+            async getWinningTickets() {
+                try {
+                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.GET_WINNERS}?agentId=${APP_STATE.agentId}`);
+                    
+                    if (!response.ok) throw new Error('Erreur réseau');
+                    
+                    const data = await response.json();
+                    APP_STATE.winningTickets = data.winners || [];
+                    return data;
+                } catch (error) {
+                    console.error('Erreur récupération gagnants:', error);
+                    return { winners: [] };
+                }
+            },
+            
+            async updateAgentFunds(amount) {
+                try {
+                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.UPDATE_FUNDS}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            agentId: APP_STATE.agentId,
+                            amount: amount,
+                            type: 'add'
+                        })
+                    });
+                    
+                    if (!response.ok) throw new Error('Erreur réseau');
+                    
+                    const data = await response.json();
+                    APP_STATE.agentFunds = data.newBalance;
+                    return data;
+                } catch (error) {
+                    console.error('Erreur mise à jour fonds:', error);
+                    throw error;
+                }
             }
         };
 
@@ -1727,17 +1804,17 @@
                 return `
                     <div class="history-card">
                         <div class="card-header">
-                            <span>#${ticket.ticket_id}</span>
-                            <span>${new Date(ticket.created_at).toLocaleDateString('fr-FR')}</span>
+                            <span>#${ticket.id}</span>
+                            <span>${new Date(ticket.date).toLocaleDateString('fr-FR')}</span>
                         </div>
                         <div>
-                            <p><strong>Tiraj:</strong> ${ticket.draw_name}</p>
+                            <p><strong>Tiraj:</strong> ${ticket.drawName}</p>
                             <p><strong>Total:</strong> ${ticket.total} Gdes</p>
-                            <p><strong>Nimewo:</strong> ${Array.isArray(ticket.bets) ? ticket.bets.length : 0}</p>
+                            <p><strong>Nimewo:</strong> ${ticket.bets.length}</p>
                         </div>
                         <div class="card-footer">
                             <span class="badge ${statusClass}">${status}</span>
-                            <button class="btn-small" onclick="viewTicketDetails('${ticket.ticket_id}')">
+                            <button class="btn-small" onclick="viewTicketDetails('${ticket._id || ticket.id}')">
                                 <i class="fas fa-eye"></i> Detay
                             </button>
                         </div>
@@ -1748,41 +1825,22 @@
 
         async function loadReports() {
             try {
-                // Pour l'instant, nous calculons les rapports localement
-                // À l'avenir, nous utiliserons une API dédiée
-                const totalTickets = APP_STATE.ticketsHistory.length;
-                const totalBets = APP_STATE.ticketsHistory.reduce((sum, ticket) => sum + parseFloat(ticket.total), 0);
-                const totalWins = APP_STATE.winningTickets.reduce((sum, ticket) => sum + parseFloat(ticket.winning_amount), 0);
-                const totalLoss = totalBets - totalWins;
-                const balance = totalBets - totalWins;
+                const reports = await APIService.getReports();
                 
-                document.getElementById('total-tickets').textContent = totalTickets;
-                document.getElementById('total-bets').textContent = totalBets.toFixed(2) + ' Gdes';
-                document.getElementById('total-wins').textContent = totalWins.toFixed(2) + ' Gdes';
-                document.getElementById('total-loss').textContent = totalLoss.toFixed(2) + ' Gdes';
-                document.getElementById('balance').textContent = balance.toFixed(2) + ' Gdes';
-                document.getElementById('balance').style.color = balance >= 0 ? 'var(--success)' : 'var(--danger)';
+                document.getElementById('total-tickets').textContent = reports.totalTickets || 0;
+                document.getElementById('total-bets').textContent = (reports.totalBets || 0) + ' Gdes';
+                document.getElementById('total-wins').textContent = (reports.totalWins || 0) + ' Gdes';
+                document.getElementById('total-loss').textContent = (reports.totalLoss || 0) + ' Gdes';
+                document.getElementById('balance').textContent = (reports.balance || 0) + ' Gdes';
+                document.getElementById('balance').style.color = (reports.balance >= 0) ? 'var(--success)' : 'var(--danger)';
                 
-                // Calculer la répartition par jeu
-                const gameBreakdown = {};
-                APP_STATE.ticketsHistory.forEach(ticket => {
-                    const bets = Array.isArray(ticket.bets) ? ticket.bets : [];
-                    bets.forEach(bet => {
-                        const gameType = bet.game || 'borlette';
-                        if (!gameBreakdown[gameType]) {
-                            gameBreakdown[gameType] = { count: 0, amount: 0 };
-                        }
-                        gameBreakdown[gameType].count++;
-                        gameBreakdown[gameType].amount += bet.amount;
-                    });
-                });
-                
+                // Game breakdown - à adapter selon votre API
                 const breakdownContainer = document.getElementById('game-breakdown');
-                if (Object.keys(gameBreakdown).length > 0) {
-                    breakdownContainer.innerHTML = Object.entries(gameBreakdown).map(([game, data]) => `
+                if (reports.breakdown) {
+                    breakdownContainer.innerHTML = Object.entries(reports.breakdown).map(([game, data]) => `
                         <div class="report-row">
                             <span>${game.toUpperCase()}:</span>
-                            <span class="val">${data.count} jwèt (${data.amount.toFixed(2)} Gdes)</span>
+                            <span class="val">${data.count} jwèt (${data.amount} Gdes)</span>
                         </div>
                     `).join('');
                 } else {
@@ -1795,7 +1853,7 @@
         
         async function loadWinners() {
             try {
-                await APIService.getWinners();
+                await APIService.getWinningTickets();
                 updateWinnersDisplay();
                 calculateProfitLoss();
             } catch (error) {
@@ -1805,6 +1863,10 @@
         
         function updateWinnersDisplay() {
             const container = document.getElementById('winners-container');
+            const fundsDisplay = document.getElementById('agent-funds');
+            
+            // Mettre à jour les fonds
+            fundsDisplay.textContent = APP_STATE.agentFunds.toLocaleString() + ' Gdes';
             
             if (APP_STATE.winningTickets.length === 0) {
                 container.innerHTML = '<div class="empty-msg">Pa gen tikè ganyen pou kounye a</div>';
@@ -1812,29 +1874,34 @@
             }
             
             container.innerHTML = APP_STATE.winningTickets.map(ticket => {
+                const canPay = APP_STATE.agentFunds >= ticket.winningAmount;
                 const isPaid = ticket.paid || false;
                 
                 return `
                     <div class="winner-ticket">
                         <div class="winner-header">
                             <div>
-                                <strong>Tikè #${ticket.ticket_id}</strong>
-                                <div style="font-size: 0.8rem; color: var(--text-dim);">${ticket.draw_name} - ${new Date(ticket.created_at).toLocaleDateString('fr-FR')}</div>
+                                <strong>Tikè #${ticket.ticketId}</strong>
+                                <div style="font-size: 0.8rem; color: var(--text-dim);">${ticket.drawName} - ${new Date(ticket.date).toLocaleDateString('fr-FR')}</div>
                             </div>
                             <div style="font-weight: bold; color: var(--success);">
-                                ${parseFloat(ticket.winning_amount).toLocaleString()} Gdes
+                                ${ticket.winningAmount.toLocaleString()} Gdes
                             </div>
                         </div>
                         <div>
-                            <p><strong>Nimewo Ganyen:</strong> ${ticket.winning_number}</p>
-                            <p><strong>Jwèt:</strong> ${ticket.game_type.toUpperCase()}</p>
-                            <p><strong>Kliyan:</strong> ${ticket.customer_name || 'Pa defini'}</p>
+                            <p><strong>Nimewo Ganyen:</strong> ${ticket.winningNumber}</p>
+                            <p><strong>Jwèt:</strong> ${ticket.gameType.toUpperCase()}</p>
+                            <p><strong>Kliyan:</strong> ${ticket.customerName || 'Pa defini'}</p>
                         </div>
                         <div class="winner-actions">
                             ${isPaid ? 
                                 '<button class="btn-paid" disabled><i class="fas fa-check"></i> Peye</button>' :
+                                canPay ?
                                 `<button class="btn-pay" onclick="payWinner('${ticket.id}')">
                                     <i class="fas fa-money-bill-wave"></i> Peye
+                                </button>` :
+                                `<button class="btn-need-funds" onclick="requestSupervisorFunds(${ticket.winningAmount})">
+                                    <i class="fas fa-exclamation-triangle"></i> Bezwen Fonds
                                 </button>`
                             }
                         </div>
@@ -1846,12 +1913,12 @@
         function calculateProfitLoss() {
             // Calculer le total des ventes
             const totalSales = APP_STATE.ticketsHistory.reduce((sum, ticket) => {
-                return sum + parseFloat(ticket.total || 0);
+                return sum + (ticket.total || 0);
             }, 0);
             
             // Calculer le total des gains
             const totalWinnings = APP_STATE.winningTickets.reduce((sum, ticket) => {
-                return sum + parseFloat(ticket.winning_amount || 0);
+                return sum + (ticket.winningAmount || 0);
             }, 0);
             
             // Calculer profit/perte
@@ -1864,7 +1931,7 @@
             
             // Mettre à jour l'affichage
             document.getElementById('profit-loss').textContent = 
-                (profitLoss >= 0 ? '+' : '') + profitLoss.toFixed(2) + ' Gdes';
+                (profitLoss >= 0 ? '+' : '') + profitLoss.toLocaleString() + ' Gdes';
             
             document.getElementById('profit-loss').className = profitLoss >= 0 ? 'val profit' : 'val loss';
             
@@ -1872,26 +1939,32 @@
             const summaryContainer = document.querySelector('.winners-summary');
             if (summaryContainer) {
                 summaryContainer.querySelectorAll('.summary-row')[0].querySelector('.val').textContent = 
-                    totalSales.toFixed(2) + ' Gdes';
+                    totalSales.toLocaleString() + ' Gdes';
                 summaryContainer.querySelectorAll('.summary-row')[1].querySelector('.val').textContent = 
-                    totalWinnings.toFixed(2) + ' Gdes';
+                    totalWinnings.toLocaleString() + ' Gdes';
             }
         }
         
         async function payWinner(ticketId) {
-            const ticket = APP_STATE.winningTickets.find(t => t.id == ticketId);
+            const ticket = APP_STATE.winningTickets.find(t => t.id === ticketId);
             if (!ticket) return;
             
-            if (confirm(`Èske ou vle peye ${ticket.winning_amount} Gdes pou Tikè #${ticket.ticket_id}?`)) {
+            if (APP_STATE.agentFunds < ticket.winningAmount) {
+                alert("Ou pa gen ase fonds pou peye tikè sa a. Tanpri ajoute fonds oswa mande vizè.");
+                return;
+            }
+            
+            if (confirm(`Èske ou vle peye ${ticket.winningAmount} Gdes pou Tikè #${ticket.ticketId}?`)) {
                 try {
-                    // Marquer comme payé localement
+                    // Simuler le paiement
+                    APP_STATE.agentFunds -= ticket.winningAmount;
                     ticket.paid = true;
                     
                     // Mettre à jour l'affichage
                     updateWinnersDisplay();
                     calculateProfitLoss();
                     
-                    alert(`Tikè #${ticket.ticket_id} peye siksè!`);
+                    alert(`Tikè #${ticket.ticketId} peye siksè!`);
                     
                     // Ici vous devriez appeler l'API pour mettre à jour le statut du ticket
                     // await APIService.markTicketAsPaid(ticketId);
@@ -1901,23 +1974,30 @@
                 }
             }
         }
+        
+        function requestSupervisorFunds(amountNeeded) {
+            const needed = amountNeeded - APP_STATE.agentFunds;
+            if (needed > 0) {
+                alert(`Ou bezwen ${needed.toLocaleString()} Gdes plis nan fonds ou. Tanpri kontakte vizè a pou rechargeman.`);
+                openAddFundsModal();
+            }
+        }
 
         function viewTicketDetails(ticketId) {
-            const ticket = APP_STATE.ticketsHistory.find(t => t.ticket_id === ticketId);
+            const ticket = APP_STATE.ticketsHistory.find(t => t._id === ticketId || t.id === ticketId);
             if (!ticket) return;
             
             let details = `
-                <h3>Detay Tikè #${ticket.ticket_id}</h3>
-                <p><strong>Tiraj:</strong> ${ticket.draw_name}</p>
-                <p><strong>Dat:</strong> ${new Date(ticket.created_at).toLocaleString('fr-FR')}</p>
+                <h3>Detay Tikè #${ticket.id}</h3>
+                <p><strong>Tiraj:</strong> ${ticket.drawName}</p>
+                <p><strong>Dat:</strong> ${new Date(ticket.date).toLocaleString('fr-FR')}</p>
                 <p><strong>Total:</strong> ${ticket.total} Gdes</p>
                 <hr>
                 <h4>Paray yo:</h4>
             `;
             
-            const bets = Array.isArray(ticket.bets) ? ticket.bets : [];
-            bets.forEach(bet => {
-                let gameName = bet.game?.toUpperCase() || 'BORLETTE';
+            ticket.bets.forEach(bet => {
+                let gameName = bet.game.toUpperCase();
                 if (bet.specialType) gameName = bet.specialType;
                 details += `<p>${gameName} ${bet.number} - ${bet.amount} Gdes ${bet.gain ? `(Ganyen: ${bet.gain} Gdes)` : ''}</p>`;
             });
@@ -2505,40 +2585,38 @@
                     const draw = CONFIG.DRAWS.find(d => d.id === drawId);
                     
                     const ticket = {
+                        id: Math.floor(100000 + Math.random() * 900000),
                         agentId: APP_STATE.agentId,
-                        agentName: APP_STATE.agentName,
+                        agentName: document.getElementById('agent-name').textContent,
                         drawId: drawId,
                         drawName: draw.name,
                         bets: drawBets,
-                        total: drawBets.reduce((sum, b) => sum + b.amount, 0)
+                        total: drawBets.reduce((sum, b) => sum + b.amount, 0),
+                        date: new Date().toISOString(),
+                        checked: false
                     };
 
-                    // Sauvegarde dans PostgreSQL via API
+                    // Sauvegarde dans MongoDB via API
                     const savedTicket = await APIService.saveTicket(ticket);
                     tickets.push(savedTicket);
                     
                     // Mise à jour de l'historique local
-                    if (savedTicket.success) {
-                        APP_STATE.ticketsHistory.unshift(savedTicket.ticket);
-                    }
+                    APP_STATE.ticketsHistory.unshift(savedTicket);
                 }
                 
                 // Impression des tickets
                 tickets.forEach(ticket => {
-                    if (ticket.success) {
-                        printThermalTicket(ticket.ticket);
-                    }
+                    printThermalTicket(ticket);
                 });
                 
                 // Réinitialisation du panier
                 APP_STATE.currentCart = [];
                 CartManager.renderCart();
                 
-                if (tickets.length === 1 && tickets[0].success) {
-                    alert("Fich sove ak siksè! #" + tickets[0].ticket.ticket_id);
+                if (tickets.length === 1) {
+                    alert("Fich sove ak siksè nan MongoDB! #" + tickets[0].id);
                 } else {
-                    const successful = tickets.filter(t => t.success).length;
-                    alert(`${successful} fich sove ak siksè!`);
+                    alert(`${tickets.length} fich sove ak siksè nan MongoDB!`);
                 }
                 
                 // Recalculer les profits/pertes
@@ -2552,14 +2630,14 @@
         function printThermalTicket(ticket) {
             const printWindow = window.open('', '_blank', 'width=300,height=600');
             
-            let betsHtml = (Array.isArray(ticket.bets) ? ticket.bets : []).map(b => {
+            let betsHtml = ticket.bets.map(b => {
                 let gameName = '';
                 if (b.isAutoGenerated && b.specialType) {
                     gameName = b.specialType.toUpperCase();
                 } else if (b.isAutoGenerated) {
                     gameName = `${b.game.replace('_', ' ').toUpperCase()}*`;
                 } else {
-                    gameName = (b.game || '').toUpperCase();
+                    gameName = b.game.toUpperCase();
                 }
                 
                 return `
@@ -2570,18 +2648,28 @@
                 `;
             }).join('');
 
+            const lotteryName = CONFIG.LOTTERY_NAME;
+            const logoHtml = CONFIG.LOTTERY_LOGO ? 
+                `<img src="${CONFIG.LOTTERY_LOGO}" style="max-width: 100px; margin: 10px auto; display: block;" alt="${lotteryName}">` : 
+                '';
+            const addressHtml = CONFIG.LOTTERY_ADDRESS ? `<p style="font-size:10px;">${CONFIG.LOTTERY_ADDRESS}</p>` : '';
+            const phoneHtml = CONFIG.LOTTERY_PHONE ? `<p style="font-size:10px;">Tel: ${CONFIG.LOTTERY_PHONE}</p>` : '';
+
             const content = `
                 <html>
                 <head>
-                    <title>Ticket #${ticket.ticket_id}</title>
+                    <title>Ticket #${ticket.id}</title>
                 </head>
                 <body style="font-family:'Courier New', monospace; width:100%; padding:0; margin:0; text-align:center;">
-                    <h2 style="margin-bottom:5px;">LOTATO PRO</h2>
+                    ${logoHtml}
+                    <h2 style="margin-bottom:5px;">${lotteryName}</h2>
+                    ${addressHtml}
+                    ${phoneHtml}
                     <p style="font-size:12px; margin:5px 0;">--------------------------</p>
-                    <p style="font-size:14px; font-weight:bold;">TIRAJ: ${ticket.draw_name.toUpperCase()}</p>
-                    <p style="font-size:12px;">TICKET: #${ticket.ticket_id}</p>
-                    <p style="font-size:12px;">DATE: ${new Date(ticket.created_at).toLocaleString('fr-FR')}</p>
-                    <p style="font-size:12px;">AJAN: ${ticket.agent_name}</p>
+                    <p style="font-size:14px; font-weight:bold;">TIRAJ: ${ticket.drawName.toUpperCase()}</p>
+                    <p style="font-size:12px;">TICKET: #${ticket.id}</p>
+                    <p style="font-size:12px;">DATE: ${new Date(ticket.date).toLocaleString('fr-FR')}</p>
+                    <p style="font-size:12px;">AJAN: ${ticket.agentName}</p>
                     <p style="font-size:12px;">--------------------------</p>
                     <div style="text-align:left; padding:0 10px;">
                         ${betsHtml}
@@ -2604,132 +2692,103 @@
             }, 500);
         }
 
+        function openAddFundsModal() {
+            document.getElementById('funds-overlay').style.display = 'flex';
+            document.getElementById('funds-amount').focus();
+        }
+        
+        function closeFundsModal() {
+            document.getElementById('funds-overlay').style.display = 'none';
+            document.getElementById('funds-amount').value = '';
+        }
+        
+        async function addFunds() {
+            const amountInput = document.getElementById('funds-amount');
+            const amount = parseFloat(amountInput.value);
+            
+            if (isNaN(amount) || amount <= 0) {
+                alert("Tanpri antre yon montan ki valid");
+                return;
+            }
+            
+            try {
+                // Simuler l'ajout de fonds
+                APP_STATE.agentFunds += amount;
+                
+                // Mettre à jour l'affichage
+                document.getElementById('agent-funds').textContent = APP_STATE.agentFunds.toLocaleString() + ' Gdes';
+                updateWinnersDisplay();
+                
+                // Ici vous devriez appeler l'API pour mettre à jour les fonds
+                // await APIService.updateAgentFunds(amount);
+                
+                alert(`${amount.toLocaleString()} Gdes ajoute nan fonds ou!`);
+                closeFundsModal();
+            } catch (error) {
+                console.error('Erreur ajout fonds:', error);
+                alert('Erè nan ajout fonds');
+            }
+        }
+        
+        function openLotteryConfig() {
+            document.getElementById('config-lottery-name').value = CONFIG.LOTTERY_NAME;
+            document.getElementById('config-logo-url').value = CONFIG.LOTTERY_LOGO;
+            document.getElementById('config-address').value = CONFIG.LOTTERY_ADDRESS;
+            document.getElementById('config-phone').value = CONFIG.LOTTERY_PHONE;
+            document.getElementById('lottery-config').style.display = 'flex';
+        }
+        
+        function closeLotteryConfig() {
+            document.getElementById('lottery-config').style.display = 'none';
+        }
+        
+        function saveLotteryConfig() {
+            CONFIG.LOTTERY_NAME = document.getElementById('config-lottery-name').value;
+            CONFIG.LOTTERY_LOGO = document.getElementById('config-logo-url').value;
+            CONFIG.LOTTERY_ADDRESS = document.getElementById('config-address').value;
+            CONFIG.LOTTERY_PHONE = document.getElementById('config-phone').value;
+            
+            // Mettre à jour l'affichage du nom
+            document.getElementById('lottery-name').innerHTML = `${CONFIG.LOTTERY_NAME} <span class="pro-badge">vession 6</span>`;
+            
+            // Sauvegarder dans le localStorage
+            localStorage.setItem('lotteryConfig', JSON.stringify({
+                name: CONFIG.LOTTERY_NAME,
+                logo: CONFIG.LOTTERY_LOGO,
+                address: CONFIG.LOTTERY_ADDRESS,
+                phone: CONFIG.LOTTERY_PHONE
+            }));
+            
+            alert("Konfigirasyon sove!");
+            closeLotteryConfig();
+        }
+
         function closeWinnerModal() {
             document.getElementById('winner-overlay').style.display = 'none';
         }
 
-        async function loginAgent() {
-            const agentId = document.getElementById('login-agent-id').value.trim().toUpperCase();
-            const password = document.getElementById('login-password').value;
-            const loginBtn = document.getElementById('login-btn');
-            const errorEl = document.getElementById('login-error');
-            
-            if (!agentId || !password) {
-                errorEl.textContent = "Tanpri ranpli tout chan yo";
-                errorEl.style.display = 'block';
-                return;
-            }
-            
-            loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Konekte...';
-            loginBtn.disabled = true;
-            errorEl.style.display = 'none';
-            
-            try {
-                const result = await APIService.login(agentId, password);
-                
-                if (result.success) {
-                    // Cacher l'écran de connexion
-                    document.getElementById('login-screen').classList.remove('active');
-                    
-                    // Afficher l'interface principale
-                    document.querySelector('header').style.display = 'flex';
-                    document.querySelector('main').style.display = 'block';
-                    document.querySelector('.nav-bar').style.display = 'flex';
-                    document.getElementById('sync-status-bar').style.display = 'block';
-                    
-                    // Mettre à jour le nom de l'agent
-                    document.getElementById('agent-name').textContent = APP_STATE.agentName;
-                    
-                    // Initialiser l'application
-                    await initApp();
-                } else {
-                    errorEl.textContent = result.message || "Koneksyon echwe";
-                    errorEl.style.display = 'block';
-                    loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Konekte';
-                    loginBtn.disabled = false;
-                }
-            } catch (error) {
-                errorEl.textContent = "Erè sèvè. Tanpri eseye ankò";
-                errorEl.style.display = 'block';
-                loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Konekte';
-                loginBtn.disabled = false;
-            }
-        }
-
-        async function logoutAgent() {
-            if (confirm("Èske ou vwe kite sesyon an?")) {
-                await APIService.logout();
-                
-                // Cacher l'interface principale
-                document.querySelector('header').style.display = 'none';
-                document.querySelector('main').style.display = 'none';
-                document.querySelector('.nav-bar').style.display = 'none';
-                document.getElementById('sync-status-bar').style.display = 'none';
-                
-                // Afficher l'écran de connexion
-                document.getElementById('login-screen').classList.add('active');
-                
-                // Réinitialiser l'état
-                APP_STATE = {
-                    selectedDraw: 'fl_matin',
-                    selectedDraws: ['fl_matin'],
-                    multiDrawMode: false,
-                    selectedGame: 'borlette',
-                    currentCart: [],
-                    ticketsHistory: [],
-                    winningTickets: [],
-                    lotto4Options: [true, true, true],
-                    lotto5Options: [true, true, true],
-                    showNumericChips: false,
-                    showLottoGames: false,
-                    showSpecialGames: false,
-                    currentTab: 'home',
-                    isDrawBlocked: false,
-                    agentId: '',
-                    agentName: '',
-                    token: null,
-                    salesTotal: 0,
-                    winningsTotal: 0,
-                    profitLoss: 0
-                };
-            }
-        }
-
         async function initApp() {
-            // Vérifier si l'utilisateur est déjà connecté
-            const savedToken = localStorage.getItem('lotato_token');
-            const savedAgent = localStorage.getItem('lotato_agent');
-            
-            if (savedToken && savedAgent) {
+            // Charger la configuration du lottery
+            const savedConfig = localStorage.getItem('lotteryConfig');
+            if (savedConfig) {
                 try {
-                    const agent = JSON.parse(savedAgent);
-                    APP_STATE.token = savedToken;
-                    APP_STATE.agentId = agent.agentId;
-                    APP_STATE.agentName = agent.name;
+                    const config = JSON.parse(savedConfig);
+                    CONFIG.LOTTERY_NAME = config.name || CONFIG.LOTTERY_NAME;
+                    CONFIG.LOTTERY_LOGO = config.logo || CONFIG.LOTTERY_LOGO;
+                    CONFIG.LOTTERY_ADDRESS = config.address || CONFIG.LOTTERY_ADDRESS;
+                    CONFIG.LOTTERY_PHONE = config.phone || CONFIG.LOTTERY_PHONE;
                     
-                    // Cacher l'écran de connexion
-                    document.getElementById('login-screen').classList.remove('active');
-                    
-                    // Afficher l'interface principale
-                    document.querySelector('header').style.display = 'flex';
-                    document.querySelector('main').style.display = 'block';
-                    document.querySelector('.nav-bar').style.display = 'flex';
-                    document.getElementById('sync-status-bar').style.display = 'block';
-                    
-                    // Mettre à jour le nom de l'agent
-                    document.getElementById('agent-name').textContent = APP_STATE.agentName;
+                    document.getElementById('lottery-name').innerHTML = `${CONFIG.LOTTERY_NAME} <span class="pro-badge">vession 6</span>`;
                 } catch (e) {
-                    console.error('Erreur chargement session:', e);
-                    localStorage.removeItem('lotato_token');
-                    localStorage.removeItem('lotato_agent');
+                    console.error('Erreur chargement configuration:', e);
                 }
             }
             
-            // Charger l'historique depuis PostgreSQL
-            if (APP_STATE.token) {
-                await APIService.getTickets();
-                await APIService.getWinners();
-            }
+            // Charger l'historique depuis MongoDB
+            await APIService.getTickets();
+            
+            // Charger les tickets gagnants
+            await APIService.getWinningTickets();
             
             renderDraws();
             updateClock();
@@ -2737,13 +2796,18 @@
             // Vérifier le statut des tirages
             checkSelectedDrawStatus();
             
-            console.log("LOTATO PRO Ready - PostgreSQL Mode");
+            console.log("LOTATO PRO Ready - MongoDB Mode");
 
             setupInputAutoMove();
             
             document.getElementById('add-bet-btn').addEventListener('click', () => CartManager.addBet());
             
             updateGameSelector();
+            
+            document.getElementById('agent-input').addEventListener('change', function() {
+                document.getElementById('agent-name').textContent = this.value;
+                APP_STATE.agentId = this.value.toLowerCase().replace(/\s+/g, '-');
+            });
             
             document.querySelectorAll('#lotto4-options .option-chip').forEach((chip, index) => {
                 chip.querySelector('input').checked = APP_STATE.lotto4Options[index];
