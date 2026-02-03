@@ -23,6 +23,8 @@
             --success: #00f190;
             --danger: #ff4d4d;
             --warning: #ffa502;
+            --profit: #00ff88;
+            --loss: #ff4757;
             --florida: #ff4757;
             --newyork: #ffa502;
             --georgia: #2ed573;
@@ -95,6 +97,58 @@
             display: flex;
             align-items: center;
             gap: 8px;
+        }
+
+        /* Login Screen */
+        .login-screen {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 40px 20px;
+            min-height: 100vh;
+            text-align: center;
+        }
+
+        .login-card {
+            background: var(--surface);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 30px;
+            width: 100%;
+            max-width: 400px;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .login-input {
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            color: white;
+            font-size: 1rem;
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 15px;
+            margin-top: 20px;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-weight: bold;
+            font-size: 1.1rem;
+            cursor: pointer;
+        }
+
+        .login-error {
+            color: var(--danger);
+            margin-top: 10px;
+            font-size: 0.9rem;
+            display: none;
         }
 
         /* Tirages */
@@ -285,6 +339,15 @@
         .cart-actions {
             display: flex;
             gap: 10px;
+            align-items: center;
+        }
+
+        .cart-total {
+            background: rgba(173, 0, 241, 0.1);
+            padding: 10px 15px;
+            border-radius: 12px;
+            font-weight: bold;
+            border: 1px solid var(--primary);
         }
 
         .print-btn {
@@ -396,28 +459,98 @@
         }
         .val { font-family: 'Courier New', monospace; font-weight: bold; }
 
-        /* Settings */
-        .settings-screen {
+        /* Écran Gagnants */
+        .winners-screen {
             padding: 20px;
         }
-        .settings-card {
+        
+        .winners-summary {
             background: var(--surface);
             border-radius: 20px;
             padding: 20px;
             margin-bottom: 20px;
             border: 1px solid var(--glass-border);
         }
-        .setting-item {
+        
+        .summary-row {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 15px 0;
+            padding: 10px 0;
             border-bottom: 1px solid var(--glass-border);
         }
-        .setting-item:last-child {
-            border-bottom: none;
+        
+        .summary-row.total {
+            font-weight: bold;
+            font-size: 1.2rem;
+            border-top: 2px solid var(--glass-border);
+            margin-top: 10px;
+            padding-top: 15px;
         }
-
+        
+        .profit { color: var(--profit); }
+        .loss { color: var(--loss); }
+        
+        .winner-ticket {
+            background: rgba(255,255,255,0.03);
+            border-radius: 16px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 1px solid var(--glass-border);
+        }
+        
+        .winner-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--glass-border);
+        }
+        
+        .winner-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .btn-pay {
+            background: var(--success);
+            border: none;
+            border-radius: 10px;
+            color: black;
+            padding: 8px 15px;
+            cursor: pointer;
+            font-weight: bold;
+            flex: 1;
+        }
+        
+        .btn-pay:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .btn-need-funds {
+            background: var(--warning);
+            border: none;
+            border-radius: 10px;
+            color: black;
+            padding: 8px 15px;
+            cursor: pointer;
+            font-weight: bold;
+            flex: 1;
+        }
+        
+        .btn-paid {
+            background: var(--secondary);
+            border: none;
+            border-radius: 10px;
+            color: black;
+            padding: 8px 15px;
+            font-weight: bold;
+            flex: 1;
+        }
+        
         /* Modal Winner */
         .modal-overlay {
             position: fixed;
@@ -452,6 +585,48 @@
             border-radius: 12px;
             margin-top: 20px;
             cursor: pointer;
+        }
+        
+        /* Modal Funds */
+        .funds-modal {
+            background: var(--bg);
+            border-radius: 24px;
+            padding: 30px;
+            max-width: 90%;
+            width: 400px;
+            border: 2px solid var(--secondary);
+        }
+        
+        .modal-input {
+            width: 100%;
+            margin: 15px 0;
+            padding: 15px;
+            font-size: 1.2rem;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .modal-btn {
+            flex: 1;
+            padding: 12px;
+            border-radius: 12px;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .modal-btn.confirm {
+            background: var(--success);
+            color: black;
+        }
+        
+        .modal-btn.cancel {
+            background: var(--danger);
+            color: white;
         }
 
         /* Sync Bar */
@@ -755,24 +930,52 @@
 </head>
 <body>
     <div class="app-shell">
-        <div id="sync-status-bar" class="sync-idle">
+        <!-- Login Screen -->
+        <section id="login-screen" class="screen active">
+            <div class="login-screen">
+                <div class="login-card">
+                    <h1 style="margin-bottom: 5px;">LOTATO PRO</h1>
+                    <p style="color: var(--text-dim); margin-bottom: 30px;">Konekte pou kontinye</p>
+                    
+                    <input type="text" id="login-agent-id" class="login-input" placeholder="Kòd Ajan (ex: AGENT01)" value="AGENT01">
+                    <input type="password" id="login-password" class="login-input" placeholder="Modpas" value="123456">
+                    
+                    <div id="login-error" class="login-error">
+                        <i class="fas fa-exclamation-circle"></i> Kòd ajan oswa modpas pa kòrèk
+                    </div>
+                    
+                    <button id="login-btn" class="login-btn" onclick="loginAgent()">
+                        <i class="fas fa-sign-in-alt"></i> Konekte
+                    </button>
+                    
+                    <p style="margin-top: 20px; font-size: 0.8rem; color: var(--text-dim);">
+                        Kòd default: AGENT01 / 123456
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <div id="sync-status-bar" class="sync-idle" style="display: none;">
             <span id="sync-text">Vérification des résultats...</span>
         </div>
 
-        <header>
+        <header style="display: none;">
             <div class="brand">
-                <h1 class="logo-text">LOTATO <span class="pro-badge">vession 6</span></h1>
+                <h1 class="logo-text" id="lottery-name">LOTATO PRO <span class="pro-badge">vession 6</span></h1>
                 <div id="live-clock">00:00:00</div>
             </div>
             <div class="user-profile">
                 <i class="fas fa-user-circle"></i>
                 <span id="agent-name">Agent-01</span>
+                <button class="config-btn" onclick="logoutAgent()">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
             </div>
         </header>
 
-        <main class="content-area">
+        <main class="content-area" style="display: none;">
             <!-- Screen 1: Draw Selection -->
-            <section id="draw-selection-screen" class="screen active">
+            <section id="draw-selection-screen" class="screen">
                 <button class="back-button" onclick="goBackToDraws()" style="display:none;">
                     <i class="fas fa-arrow-left"></i> Retounen
                 </button>
@@ -903,6 +1106,7 @@
                             <span id="items-count">0 jwèt</span>
                         </div>
                         <div class="cart-actions">
+                            <div class="cart-total" id="cart-total-display">0 Gdes</div>
                             <button onclick="processFinalTicket()" class="print-btn" id="print-cart-btn">
                                 <i class="fas fa-print"></i> Enprime Fich
                             </button>
@@ -967,46 +1171,32 @@
                 </div>
             </section>
 
-            <!-- Screen 5: Settings -->
-            <section id="settings-screen" class="screen">
+            <!-- Screen 5: Winners -->
+            <section id="winners-screen" class="screen">
                 <div style="padding: 20px;">
-                    <h2 class="section-title">Sistèm</h2>
-                    <div class="settings-card">
-                        <div class="setting-item">
-                            <span>Non Ajan:</span>
-                            <input type="text" id="agent-input" value="Agent-01" style="width: 150px; padding: 8px; border-radius: 8px;">
+                    <h2 class="section-title">Jere Ganyen</h2>
+
+                    <div class="winners-summary">
+                        <h3 style="margin-bottom: 15px;">Rekapitilatif Tiraj</h3>
+                        <div class="summary-row">
+                            <span>Total Vann:</span>
+                            <span class="val">5,000 Gdes</span>
                         </div>
-                        <div class="setting-item">
-                            <span>Vèsyon:</span>
-                            <span>6.0.0</span>
+                        <div class="summary-row">
+                            <span>Total Ganyen:</span>
+                            <span class="val">1,500 Gdes</span>
                         </div>
-                        <div class="setting-item">
-                            <span>Dènye Mizajou:</span>
-                            <span id="last-update">2024-03-15</span>
+                        <div class="summary-row total">
+                            <span>Pwòfi/Pèt:</span>
+                            <span class="val profit" id="profit-loss">+3,500 Gdes</span>
                         </div>
                     </div>
 
-                    <div class="settings-card">
-                        <h3 style="margin-bottom: 15px;">Opsyon</h3>
-                        <div class="setting-item">
-                            <span>Son Ganyen:</span>
-                            <label class="switch">
-                                <input type="checkbox" id="sound-toggle" checked>
-                                <span class="slider"></span>
-                            </label>
-                        </div>
-                        <div class="setting-item">
-                            <span>Notifikasyon:</span>
-                            <label class="switch">
-                                <input type="checkbox" id="notif-toggle" checked>
-                                <span class="slider"></span>
-                            </label>
-                        </div>
+                    <h3 style="margin-bottom: 15px; margin-top: 30px;">Tikè Ganyen yo</h3>
+                    <div id="winners-container">
+                        <!-- Winning tickets will be inserted here -->
+                        <div class="empty-msg">Pa gen tikè ganyen pou kounye a</div>
                     </div>
-
-                    <button onclick="clearAllData()" style="width: 100%; padding: 15px; background: var(--danger); color: white; border: none; border-radius: 12px; margin-top: 20px;">
-                        <i class="fas fa-trash"></i> Efase Tout Done
-                    </button>
                 </div>
             </section>
         </main>
@@ -1020,7 +1210,7 @@
             </div>
         </div>
 
-        <nav class="nav-bar">
+        <nav class="nav-bar" style="display: none;">
             <a href="#" class="nav-item active" onclick="switchTab('home')">
                 <i class="fas fa-dice"></i><span>Jwèt</span>
             </a>
@@ -1030,8 +1220,8 @@
             <a href="#" class="nav-item" onclick="switchTab('reports')">
                 <i class="fas fa-chart-line"></i><span>Rapò</span>
             </a>
-            <a href="#" class="nav-item" onclick="switchTab('settings')">
-                <i class="fas fa-cog"></i><span>Sistèm</span>
+            <a href="#" class="nav-item" onclick="switchTab('winners')">
+                <i class="fas fa-trophy"></i><span>Ganyen</span>
             </a>
         </nav>
     </div>
@@ -1039,13 +1229,14 @@
     <script>
         // Configuration de l'API
         const API_CONFIG = {
-            BASE_URL: 'http://localhost:3000/api',
+            BASE_URL: window.location.origin + '/api',
             ENDPOINTS: {
+                LOGIN: '/auth/login',
+                LOGOUT: '/auth/logout',
+                VERIFY: '/auth/verify',
                 SAVE_TICKET: '/tickets/save',
                 GET_TICKETS: '/tickets',
-                GET_REPORTS: '/reports',
-                SAVE_AGENT: '/agent/save',
-                CHECK_DRAW_STATUS: '/draws/status'
+                GET_WINNERS: '/winners'
             }
         };
 
@@ -1082,6 +1273,7 @@
             selectedGame: 'borlette',
             currentCart: [],
             ticketsHistory: [],
+            winningTickets: [],
             lotto4Options: [true, true, true],
             lotto5Options: [true, true, true],
             showNumericChips: false,
@@ -1089,7 +1281,12 @@
             showSpecialGames: false,
             currentTab: 'home',
             isDrawBlocked: false,
-            agentId: 'AGENT01'
+            agentId: '',
+            agentName: '',
+            token: null,
+            salesTotal: 0,
+            winningsTotal: 0,
+            profitLoss: 0
         };
 
         // Fonction pour vérifier si un tirage est bloqué (3 minutes avant)
@@ -1097,29 +1294,19 @@
             const now = new Date();
             const currentHours = now.getHours();
             const currentMinutes = now.getMinutes();
+            const currentSeconds = now.getSeconds();
             
             const [hours, minutes] = drawTime.split(':').map(Number);
             
-            // Calculer le temps en minutes depuis minuit
-            const drawTimeInMinutes = hours * 60 + minutes;
-            const currentTimeInMinutes = currentHours * 60 + currentMinutes;
+            // Convertir tout en minutes pour faciliter la comparaison
+            const drawTotalMinutes = hours * 60 + minutes;
+            const currentTotalMinutes = currentHours * 60 + currentMinutes;
+            const currentTotalSeconds = currentTotalMinutes * 60 + currentSeconds;
             
-            // Bloquer 3 minutes avant
-            return currentTimeInMinutes >= (drawTimeInMinutes - 3) && currentTimeInMinutes < drawTimeInMinutes;
-        }
-
-        // Fonction pour vérifier le statut de tous les tirages
-        function checkAllDrawsStatus() {
-            const draws = CONFIG.DRAWS;
-            const now = new Date();
+            // Bloquer 3 minutes avant (180 secondes)
+            const blockedTime = drawTotalMinutes * 60 - 180;
             
-            draws.forEach(draw => {
-                if (isDrawBlocked(draw.time)) {
-                    console.log(`Tiraj ${draw.name} (${draw.time}) bloqué`);
-                    return true;
-                }
-            });
-            return false;
+            return currentTotalSeconds >= blockedTime && currentTotalSeconds < drawTotalMinutes * 60;
         }
 
         // Fonction pour vérifier le tirage sélectionné
@@ -1148,39 +1335,6 @@
             }
             
             return blocked;
-        }
-
-        // Fonction pour mettre à jour le statut de tous les tirages dans l'interface
-        function updateAllDrawsStatus() {
-            const draws = CONFIG.DRAWS;
-            
-            draws.forEach(draw => {
-                const drawElement = document.querySelector(`.draw-card[onclick*="${draw.id}"]`);
-                if (drawElement) {
-                    const blocked = isDrawBlocked(draw.time);
-                    
-                    if (blocked) {
-                        drawElement.classList.add('blocked');
-                        drawElement.classList.remove('active');
-                        // Changer l'onclick pour empêcher la sélection
-                        const onclickAttr = drawElement.getAttribute('onclick');
-                        if (onclickAttr && !onclickAttr.includes('return false')) {
-                            drawElement.setAttribute('onclick', 'alert("Tiraj sa a bloke! Ou pa ka ajoute paray."); return false;');
-                        }
-                    } else {
-                        drawElement.classList.remove('blocked');
-                        // Rétablir l'onclick original
-                        if (drawElement.getAttribute('onclick').includes('return false')) {
-                            drawElement.setAttribute('onclick', `selectDraw('${draw.id}')`);
-                        }
-                    }
-                }
-            });
-            
-            // Mettre à jour aussi les tirages dans la sélection multi-tirage
-            if (APP_STATE.multiDrawMode) {
-                updateMultiDrawSelector();
-            }
         }
 
         const SpecialGames = {
@@ -1403,79 +1557,90 @@
 
         // Fonctions API
         const APIService = {
-            async saveTicket(ticket) {
-                try {
-                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.SAVE_TICKET}`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            ...ticket,
-                            agentId: APP_STATE.agentId,
-                            date: new Date().toISOString()
-                        })
-                    });
-                    
-                    if (!response.ok) throw new Error('Erreur réseau');
-                    
-                    const data = await response.json();
-                    return data;
-                } catch (error) {
-                    console.error('Erreur sauvegarde ticket:', error);
-                    throw error;
+            async makeRequest(endpoint, method = 'GET', body = null) {
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+                
+                if (APP_STATE.token) {
+                    headers['Authorization'] = `Bearer ${APP_STATE.token}`;
                 }
-            },
-
-            async getTickets() {
-                try {
-                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.GET_TICKETS}?agentId=${APP_STATE.agentId}`);
-                    
-                    if (!response.ok) throw new Error('Erreur réseau');
-                    
-                    const data = await response.json();
-                    APP_STATE.ticketsHistory = data.tickets || [];
-                    return data;
-                } catch (error) {
-                    console.error('Erreur récupération tickets:', error);
-                    return { tickets: [] };
+                
+                const config = {
+                    method,
+                    headers
+                };
+                
+                if (body) {
+                    config.body = JSON.stringify(body);
                 }
-            },
-
-            async getReports() {
+                
                 try {
-                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.GET_REPORTS}?agentId=${APP_STATE.agentId}`);
+                    const response = await fetch(`${API_CONFIG.BASE_URL}${endpoint}`, config);
                     
-                    if (!response.ok) throw new Error('Erreur réseau');
-                    
-                    const data = await response.json();
-                    return data;
-                } catch (error) {
-                    console.error('Erreur récupération rapports:', error);
-                    return { totalTickets: 0, totalBets: 0, totalWins: 0, totalLoss: 0, balance: 0 };
-                }
-            },
-
-            async saveAgentConfig(config) {
-                try {
-                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.SAVE_AGENT}`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            agentId: APP_STATE.agentId,
-                            ...config
-                        })
-                    });
-                    
-                    if (!response.ok) throw new Error('Erreur réseau');
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.message || 'Erreur réseau');
+                    }
                     
                     return await response.json();
                 } catch (error) {
-                    console.error('Erreur sauvegarde agent:', error);
+                    console.error(`Erreur ${method} ${endpoint}:`, error);
                     throw error;
                 }
+            },
+
+            async login(agentId, password) {
+                try {
+                    const data = await this.makeRequest(API_CONFIG.ENDPOINTS.LOGIN, 'POST', {
+                        username: agentId,
+                        password: password
+                    });
+                    
+                    if (data.success) {
+                        APP_STATE.token = data.token;
+                        APP_STATE.agentId = data.user.agentId;
+                        APP_STATE.agentName = data.user.name;
+                        
+                        localStorage.setItem('lotato_token', data.token);
+                        localStorage.setItem('lotato_agent', JSON.stringify({
+                            agentId: data.user.agentId,
+                            name: data.user.name
+                        }));
+                    }
+                    
+                    return data;
+                } catch (error) {
+                    throw error;
+                }
+            },
+
+            async logout() {
+                try {
+                    await this.makeRequest(API_CONFIG.ENDPOINTS.LOGOUT, 'POST');
+                } catch (error) {
+                    // Ignorer les erreurs de déconnexion
+                } finally {
+                    localStorage.removeItem('lotato_token');
+                    localStorage.removeItem('lotato_agent');
+                    APP_STATE.token = null;
+                }
+            },
+
+            async saveTicket(ticket) {
+                return await this.makeRequest(API_CONFIG.ENDPOINTS.SAVE_TICKET, 'POST', ticket);
+            },
+
+            async getTickets() {
+                const data = await this.makeRequest(`${API_CONFIG.ENDPOINTS.GET_TICKETS}?agentId=${APP_STATE.agentId}`);
+                APP_STATE.ticketsHistory = data.tickets || [];
+                return data;
+            },
+
+            async getWinners() {
+                const data = await this.makeRequest(`${API_CONFIG.ENDPOINTS.GET_WINNERS}?agentId=${APP_STATE.agentId}`);
+                APP_STATE.winningTickets = data.winners || [];
+                return data;
             }
         };
 
@@ -1506,9 +1671,10 @@
                     document.querySelector('.nav-item:nth-child(3)').classList.add('active');
                     loadReports();
                     break;
-                case 'settings':
-                    screenId = 'settings-screen';
+                case 'winners':
+                    screenId = 'winners-screen';
                     document.querySelector('.nav-item:nth-child(4)').classList.add('active');
+                    loadWinners();
                     break;
             }
             
@@ -1561,17 +1727,17 @@
                 return `
                     <div class="history-card">
                         <div class="card-header">
-                            <span>#${ticket.id}</span>
-                            <span>${new Date(ticket.date).toLocaleDateString('fr-FR')}</span>
+                            <span>#${ticket.ticket_id}</span>
+                            <span>${new Date(ticket.created_at).toLocaleDateString('fr-FR')}</span>
                         </div>
                         <div>
-                            <p><strong>Tiraj:</strong> ${ticket.drawName}</p>
+                            <p><strong>Tiraj:</strong> ${ticket.draw_name}</p>
                             <p><strong>Total:</strong> ${ticket.total} Gdes</p>
-                            <p><strong>Nimewo:</strong> ${ticket.bets.length}</p>
+                            <p><strong>Nimewo:</strong> ${Array.isArray(ticket.bets) ? ticket.bets.length : 0}</p>
                         </div>
                         <div class="card-footer">
                             <span class="badge ${statusClass}">${status}</span>
-                            <button class="btn-small" onclick="viewTicketDetails('${ticket._id || ticket.id}')">
+                            <button class="btn-small" onclick="viewTicketDetails('${ticket.ticket_id}')">
                                 <i class="fas fa-eye"></i> Detay
                             </button>
                         </div>
@@ -1582,22 +1748,41 @@
 
         async function loadReports() {
             try {
-                const reports = await APIService.getReports();
+                // Pour l'instant, nous calculons les rapports localement
+                // À l'avenir, nous utiliserons une API dédiée
+                const totalTickets = APP_STATE.ticketsHistory.length;
+                const totalBets = APP_STATE.ticketsHistory.reduce((sum, ticket) => sum + parseFloat(ticket.total), 0);
+                const totalWins = APP_STATE.winningTickets.reduce((sum, ticket) => sum + parseFloat(ticket.winning_amount), 0);
+                const totalLoss = totalBets - totalWins;
+                const balance = totalBets - totalWins;
                 
-                document.getElementById('total-tickets').textContent = reports.totalTickets || 0;
-                document.getElementById('total-bets').textContent = (reports.totalBets || 0) + ' Gdes';
-                document.getElementById('total-wins').textContent = (reports.totalWins || 0) + ' Gdes';
-                document.getElementById('total-loss').textContent = (reports.totalLoss || 0) + ' Gdes';
-                document.getElementById('balance').textContent = (reports.balance || 0) + ' Gdes';
-                document.getElementById('balance').style.color = (reports.balance >= 0) ? 'var(--success)' : 'var(--danger)';
+                document.getElementById('total-tickets').textContent = totalTickets;
+                document.getElementById('total-bets').textContent = totalBets.toFixed(2) + ' Gdes';
+                document.getElementById('total-wins').textContent = totalWins.toFixed(2) + ' Gdes';
+                document.getElementById('total-loss').textContent = totalLoss.toFixed(2) + ' Gdes';
+                document.getElementById('balance').textContent = balance.toFixed(2) + ' Gdes';
+                document.getElementById('balance').style.color = balance >= 0 ? 'var(--success)' : 'var(--danger)';
                 
-                // Game breakdown - à adapter selon votre API
+                // Calculer la répartition par jeu
+                const gameBreakdown = {};
+                APP_STATE.ticketsHistory.forEach(ticket => {
+                    const bets = Array.isArray(ticket.bets) ? ticket.bets : [];
+                    bets.forEach(bet => {
+                        const gameType = bet.game || 'borlette';
+                        if (!gameBreakdown[gameType]) {
+                            gameBreakdown[gameType] = { count: 0, amount: 0 };
+                        }
+                        gameBreakdown[gameType].count++;
+                        gameBreakdown[gameType].amount += bet.amount;
+                    });
+                });
+                
                 const breakdownContainer = document.getElementById('game-breakdown');
-                if (reports.breakdown) {
-                    breakdownContainer.innerHTML = Object.entries(reports.breakdown).map(([game, data]) => `
+                if (Object.keys(gameBreakdown).length > 0) {
+                    breakdownContainer.innerHTML = Object.entries(gameBreakdown).map(([game, data]) => `
                         <div class="report-row">
                             <span>${game.toUpperCase()}:</span>
-                            <span class="val">${data.count} jwèt (${data.amount} Gdes)</span>
+                            <span class="val">${data.count} jwèt (${data.amount.toFixed(2)} Gdes)</span>
                         </div>
                     `).join('');
                 } else {
@@ -1607,22 +1792,132 @@
                 console.error('Erreur chargement rapports:', error);
             }
         }
+        
+        async function loadWinners() {
+            try {
+                await APIService.getWinners();
+                updateWinnersDisplay();
+                calculateProfitLoss();
+            } catch (error) {
+                console.error('Erreur chargement gagnants:', error);
+            }
+        }
+        
+        function updateWinnersDisplay() {
+            const container = document.getElementById('winners-container');
+            
+            if (APP_STATE.winningTickets.length === 0) {
+                container.innerHTML = '<div class="empty-msg">Pa gen tikè ganyen pou kounye a</div>';
+                return;
+            }
+            
+            container.innerHTML = APP_STATE.winningTickets.map(ticket => {
+                const isPaid = ticket.paid || false;
+                
+                return `
+                    <div class="winner-ticket">
+                        <div class="winner-header">
+                            <div>
+                                <strong>Tikè #${ticket.ticket_id}</strong>
+                                <div style="font-size: 0.8rem; color: var(--text-dim);">${ticket.draw_name} - ${new Date(ticket.created_at).toLocaleDateString('fr-FR')}</div>
+                            </div>
+                            <div style="font-weight: bold; color: var(--success);">
+                                ${parseFloat(ticket.winning_amount).toLocaleString()} Gdes
+                            </div>
+                        </div>
+                        <div>
+                            <p><strong>Nimewo Ganyen:</strong> ${ticket.winning_number}</p>
+                            <p><strong>Jwèt:</strong> ${ticket.game_type.toUpperCase()}</p>
+                            <p><strong>Kliyan:</strong> ${ticket.customer_name || 'Pa defini'}</p>
+                        </div>
+                        <div class="winner-actions">
+                            ${isPaid ? 
+                                '<button class="btn-paid" disabled><i class="fas fa-check"></i> Peye</button>' :
+                                `<button class="btn-pay" onclick="payWinner('${ticket.id}')">
+                                    <i class="fas fa-money-bill-wave"></i> Peye
+                                </button>`
+                            }
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function calculateProfitLoss() {
+            // Calculer le total des ventes
+            const totalSales = APP_STATE.ticketsHistory.reduce((sum, ticket) => {
+                return sum + parseFloat(ticket.total || 0);
+            }, 0);
+            
+            // Calculer le total des gains
+            const totalWinnings = APP_STATE.winningTickets.reduce((sum, ticket) => {
+                return sum + parseFloat(ticket.winning_amount || 0);
+            }, 0);
+            
+            // Calculer profit/perte
+            const profitLoss = totalSales - totalWinnings;
+            
+            // Mettre à jour l'état
+            APP_STATE.salesTotal = totalSales;
+            APP_STATE.winningsTotal = totalWinnings;
+            APP_STATE.profitLoss = profitLoss;
+            
+            // Mettre à jour l'affichage
+            document.getElementById('profit-loss').textContent = 
+                (profitLoss >= 0 ? '+' : '') + profitLoss.toFixed(2) + ' Gdes';
+            
+            document.getElementById('profit-loss').className = profitLoss >= 0 ? 'val profit' : 'val loss';
+            
+            // Mettre à jour les détails
+            const summaryContainer = document.querySelector('.winners-summary');
+            if (summaryContainer) {
+                summaryContainer.querySelectorAll('.summary-row')[0].querySelector('.val').textContent = 
+                    totalSales.toFixed(2) + ' Gdes';
+                summaryContainer.querySelectorAll('.summary-row')[1].querySelector('.val').textContent = 
+                    totalWinnings.toFixed(2) + ' Gdes';
+            }
+        }
+        
+        async function payWinner(ticketId) {
+            const ticket = APP_STATE.winningTickets.find(t => t.id == ticketId);
+            if (!ticket) return;
+            
+            if (confirm(`Èske ou vle peye ${ticket.winning_amount} Gdes pou Tikè #${ticket.ticket_id}?`)) {
+                try {
+                    // Marquer comme payé localement
+                    ticket.paid = true;
+                    
+                    // Mettre à jour l'affichage
+                    updateWinnersDisplay();
+                    calculateProfitLoss();
+                    
+                    alert(`Tikè #${ticket.ticket_id} peye siksè!`);
+                    
+                    // Ici vous devriez appeler l'API pour mettre à jour le statut du ticket
+                    // await APIService.markTicketAsPaid(ticketId);
+                } catch (error) {
+                    console.error('Erreur paiement:', error);
+                    alert('Erè nan peman an');
+                }
+            }
+        }
 
         function viewTicketDetails(ticketId) {
-            const ticket = APP_STATE.ticketsHistory.find(t => t._id === ticketId || t.id === ticketId);
+            const ticket = APP_STATE.ticketsHistory.find(t => t.ticket_id === ticketId);
             if (!ticket) return;
             
             let details = `
-                <h3>Detay Tikè #${ticket.id}</h3>
-                <p><strong>Tiraj:</strong> ${ticket.drawName}</p>
-                <p><strong>Dat:</strong> ${new Date(ticket.date).toLocaleString('fr-FR')}</p>
+                <h3>Detay Tikè #${ticket.ticket_id}</h3>
+                <p><strong>Tiraj:</strong> ${ticket.draw_name}</p>
+                <p><strong>Dat:</strong> ${new Date(ticket.created_at).toLocaleString('fr-FR')}</p>
                 <p><strong>Total:</strong> ${ticket.total} Gdes</p>
                 <hr>
                 <h4>Paray yo:</h4>
             `;
             
-            ticket.bets.forEach(bet => {
-                let gameName = bet.game.toUpperCase();
+            const bets = Array.isArray(ticket.bets) ? ticket.bets : [];
+            bets.forEach(bet => {
+                let gameName = bet.game?.toUpperCase() || 'BORLETTE';
                 if (bet.specialType) gameName = bet.specialType;
                 details += `<p>${gameName} ${bet.number} - ${bet.amount} Gdes ${bet.gain ? `(Ganyen: ${bet.gain} Gdes)` : ''}</p>`;
             });
@@ -1673,12 +1968,6 @@
             }).join('');
         }
 
-        function updateMultiDrawSelector() {
-            if (APP_STATE.multiDrawMode) {
-                renderMultiDrawSelector();
-            }
-        }
-
         function toggleMultiDrawSelection(drawId) {
             const checkbox = document.getElementById(`multi-${drawId}`);
             if (checkbox.checked) {
@@ -1698,18 +1987,6 @@
                 return;
             }
             
-            // Filtrer les tirages bloqués
-            const availableDraws = APP_STATE.selectedDraws.filter(drawId => {
-                const draw = CONFIG.DRAWS.find(d => d.id === drawId);
-                return draw && !isDrawBlocked(draw.time);
-            });
-            
-            if (availableDraws.length === 0) {
-                alert("Tout tiraj ou chwazi yo bloke. Tanpri chwazi lòt tiraj.");
-                return;
-            }
-            
-            APP_STATE.selectedDraws = availableDraws;
             APP_STATE.selectedDraw = APP_STATE.selectedDraws[0];
             const draw = CONFIG.DRAWS.find(d => d.id === APP_STATE.selectedDraw);
             document.getElementById('current-draw-title').textContent = draw.name;
@@ -1729,6 +2006,11 @@
         function updateClock() {
             const now = new Date();
             document.getElementById('live-clock').innerText = now.toLocaleTimeString('fr-FR');
+            
+            // Vérifier le statut du tirage toutes les 30 secondes
+            if (APP_STATE.currentTab === 'home' || APP_STATE.currentTab === 'betting') {
+                checkSelectedDrawStatus();
+            }
         }
 
         function renderDraws() {
@@ -1739,7 +2021,7 @@
                 
                 return `
                     <div class="draw-card ${isActive ? 'active' : ''} ${blocked ? 'blocked' : ''}" 
-                         onclick="${blocked ? 'alert(\"Tiraj sa a bloke! Ou pa ka ajoute paray.\"); return false;' : `selectDraw('${draw.id}')`}" 
+                         onclick="${blocked ? '' : `selectDraw('${draw.id}')`}" 
                          style="--draw-color: ${draw.color}">
                         <span class="draw-name">${draw.name}</span>
                         <span class="draw-time"><i class="far fa-clock"></i> ${draw.time}</span>
@@ -2145,11 +2427,13 @@
                 const summary = document.getElementById('cart-summary');
                 const totalDisplay = document.getElementById('total-amount');
                 const countDisplay = document.getElementById('items-count');
+                const cartTotalDisplay = document.getElementById('cart-total-display');
 
                 if (APP_STATE.currentCart.length === 0) {
                     display.innerHTML = '<div class="empty-msg">Pa gen paray ankò</div>';
                     summary.style.display = 'none';
                     countDisplay.innerText = "0 jwèt";
+                    cartTotalDisplay.innerText = "0 Gdes";
                     return;
                 }
 
@@ -2186,6 +2470,7 @@
 
                 totalDisplay.innerText = total;
                 countDisplay.innerText = APP_STATE.currentCart.length + " jwèt";
+                cartTotalDisplay.innerText = total.toLocaleString() + " Gdes";
                 summary.style.display = 'block';
                 
                 display.scrollTop = display.scrollHeight;
@@ -2220,39 +2505,44 @@
                     const draw = CONFIG.DRAWS.find(d => d.id === drawId);
                     
                     const ticket = {
-                        id: Math.floor(100000 + Math.random() * 900000),
                         agentId: APP_STATE.agentId,
-                        agentName: document.getElementById('agent-name').textContent,
+                        agentName: APP_STATE.agentName,
                         drawId: drawId,
                         drawName: draw.name,
                         bets: drawBets,
-                        total: drawBets.reduce((sum, b) => sum + b.amount, 0),
-                        date: new Date().toISOString(),
-                        checked: false
+                        total: drawBets.reduce((sum, b) => sum + b.amount, 0)
                     };
 
-                    // Sauvegarde dans MongoDB via API
+                    // Sauvegarde dans PostgreSQL via API
                     const savedTicket = await APIService.saveTicket(ticket);
                     tickets.push(savedTicket);
                     
                     // Mise à jour de l'historique local
-                    APP_STATE.ticketsHistory.unshift(savedTicket);
+                    if (savedTicket.success) {
+                        APP_STATE.ticketsHistory.unshift(savedTicket.ticket);
+                    }
                 }
                 
                 // Impression des tickets
                 tickets.forEach(ticket => {
-                    printThermalTicket(ticket);
+                    if (ticket.success) {
+                        printThermalTicket(ticket.ticket);
+                    }
                 });
                 
                 // Réinitialisation du panier
                 APP_STATE.currentCart = [];
                 CartManager.renderCart();
                 
-                if (tickets.length === 1) {
-                    alert("Fich sove ak siksè nan MongoDB! #" + tickets[0].id);
+                if (tickets.length === 1 && tickets[0].success) {
+                    alert("Fich sove ak siksè! #" + tickets[0].ticket.ticket_id);
                 } else {
-                    alert(`${tickets.length} fich sove ak siksè nan MongoDB!`);
+                    const successful = tickets.filter(t => t.success).length;
+                    alert(`${successful} fich sove ak siksè!`);
                 }
+                
+                // Recalculer les profits/pertes
+                calculateProfitLoss();
             } catch (error) {
                 console.error('Erreur sauvegarde:', error);
                 alert("Erè sou sèvè a. Fich la pa sove.");
@@ -2262,14 +2552,14 @@
         function printThermalTicket(ticket) {
             const printWindow = window.open('', '_blank', 'width=300,height=600');
             
-            let betsHtml = ticket.bets.map(b => {
+            let betsHtml = (Array.isArray(ticket.bets) ? ticket.bets : []).map(b => {
                 let gameName = '';
                 if (b.isAutoGenerated && b.specialType) {
                     gameName = b.specialType.toUpperCase();
                 } else if (b.isAutoGenerated) {
                     gameName = `${b.game.replace('_', ' ').toUpperCase()}*`;
                 } else {
-                    gameName = b.game.toUpperCase();
+                    gameName = (b.game || '').toUpperCase();
                 }
                 
                 return `
@@ -2282,14 +2572,16 @@
 
             const content = `
                 <html>
+                <head>
+                    <title>Ticket #${ticket.ticket_id}</title>
+                </head>
                 <body style="font-family:'Courier New', monospace; width:100%; padding:0; margin:0; text-align:center;">
                     <h2 style="margin-bottom:5px;">LOTATO PRO</h2>
-                    <p style="font-size:12px; margin:0;">Nouvelle Version 2024</p>
-                    <p style="font-size:12px;">--------------------------</p>
-                    <p style="font-size:14px; font-weight:bold;">TIRAJ: ${ticket.drawName.toUpperCase()}</p>
-                    <p style="font-size:12px;">TICKET: #${ticket.id}</p>
-                    <p style="font-size:12px;">DATE: ${new Date(ticket.date).toLocaleString('fr-FR')}</p>
-                    <p style="font-size:12px;">AJAN: ${ticket.agentName}</p>
+                    <p style="font-size:12px; margin:5px 0;">--------------------------</p>
+                    <p style="font-size:14px; font-weight:bold;">TIRAJ: ${ticket.draw_name.toUpperCase()}</p>
+                    <p style="font-size:12px;">TICKET: #${ticket.ticket_id}</p>
+                    <p style="font-size:12px;">DATE: ${new Date(ticket.created_at).toLocaleString('fr-FR')}</p>
+                    <p style="font-size:12px;">AJAN: ${ticket.agent_name}</p>
                     <p style="font-size:12px;">--------------------------</p>
                     <div style="text-align:left; padding:0 10px;">
                         ${betsHtml}
@@ -2312,41 +2604,146 @@
             }, 500);
         }
 
-        function clearAllData() {
-            if (confirm("Èske ou vle efase tout done lokal? Aksyon sa pa ka anile!")) {
-                APP_STATE.currentCart = [];
-                CartManager.renderCart();
-                alert("Done lokal efase!");
-            }
-        }
-
         function closeWinnerModal() {
             document.getElementById('winner-overlay').style.display = 'none';
         }
 
+        async function loginAgent() {
+            const agentId = document.getElementById('login-agent-id').value.trim().toUpperCase();
+            const password = document.getElementById('login-password').value;
+            const loginBtn = document.getElementById('login-btn');
+            const errorEl = document.getElementById('login-error');
+            
+            if (!agentId || !password) {
+                errorEl.textContent = "Tanpri ranpli tout chan yo";
+                errorEl.style.display = 'block';
+                return;
+            }
+            
+            loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Konekte...';
+            loginBtn.disabled = true;
+            errorEl.style.display = 'none';
+            
+            try {
+                const result = await APIService.login(agentId, password);
+                
+                if (result.success) {
+                    // Cacher l'écran de connexion
+                    document.getElementById('login-screen').classList.remove('active');
+                    
+                    // Afficher l'interface principale
+                    document.querySelector('header').style.display = 'flex';
+                    document.querySelector('main').style.display = 'block';
+                    document.querySelector('.nav-bar').style.display = 'flex';
+                    document.getElementById('sync-status-bar').style.display = 'block';
+                    
+                    // Mettre à jour le nom de l'agent
+                    document.getElementById('agent-name').textContent = APP_STATE.agentName;
+                    
+                    // Initialiser l'application
+                    await initApp();
+                } else {
+                    errorEl.textContent = result.message || "Koneksyon echwe";
+                    errorEl.style.display = 'block';
+                    loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Konekte';
+                    loginBtn.disabled = false;
+                }
+            } catch (error) {
+                errorEl.textContent = "Erè sèvè. Tanpri eseye ankò";
+                errorEl.style.display = 'block';
+                loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Konekte';
+                loginBtn.disabled = false;
+            }
+        }
+
+        async function logoutAgent() {
+            if (confirm("Èske ou vwe kite sesyon an?")) {
+                await APIService.logout();
+                
+                // Cacher l'interface principale
+                document.querySelector('header').style.display = 'none';
+                document.querySelector('main').style.display = 'none';
+                document.querySelector('.nav-bar').style.display = 'none';
+                document.getElementById('sync-status-bar').style.display = 'none';
+                
+                // Afficher l'écran de connexion
+                document.getElementById('login-screen').classList.add('active');
+                
+                // Réinitialiser l'état
+                APP_STATE = {
+                    selectedDraw: 'fl_matin',
+                    selectedDraws: ['fl_matin'],
+                    multiDrawMode: false,
+                    selectedGame: 'borlette',
+                    currentCart: [],
+                    ticketsHistory: [],
+                    winningTickets: [],
+                    lotto4Options: [true, true, true],
+                    lotto5Options: [true, true, true],
+                    showNumericChips: false,
+                    showLottoGames: false,
+                    showSpecialGames: false,
+                    currentTab: 'home',
+                    isDrawBlocked: false,
+                    agentId: '',
+                    agentName: '',
+                    token: null,
+                    salesTotal: 0,
+                    winningsTotal: 0,
+                    profitLoss: 0
+                };
+            }
+        }
+
         async function initApp() {
-            // Charger l'historique depuis MongoDB
-            await APIService.getTickets();
+            // Vérifier si l'utilisateur est déjà connecté
+            const savedToken = localStorage.getItem('lotato_token');
+            const savedAgent = localStorage.getItem('lotato_agent');
+            
+            if (savedToken && savedAgent) {
+                try {
+                    const agent = JSON.parse(savedAgent);
+                    APP_STATE.token = savedToken;
+                    APP_STATE.agentId = agent.agentId;
+                    APP_STATE.agentName = agent.name;
+                    
+                    // Cacher l'écran de connexion
+                    document.getElementById('login-screen').classList.remove('active');
+                    
+                    // Afficher l'interface principale
+                    document.querySelector('header').style.display = 'flex';
+                    document.querySelector('main').style.display = 'block';
+                    document.querySelector('.nav-bar').style.display = 'flex';
+                    document.getElementById('sync-status-bar').style.display = 'block';
+                    
+                    // Mettre à jour le nom de l'agent
+                    document.getElementById('agent-name').textContent = APP_STATE.agentName;
+                } catch (e) {
+                    console.error('Erreur chargement session:', e);
+                    localStorage.removeItem('lotato_token');
+                    localStorage.removeItem('lotato_agent');
+                }
+            }
+            
+            // Charger l'historique depuis PostgreSQL
+            if (APP_STATE.token) {
+                await APIService.getTickets();
+                await APIService.getWinners();
+            }
             
             renderDraws();
             updateClock();
             
-            // Vérifier le statut des tirages initialement
+            // Vérifier le statut des tirages
             checkSelectedDrawStatus();
-            updateAllDrawsStatus();
             
-            console.log("LOTATO PRO Ready - MongoDB Mode");
+            console.log("LOTATO PRO Ready - PostgreSQL Mode");
 
             setupInputAutoMove();
             
             document.getElementById('add-bet-btn').addEventListener('click', () => CartManager.addBet());
             
             updateGameSelector();
-            
-            document.getElementById('agent-input').addEventListener('change', function() {
-                document.getElementById('agent-name').textContent = this.value;
-                APP_STATE.agentId = this.value.toLowerCase().replace(/\s+/g, '-');
-            });
             
             document.querySelectorAll('#lotto4-options .option-chip').forEach((chip, index) => {
                 chip.querySelector('input').checked = APP_STATE.lotto4Options[index];
@@ -2356,15 +2753,13 @@
                 chip.querySelector('input').checked = APP_STATE.lotto5Options[index];
             });
             
-            // Vérifier les tirages toutes les 30 secondes
-            setInterval(() => {
-                checkSelectedDrawStatus();
-                updateAllDrawsStatus();
-            }, 30000);
+            // Calculer le profit/pertes initial
+            calculateProfitLoss();
         }
 
         document.addEventListener('DOMContentLoaded', initApp);
         setInterval(updateClock, 1000);
+        setInterval(checkSelectedDrawStatus, 30000); // Vérifier toutes les 30 secondes
 
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/service-worker.js')
