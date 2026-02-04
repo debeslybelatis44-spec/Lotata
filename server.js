@@ -1,760 +1,514 @@
 const express = require('express');
 const { Pool } = require('pg');
-const cors = require('cors');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Configuration PostgreSQL
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
+
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static('.'));
+app.use(express.static('.')); // Servir les fichiers HTML statiques
 
-// JWT Secret
-const JWT_SECRET = process.env.JWT_SECRET || 'lotato-pro-super-secret-key-2024';
-
-// Configuration PostgreSQL/Neon
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false
-  },
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-});
-
-// Test de connexion
-pool.on('connect', () => {
-  console.log('✅ Connecté à PostgreSQL/Neon');
-});
-
-pool.on('error', (err) => {
-  console.error('❌ Erreur PostgreSQL:', err);
-});
+// Secret JWT
+const JWT_SECRET = process.env.JWT_SECRET || 'votre_secret_jwt_super_securise_changez_moi';
 
 // Middleware d'authentification
-const authenticate = async (req, res, next) => {
-  try {
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    
-    if (!token) {
-      return res.status(401).json({
-        success: false,
-        message: 'Token obligatwa'
-      });
-    }
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
 
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch (error) {
-    return res.status(401).json({
-      success: false,
-      message: 'Token pa valab'
-    });
+  if (!token) {
+    return res.status(401).json({ error: 'Token manquant' });
   }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: 'Token invalide' });
+    }
+    req.user = user;
+    next();
+  });
 };
 
-// Middleware de vérification de rôle
-const requireRole = (roles) => {
+// Middleware pour vérifier le rôle
+const checkRole = (...roles) => {
   return (req, res, next) => {
     if (!roles.includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Ou pa gen otorizasyon'
-      });
+      return res.status(403).json({ error: 'Accès refusé' });
     }
     next();
   };
 };
 
-// Fonction helper pour exécuter les requêtes
-const db = {
-  query: async (text, params) => {
-    const client = await pool.connect();
-    try {
-      const result = await client.query(text, params);
-      return result;
-    } finally {
-      client.release();
-    }
-  }
-};
+// ==================== ROUTES D'AUTHENTIFICATION ====================
 
-// === CRÉATION DES TABLES ===
-async function createTables() {
-  try {
-    console.log('🗄️ Création des tables...');
-    
-    // Table des agents
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS agents (
-        id SERIAL PRIMARY KEY,
-        agent_id VARCHAR(20) UNIQUE NOT NULL,
-        agent_name VARCHAR(100) NOT NULL,
-        password VARCHAR(100) NOT NULL,
-        supervisor_id VARCHAR(20),
-        funds DECIMAL(10,2) DEFAULT 0,
-        online BOOLEAN DEFAULT false,
-        is_active BOOLEAN DEFAULT true,
-        location VARCHAR(200),
-        last_activity TIMESTAMP,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    // Table des superviseurs
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS supervisors (
-        id SERIAL PRIMARY KEY,
-        username VARCHAR(50) UNIQUE NOT NULL,
-        password VARCHAR(100) NOT NULL,
-        name VARCHAR(100) NOT NULL,
-        is_active BOOLEAN DEFAULT true,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    // Table des propriétaires
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS owners (
-        id SERIAL PRIMARY KEY,
-        username VARCHAR(50) UNIQUE NOT NULL,
-        password VARCHAR(100) NOT NULL,
-        name VARCHAR(100) NOT NULL,
-        is_active BOOLEAN DEFAULT true,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    // Table des tirages
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS draws (
-        id SERIAL PRIMARY KEY,
-        draw_id VARCHAR(10) UNIQUE NOT NULL,
-        draw_name VARCHAR(50) NOT NULL,
-        draw_time TIME NOT NULL,
-        is_active BOOLEAN DEFAULT true,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    // Table des tickets
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS tickets (
-        id SERIAL PRIMARY KEY,
-        ticket_id VARCHAR(50) UNIQUE NOT NULL,
-        agent_id VARCHAR(20) NOT NULL,
-        agent_name VARCHAR(100) NOT NULL,
-        draw_id VARCHAR(10) NOT NULL,
-        draw_name VARCHAR(50) NOT NULL,
-        bets JSONB NOT NULL,
-        total DECIMAL(10,2) NOT NULL,
-        checked BOOLEAN DEFAULT false,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    console.log('✅ Tables créées');
-    return true;
-  } catch (error) {
-    console.error('❌ Erreur création tables:', error.message);
-    return false;
-  }
-}
-
-// === CRÉATION DES COMPTES PAR DÉFAUT ===
-async function createDefaultAccounts() {
-  try {
-    console.log('👤 Création des comptes par défaut...');
-    
-    // Vérifier et créer le superviseur
-    const supervisorCheck = await db.query(
-      'SELECT * FROM supervisors WHERE username = $1',
-      ['supervisor']
-    );
-    
-    if (supervisorCheck.rows.length === 0) {
-      await db.query(
-        `INSERT INTO supervisors (username, password, name, is_active) 
-         VALUES ($1, $2, $3, $4)`,
-        ['supervisor', '123456', 'Supervizè Prensipal', true]
-      );
-      console.log('✅ Superviseur créé: supervisor / 123456');
-    }
-
-    // Vérifier et créer l'agent
-    const agentCheck = await db.query(
-      'SELECT * FROM agents WHERE agent_id = $1',
-      ['AGENT01']
-    );
-    
-    if (agentCheck.rows.length === 0) {
-      await db.query(
-        `INSERT INTO agents (agent_id, agent_name, password, supervisor_id, funds, is_active) 
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        ['AGENT01', 'Ajan Prensipal', '123456', 'supervisor', 50000, true]
-      );
-      console.log('✅ Agent créé: AGENT01 / 123456');
-    }
-
-    // Vérifier et créer le propriétaire
-    const ownerCheck = await db.query(
-      'SELECT * FROM owners WHERE username = $1',
-      ['owner']
-    );
-    
-    if (ownerCheck.rows.length === 0) {
-      await db.query(
-        `INSERT INTO owners (username, password, name, is_active) 
-         VALUES ($1, $2, $3, $4)`,
-        ['owner', '123456', 'Pwopriyetè', true]
-      );
-      console.log('✅ Propriétaire créé: owner / 123456');
-    }
-
-    // Créer des tirages par défaut
-    const drawsCheck = await db.query('SELECT COUNT(*) as count FROM draws');
-    if (parseInt(drawsCheck.rows[0].count) === 0) {
-      await db.query(`
-        INSERT INTO draws (draw_id, draw_name, draw_time, is_active) 
-        VALUES 
-          ('D001', 'Matin', '08:00:00', true),
-          ('D002', 'Midday', '12:00:00', true),
-          ('D003', 'Soir', '16:00:00', true),
-          ('D004', 'Night', '20:00:00', true)
-      `);
-      console.log('✅ 4 tirages créés');
-    }
-
-    console.log('✅ Comptes par défaut créés');
-    return true;
-  } catch (error) {
-    console.error('❌ Erreur création comptes:', error.message);
-    return false;
-  }
-}
-
-// === ROUTES D'AUTHENTIFICATION ===
-
-// 1. Connexion Agent
+// Connexion
 app.post('/api/auth/login', async (req, res) => {
   try {
-    console.log('🔐 Tentative connexion AGENT:', req.body);
-    const { username, password } = req.body;
-    
-    const result = await db.query(
-      'SELECT * FROM agents WHERE agent_id = $1',
-      [username.toUpperCase()]
+    const { username, password, role } = req.body;
+
+    if (!username || !password || !role) {
+      return res.status(400).json({ error: 'Tous les champs sont requis' });
+    }
+
+    const result = await pool.query(
+      'SELECT * FROM users WHERE username = $1 AND role = $2',
+      [username, role]
     );
-    
+
     if (result.rows.length === 0) {
-      console.log('❌ Agent non trouvé:', username);
-      return res.status(401).json({
-        success: false,
-        message: 'Kòd ajan pa egziste'
-      });
+      return res.status(401).json({ error: 'Identifiants incorrects' });
     }
 
-    const agent = result.rows[0];
-    console.log('✅ Agent trouvé:', agent.agent_name);
+    const user = result.rows[0];
+    const validPassword = await bcrypt.compare(password, user.password);
 
-    // Vérification mot de passe EN CLAIR
-    if (agent.password !== password) {
-      console.log('❌ Mot de passe incorrect');
-      return res.status(401).json({
-        success: false,
-        message: 'Modpas pa kòrèk'
-      });
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Identifiants incorrects' });
     }
-
-    console.log('✅ Connexion réussie');
 
     const token = jwt.sign(
-      {
-        id: agent.id,
-        agentId: agent.agent_id,
-        name: agent.agent_name,
-        role: 'agent',
-        supervisorId: agent.supervisor_id
-      },
+      { id: user.id, username: user.username, role: user.role },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
 
     res.json({
-      success: true,
-      message: 'Koneksyon reyisi',
-      token: token,
+      token,
       user: {
-        id: agent.id,
-        agentId: agent.agent_id,
-        name: agent.agent_name,
-        role: 'agent',
-        supervisorId: agent.supervisor_id
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        supervisorId: user.supervisor_id
       }
     });
   } catch (error) {
-    console.error('❌ Erreur connexion agent:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erè sèvè'
-    });
+    console.error('Erreur de connexion:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
-// 2. Connexion Superviseur
-app.post('/api/auth/supervisor-login', async (req, res) => {
+// ==================== ROUTES OWNER ====================
+
+// Créer un superviseur
+app.post('/api/owner/supervisors', authenticateToken, checkRole('owner'), async (req, res) => {
   try {
-    console.log('🔐 Tentative connexion SUPERVISEUR:', req.body);
-    const { username, password } = req.body;
-    
-    const result = await db.query(
-      'SELECT * FROM supervisors WHERE username = $1',
-      [username.toLowerCase()]
+    const { username, password, name } = req.body;
+
+    if (!username || !password || !name) {
+      return res.status(400).json({ error: 'Tous les champs sont requis' });
+    }
+
+    // Vérifier si le username existe déjà
+    const existing = await pool.query('SELECT id FROM users WHERE username = $1', [username]);
+    if (existing.rows.length > 0) {
+      return res.status(400).json({ error: 'Ce nom d\'utilisateur existe déjà' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const result = await pool.query(
+      `INSERT INTO users (username, password, name, role, created_by) 
+       VALUES ($1, $2, $3, 'supervisor', $4) 
+       RETURNING id, username, name, role, created_at`,
+      [username, hashedPassword, name, req.user.id]
     );
-    
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Erreur création superviseur:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Créer un agent
+app.post('/api/owner/agents', authenticateToken, checkRole('owner'), async (req, res) => {
+  try {
+    const { username, password, name, supervisorId } = req.body;
+
+    if (!username || !password || !name || !supervisorId) {
+      return res.status(400).json({ error: 'Tous les champs sont requis' });
+    }
+
+    // Vérifier que le superviseur existe
+    const supervisor = await pool.query(
+      'SELECT id FROM users WHERE id = $1 AND role = $2',
+      [supervisorId, 'supervisor']
+    );
+
+    if (supervisor.rows.length === 0) {
+      return res.status(400).json({ error: 'Superviseur invalide' });
+    }
+
+    // Vérifier si le username existe déjà
+    const existing = await pool.query('SELECT id FROM users WHERE username = $1', [username]);
+    if (existing.rows.length > 0) {
+      return res.status(400).json({ error: 'Ce nom d\'utilisateur existe déjà' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const result = await pool.query(
+      `INSERT INTO users (username, password, name, role, supervisor_id, created_by) 
+       VALUES ($1, $2, $3, 'agent', $4, $5) 
+       RETURNING id, username, name, role, supervisor_id, created_at`,
+      [username, hashedPassword, name, supervisorId, req.user.id]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Erreur création agent:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Lister tous les superviseurs
+app.get('/api/owner/supervisors', authenticateToken, checkRole('owner'), async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, username, name, created_at,
+       (SELECT COUNT(*) FROM users WHERE supervisor_id = u.id) as agent_count
+       FROM users u WHERE role = 'supervisor' ORDER BY created_at DESC`
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Erreur liste superviseurs:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Lister tous les agents
+app.get('/api/owner/agents', authenticateToken, checkRole('owner'), async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT a.id, a.username, a.name, a.supervisor_id, a.created_at,
+       s.name as supervisor_name,
+       (SELECT COUNT(*) FROM tickets WHERE agent_id = a.id) as ticket_count
+       FROM users a
+       LEFT JOIN users s ON a.supervisor_id = s.id
+       WHERE a.role = 'agent'
+       ORDER BY a.created_at DESC`
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Erreur liste agents:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Statistiques globales
+app.get('/api/owner/stats', authenticateToken, checkRole('owner'), async (req, res) => {
+  try {
+    const stats = await pool.query(`
+      SELECT 
+        (SELECT COUNT(*) FROM users WHERE role = 'supervisor') as supervisors,
+        (SELECT COUNT(*) FROM users WHERE role = 'agent') as agents,
+        (SELECT COUNT(*) FROM tickets) as total_tickets,
+        (SELECT COUNT(*) FROM tickets WHERE is_winner = true) as winning_tickets,
+        (SELECT COALESCE(SUM(amount), 0) FROM tickets) as total_amount,
+        (SELECT COALESCE(SUM(winning_amount), 0) FROM tickets WHERE is_winner = true) as total_winnings
+    `);
+    res.json(stats.rows[0]);
+  } catch (error) {
+    console.error('Erreur stats:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// ==================== ROUTES SUPERVISEUR ====================
+
+// Lister les agents du superviseur
+app.get('/api/supervisor/agents', authenticateToken, checkRole('supervisor'), async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT a.id, a.username, a.name, a.created_at,
+       (SELECT COUNT(*) FROM tickets WHERE agent_id = a.id) as ticket_count,
+       (SELECT COALESCE(SUM(amount), 0) FROM tickets WHERE agent_id = a.id) as total_sales
+       FROM users a
+       WHERE a.supervisor_id = $1 AND a.role = 'agent'
+       ORDER BY a.created_at DESC`,
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Erreur liste agents superviseur:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Lister tous les tickets des agents
+app.get('/api/supervisor/tickets', authenticateToken, checkRole('supervisor'), async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT t.*, u.name as agent_name, u.username as agent_username
+       FROM tickets t
+       JOIN users u ON t.agent_id = u.id
+       WHERE u.supervisor_id = $1
+       ORDER BY t.created_at DESC`,
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Erreur liste tickets superviseur:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Supprimer un ticket (si moins de 10 minutes)
+app.delete('/api/supervisor/tickets/:id', authenticateToken, checkRole('supervisor'), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Vérifier que le ticket appartient à un agent du superviseur et a moins de 10 minutes
+    const result = await pool.query(
+      `DELETE FROM tickets t
+       USING users u
+       WHERE t.id = $1 
+       AND t.agent_id = u.id 
+       AND u.supervisor_id = $2
+       AND t.created_at > NOW() - INTERVAL '10 minutes'
+       RETURNING t.id`,
+      [id, req.user.id]
+    );
+
     if (result.rows.length === 0) {
-      console.log('❌ Superviseur non trouvé:', username);
-      return res.status(401).json({
-        success: false,
-        message: 'Supervizè pa egziste'
-      });
+      return res.status(400).json({ error: 'Ticket non trouvé ou délai de 10 minutes dépassé' });
     }
 
-    const supervisor = result.rows[0];
-
-    // Vérification mot de passe EN CLAIR
-    if (supervisor.password !== password) {
-      console.log('❌ Mot de passe incorrect');
-      return res.status(401).json({
-        success: false,
-        message: 'Modpas pa kòrèk'
-      });
-    }
-
-    console.log('✅ Connexion réussie');
-
-    const token = jwt.sign(
-      {
-        id: supervisor.id,
-        username: supervisor.username,
-        name: supervisor.name,
-        role: 'supervisor'
-      },
-      JWT_SECRET,
-      { expiresIn: '24h' }
-    );
-
-    res.json({
-      success: true,
-      message: 'Koneksyon reyisi',
-      token: token,
-      user: {
-        id: supervisor.id,
-        username: supervisor.username,
-        name: supervisor.name,
-        role: 'supervisor'
-      }
-    });
+    res.json({ message: 'Ticket supprimé avec succès' });
   } catch (error) {
-    console.error('❌ Erreur connexion superviseur:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erè sèvè'
-    });
+    console.error('Erreur suppression ticket:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
-// 3. Connexion Propriétaire
-app.post('/api/auth/owner-login', async (req, res) => {
+// Statistiques du superviseur
+app.get('/api/supervisor/stats', authenticateToken, checkRole('supervisor'), async (req, res) => {
   try {
-    console.log('🔐 Tentative connexion PROPRIÉTAIRE:', req.body);
-    const { username, password } = req.body;
-    
-    const result = await db.query(
-      'SELECT * FROM owners WHERE username = $1',
-      [username.toLowerCase()]
-    );
-    
-    if (result.rows.length === 0) {
-      console.log('❌ Propriétaire non trouvé:', username);
-      return res.status(401).json({
-        success: false,
-        message: 'Pwopriyetè pa egziste'
-      });
-    }
-
-    const owner = result.rows[0];
-
-    // Vérification mot de passe EN CLAIR
-    if (owner.password !== password) {
-      console.log('❌ Mot de passe incorrect');
-      return res.status(401).json({
-        success: false,
-        message: 'Modpas pa kòrèk'
-      });
-    }
-
-    console.log('✅ Connexion réussie');
-
-    const token = jwt.sign(
-      {
-        id: owner.id,
-        username: owner.username,
-        name: owner.name,
-        role: 'owner'
-      },
-      JWT_SECRET,
-      { expiresIn: '24h' }
-    );
-
-    res.json({
-      success: true,
-      message: 'Koneksyon reyisi',
-      token: token,
-      user: {
-        id: owner.id,
-        username: owner.username,
-        name: owner.name,
-        role: 'owner'
-      }
-    });
+    const stats = await pool.query(`
+      SELECT 
+        (SELECT COUNT(*) FROM users WHERE supervisor_id = $1 AND role = 'agent') as agents,
+        (SELECT COUNT(*) FROM tickets t JOIN users u ON t.agent_id = u.id WHERE u.supervisor_id = $1) as total_tickets,
+        (SELECT COUNT(*) FROM tickets t JOIN users u ON t.agent_id = u.id WHERE u.supervisor_id = $1 AND t.is_winner = true) as winning_tickets,
+        (SELECT COALESCE(SUM(t.amount), 0) FROM tickets t JOIN users u ON t.agent_id = u.id WHERE u.supervisor_id = $1) as total_sales
+    `, [req.user.id]);
+    res.json(stats.rows[0]);
   } catch (error) {
-    console.error('❌ Erreur connexion propriétaire:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erè sèvè'
-    });
+    console.error('Erreur stats superviseur:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
-// Vérification de session
-app.get('/api/auth/verify', authenticate, async (req, res) => {
-  res.json({
-    success: true,
-    user: req.user
-  });
-});
+// ==================== ROUTES AGENT ====================
 
-// Déconnexion
-app.post('/api/auth/logout', authenticate, async (req, res) => {
+// Créer un ticket
+app.post('/api/agent/tickets', authenticateToken, checkRole('agent'), async (req, res) => {
   try {
-    if (req.user.role === 'agent') {
-      await db.query(
-        'UPDATE agents SET online = false WHERE agent_id = $1',
-        [req.user.agentId]
-      );
-    }
-    
-    res.json({
-      success: true,
-      message: 'Dekonekte avèk siksè'
-    });
-  } catch (error) {
-    res.json({
-      success: true,
-      message: 'Dekonekte avèk siksè'
-    });
-  }
-});
+    const { draw, numbers, amount, customerName, customerPhone } = req.body;
 
-// Initialiser les tables et comptes
-app.post('/api/init/default-accounts', async (req, res) => {
-  try {
-    console.log('🚀 Initialisation des tables et comptes...');
-    
-    await createTables();
-    await createDefaultAccounts();
-    
-    res.json({
-      success: true,
-      message: 'Sistèm inisyalize avèk siksè'
-    });
-  } catch (error) {
-    console.error('❌ Erreur initialisation:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erè initializasyon'
-    });
-  }
-});
-
-// === ROUTES AGENT ===
-
-// Récupérer les tirages actifs
-app.get('/api/draws/active', authenticate, requireRole(['agent']), async (req, res) => {
-  try {
-    const result = await db.query(
-      'SELECT * FROM draws WHERE is_active = true ORDER BY draw_time'
-    );
-    
-    const draws = result.rows.map(draw => ({
-      drawId: draw.draw_id,
-      drawName: draw.draw_name,
-      drawTime: draw.draw_time,
-      isActive: draw.is_active
-    }));
-    
-    res.json({
-      success: true,
-      draws
-    });
-  } catch (error) {
-    console.error('Erreur récupération tirages:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erreur tirages'
-    });
-  }
-});
-
-// Sauvegarder un ticket
-app.post('/api/tickets/save', authenticate, requireRole(['agent']), async (req, res) => {
-  try {
-    const ticketData = req.body;
-    
-    const agentResult = await db.query(
-      'SELECT * FROM agents WHERE agent_id = $1 AND is_active = true',
-      [req.user.agentId]
-    );
-    
-    if (agentResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Ajan pa jwenn'
-      });
+    if (!draw || !numbers || !amount) {
+      return res.status(400).json({ error: 'Champs requis manquants' });
     }
+
+    // Valider les numéros selon le tirage
+    const numbersArray = Array.isArray(numbers) ? numbers : JSON.parse(numbers);
     
-    const agent = agentResult.rows[0];
-    
-    // Vérifier si le tirage existe
-    const drawResult = await db.query(
-      'SELECT * FROM draws WHERE draw_id = $1',
-      [ticketData.drawId]
-    );
-    
-    if (drawResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Tiraj pa jwenn'
-      });
+    let valid = false;
+    switch(draw) {
+      case 'miami':
+      case 'newyork':
+      case 'texas':
+        valid = numbersArray.length === 2 && numbersArray.every(n => n >= 0 && n <= 99);
+        break;
+      case 'georgia':
+        valid = numbersArray.length === 3 && numbersArray.every(n => n >= 0 && n <= 99);
+        break;
+      case 'tunisia':
+        valid = numbersArray.length === 4 && numbersArray.every(n => n >= 0 && n <= 99);
+        break;
     }
-    
-    if (parseFloat(agent.funds) < ticketData.total) {
-      return res.status(400).json({
-        success: false,
-        message: 'Fonds ensifizan'
-      });
+
+    if (!valid) {
+      return res.status(400).json({ error: 'Numéros invalides pour ce tirage' });
     }
-    
-    const ticketId = `T${Date.now()}${Math.floor(Math.random() * 1000)}`;
-    
-    const result = await db.query(
-      `INSERT INTO tickets (ticket_id, agent_id, agent_name, draw_id, draw_name, bets, total, checked) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+
+    const result = await pool.query(
+      `INSERT INTO tickets (agent_id, draw, numbers, amount, customer_name, customer_phone) 
+       VALUES ($1, $2, $3, $4, $5, $6) 
        RETURNING *`,
-      [
-        ticketId,
-        req.user.agentId,
-        req.user.name,
-        ticketData.drawId,
-        ticketData.drawName,
-        JSON.stringify(ticketData.bets),
-        ticketData.total,
-        false
-      ]
+      [req.user.id, draw, JSON.stringify(numbersArray), amount, customerName, customerPhone]
     );
-    
-    const newFunds = parseFloat(agent.funds) - ticketData.total;
-    await db.query(
-      'UPDATE agents SET funds = $1 WHERE agent_id = $2',
-      [newFunds, req.user.agentId]
-    );
-    
-    res.status(201).json({
-      success: true,
-      message: 'Ticket sove',
-      ticket: result.rows[0]
-    });
+
+    res.status(201).json(result.rows[0]);
   } catch (error) {
-    console.error('Erreur sauvegarde ticket:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erreur sove ticket'
-    });
+    console.error('Erreur création ticket:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
-// Récupérer les tickets d'un agent
-app.get('/api/tickets', authenticate, async (req, res) => {
+// Lister les tickets de l'agent
+app.get('/api/agent/tickets', authenticateToken, checkRole('agent'), async (req, res) => {
   try {
-    const { agentId } = req.query;
-    const user = req.user;
-    
-    // Vérifier les permissions
-    if (user.role === 'agent' && user.agentId !== agentId) {
-      return res.status(403).json({
-        success: false,
-        message: 'Pa gen aksè'
+    const result = await pool.query(
+      `SELECT * FROM tickets 
+       WHERE agent_id = $1 
+       ORDER BY created_at DESC`,
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Erreur liste tickets agent:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Vérifier les résultats d'un tirage
+app.post('/api/agent/check-results', authenticateToken, checkRole('agent'), async (req, res) => {
+  try {
+    const { draw, winningNumbers } = req.body;
+
+    if (!draw || !winningNumbers) {
+      return res.status(400).json({ error: 'Tirage et numéros gagnants requis' });
+    }
+
+    const winningArray = Array.isArray(winningNumbers) ? winningNumbers : JSON.parse(winningNumbers);
+
+    // Récupérer tous les tickets de ce tirage pour cet agent
+    const tickets = await pool.query(
+      `SELECT * FROM tickets 
+       WHERE agent_id = $1 AND draw = $2 AND is_winner IS NULL
+       ORDER BY created_at DESC`,
+      [req.user.id, draw]
+    );
+
+    const results = [];
+
+    for (const ticket of tickets.rows) {
+      const ticketNumbers = typeof ticket.numbers === 'string' 
+        ? JSON.parse(ticket.numbers) 
+        : ticket.numbers;
+
+      // Calculer les correspondances
+      const matches = ticketNumbers.filter(num => winningArray.includes(num)).length;
+      const isWinner = matches >= 2; // Au moins 2 numéros corrects pour gagner
+      
+      let winningAmount = 0;
+      if (isWinner) {
+        // Calcul du gain selon le nombre de correspondances et le tirage
+        const baseAmount = parseFloat(ticket.amount);
+        switch(matches) {
+          case 2:
+            winningAmount = baseAmount * 5;
+            break;
+          case 3:
+            winningAmount = baseAmount * 50;
+            break;
+          case 4:
+            winningAmount = baseAmount * 500;
+            break;
+        }
+      }
+
+      // Mettre à jour le ticket
+      await pool.query(
+        `UPDATE tickets 
+         SET is_winner = $1, winning_amount = $2, winning_numbers = $3, checked_at = NOW()
+         WHERE id = $4`,
+        [isWinner, winningAmount, JSON.stringify(winningArray), ticket.id]
+      );
+
+      results.push({
+        id: ticket.id,
+        numbers: ticketNumbers,
+        isWinner,
+        matches,
+        winningAmount,
+        amount: ticket.amount
       });
     }
-    
-    const result = await db.query(
-      'SELECT * FROM tickets WHERE agent_id = $1 ORDER BY created_at DESC LIMIT 100',
-      [agentId]
-    );
-    
-    res.json({
-      success: true,
-      tickets: result.rows
+
+    res.json({ 
+      draw, 
+      winningNumbers: winningArray, 
+      results,
+      totalWinners: results.filter(r => r.isWinner).length
     });
   } catch (error) {
-    console.error('Erreur récupération tickets:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erreur tickets'
-    });
+    console.error('Erreur vérification résultats:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
-// Récupérer les rapports
-app.get('/api/reports', authenticate, async (req, res) => {
+// Statistiques de l'agent
+app.get('/api/agent/stats', authenticateToken, checkRole('agent'), async (req, res) => {
   try {
-    const { agentId } = req.query;
-    const user = req.user;
-    
-    if (user.role === 'agent' && user.agentId !== agentId) {
-      return res.status(403).json({
-        success: false,
-        message: 'Pa gen aksè'
-      });
-    }
-    
-    // Calculer les totaux
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const ticketsResult = await db.query(
-      `SELECT COUNT(*) as total_tickets, COALESCE(SUM(total), 0) as total_bets
-       FROM tickets WHERE agent_id = $1 AND created_at >= $2`,
-      [agentId, today]
-    );
-    
-    const agentResult = await db.query(
-      'SELECT funds FROM agents WHERE agent_id = $1',
-      [agentId]
-    );
-    
-    const agent = agentResult.rows[0];
-    const totalTickets = parseInt(ticketsResult.rows[0].total_tickets);
-    const totalBets = parseFloat(ticketsResult.rows[0].total_bets);
-    
-    res.json({
-      success: true,
-      totalTickets,
-      totalBets,
-      totalWins: 0,
-      totalLoss: totalBets,
-      balance: totalBets,
-      breakdown: {}
-    });
+    const stats = await pool.query(`
+      SELECT 
+        COUNT(*) as total_tickets,
+        COUNT(*) FILTER (WHERE is_winner = true) as winning_tickets,
+        COALESCE(SUM(amount), 0) as total_sales,
+        COALESCE(SUM(winning_amount), 0) as total_winnings,
+        COUNT(*) FILTER (WHERE draw = 'miami') as miami_tickets,
+        COUNT(*) FILTER (WHERE draw = 'newyork') as newyork_tickets,
+        COUNT(*) FILTER (WHERE draw = 'georgia') as georgia_tickets,
+        COUNT(*) FILTER (WHERE draw = 'texas') as texas_tickets,
+        COUNT(*) FILTER (WHERE draw = 'tunisia') as tunisia_tickets
+      FROM tickets 
+      WHERE agent_id = $1
+    `, [req.user.id]);
+    res.json(stats.rows[0]);
   } catch (error) {
-    console.error('Erreur récupération rapports:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erreur rapports'
-    });
+    console.error('Erreur stats agent:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
-// === ROUTES FICHIERS STATIQUES ===
+// ==================== ROUTES DES FICHIERS HTML ====================
 
-// Route pour la page de connexion
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Route pour l'interface agent
-app.get('/agent1.html', (req, res) => {
-  res.sendFile(path.join(__dirname, 'agent1.html'));
-});
-
-// Route pour l'interface superviseur
-app.get('/supervisor.html', (req, res) => {
-  res.sendFile(path.join(__dirname, 'supervisor.html'));
-});
-
-// Route pour l'interface propriétaire
 app.get('/owner.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'owner.html'));
 });
 
-// Route de santé
+app.get('/responsable.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'responsable.html'));
+});
+
+app.get('/agent1.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'agent1.html'));
+});
+
+// Test de la connexion DB
 app.get('/api/health', async (req, res) => {
   try {
-    await db.query('SELECT 1');
-    res.json({
-      success: true,
-      message: 'API LOTATO PRO fonksyone',
-      timestamp: new Date().toISOString(),
-      database: 'PostgreSQL/Neon - Konekte'
-    });
+    await pool.query('SELECT NOW()');
+    res.json({ status: 'ok', database: 'connected' });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Erè koneksyon database'
-    });
+    res.status(500).json({ status: 'error', database: 'disconnected' });
   }
 });
 
-// Gestion des erreurs 404
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'Rout pa jwenn'
-  });
+// Démarrage du serveur
+app.listen(PORT, () => {
+  console.log(`✅ Serveur démarré sur le port ${PORT}`);
+  console.log(`🌐 API disponible sur http://localhost:${PORT}`);
 });
 
-// Middleware de gestion d'erreurs global
-app.use((err, req, res, next) => {
-  console.error('Erreur globale:', err);
-  res.status(500).json({
-    success: false,
-    message: 'Erè sèvè'
-  });
-});
-
-// Initialiser le serveur
-async function initializeServer() {
-  try {
-    console.log('🚀 Démarrage LOTATO PRO...');
-    
-    // Créer les tables
-    await createTables();
-    
-    // Créer les comptes par défaut
-    await createDefaultAccounts();
-    
-    console.log('\n✅ Serveur prêt!');
-    console.log('📡 URL: http://localhost:' + PORT);
-    console.log('\n👤 Comptes disponibles:');
-    console.log('   - Agent: AGENT01 / 123456');
-    console.log('   - Superviseur: supervisor / 123456');
-    console.log('   - Propriétaire: owner / 123456');
-    
-  } catch (error) {
-    console.error('❌ Erreur initialisation:', error.message);
-  }
-}
-
-// Démarrer le serveur
-app.listen(PORT, async () => {
-  console.log(`\n🚀 Serveur LOTATO PRO démarré sur le port ${PORT}`);
-  await initializeServer();
+// Gestion des erreurs non capturées
+process.on('unhandledRejection', (err) => {
+  console.error('Erreur non gérée:', err);
 });

@@ -3,11 +3,18 @@ services:
     name: lotato-pro
     env: node
     buildCommand: npm install
-    startCommand: npm start
+    startCommand: node server.js
     envVars:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        sync: false
-    healthCheckPath: /api/health
-    autoDeploy: true
+        fromDatabase:
+          name: lotato-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+    
+databases:
+  - name: lotato-db
+    databaseName: lotato_pro
+    user: lotato_user
