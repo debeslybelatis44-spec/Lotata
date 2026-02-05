@@ -9,7 +9,6 @@
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="manifest" href="/manifest.json">
     <style>
         :root {
             --primary: #ad00f1;
@@ -99,7 +98,7 @@
             gap: 8px;
         }
 
-        /* Multi-draw continue button - POSITION CORRIGÉE */
+        /* Multi-draw continue button */
         #multi-draw-continue {
             position: sticky;
             top: 80px;
@@ -132,25 +131,32 @@
             box-shadow: 0 0 20px rgba(0, 241, 144, 0.5);
         }
 
-        /* Tirages */
+        /* Tirages - AJUSTÉ POUR TUNISIE */
         .draw-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 12px;
             padding: 20px;
             margin-top: 20px;
+            min-height: 70vh;
+            overflow-y: auto;
         }
 
         .draw-card {
             background: var(--surface);
             border: 1px solid var(--glass-border);
             border-radius: 20px;
-            padding: 15px;
+            padding: 20px 15px;
             text-align: center;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             cursor: pointer;
             position: relative;
             overflow: hidden;
+            min-height: 100px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }
 
         .draw-card.active {
@@ -177,6 +183,17 @@
             border-radius: 10px;
             font-size: 0.8rem;
             font-weight: bold;
+        }
+
+        .draw-name {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .draw-time {
+            font-size: 0.85rem;
+            color: var(--text-dim);
         }
 
         /* Betting Panel */
@@ -407,7 +424,7 @@
         .history-screen {
             padding: 20px;
         }
-        .history-list { display: flex; flex-direction: column; gap: 15px; padding-bottom: 80px; }
+        .history-list { display: flex; flex-direction: column; gap: 15px; padding-bottom: 100px; }
         .history-card {
             background: var(--surface);
             border: 1px solid var(--glass-border);
@@ -600,58 +617,16 @@
             transform: translateX(26px);
         }
         
-        /* Configuration button */
+        /* Configuration button - SUPPRIMÉ */
         .config-btn {
-            background: none;
-            border: none;
-            color: var(--text-dim);
-            font-size: 1.2rem;
-            cursor: pointer;
-            padding: 5px;
-        }
-        
-        /* Lottery configuration */
-        .lottery-config {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.8);
             display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 3000;
         }
         
-        .config-modal {
-            background: var(--bg);
-            border-radius: 24px;
-            padding: 30px;
-            max-width: 90%;
-            width: 400px;
-            border: 2px solid var(--primary);
+        /* Lottery configuration - SUPPRIMÉ */
+        .lottery-config {
+            display: none;
         }
         
-        .config-item {
-            margin: 15px 0;
-        }
-        
-        .config-label {
-            display: block;
-            margin-bottom: 5px;
-            color: var(--text-dim);
-        }
-        
-        .config-input {
-            width: 100%;
-            padding: 10px;
-            border-radius: 8px;
-            background: rgba(255,255,255,0.05);
-            border: 1px solid var(--glass-border);
-            color: white;
-        }
-
         /* Screen States */
         .screen {
             display: none;
@@ -767,7 +742,7 @@
             display: flex;
         }
 
-        /* Lotto 4/5 options - MODIFIÉ POUR CHAQUE OPTION = JEU SÉPARÉ */
+        /* Lotto 4/5 options */
         .lotto-options {
             display: none;
             gap: 10px;
@@ -917,6 +892,49 @@
             color: var(--text-dim);
             margin-top: 2px;
         }
+        
+        /* Rapport par tirage */
+        .report-draw-selector {
+            margin: 15px 20px;
+        }
+        
+        .print-report-btn {
+            background: var(--secondary);
+            border: none;
+            border-radius: 12px;
+            color: black;
+            font-weight: bold;
+            padding: 10px 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 20px auto;
+        }
+        
+        .draw-report-summary {
+            background: var(--surface);
+            border-radius: 16px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 1px solid var(--glass-border);
+        }
+        
+        /* Bouton supprimer historique */
+        .delete-history-btn {
+            background: rgba(255, 77, 77, 0.1);
+            border: 1px solid var(--danger);
+            color: var(--danger);
+            padding: 5px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.75rem;
+        }
+        
+        .delete-history-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
@@ -933,9 +951,6 @@
             <div class="user-profile">
                 <i class="fas fa-user-circle"></i>
                 <span id="agent-name">Agent-01</span>
-                <button class="config-btn" onclick="openLotteryConfig()">
-                    <i class="fas fa-cog"></i>
-                </button>
             </div>
         </header>
 
@@ -954,7 +969,7 @@
                     </button>
                 </div>
 
-                <!-- BOUTON CONTINUER MULTI-TIRAGE DÉPLACÉ EN HAUT -->
+                <!-- BOUTON CONTINUER MULTI-TIRAGE -->
                 <div id="multi-draw-continue" style="display: none;">
                     <button onclick="continueToBettingWithMultiDraw()" class="btn-success-full">
                         <i class="fas fa-play"></i> Kontinye ak Tiraj Chwazi yo (<span id="selected-draws-count-multi">0</span>)
@@ -987,7 +1002,7 @@
                     <i class="fas fa-layer-group"></i> Jwe pou plizyè tiraj: <span id="selected-draws-count">1</span> tiraj
                 </div>
 
-                <!-- Lotto 4 Options - MODIFIÉ POUR CHAQUE OPTION SÉPARÉE -->
+                <!-- Lotto 4 Options -->
                 <div id="lotto4-options" class="lotto-options">
                     <div class="option-chip active" data-option="1" onclick="toggleLottoOption(4, 1)">
                         <input type="checkbox" id="opt1-4" checked>
@@ -1006,7 +1021,7 @@
                     </div>
                 </div>
 
-                <!-- Lotto 5 Options - MODIFIÉ POUR CHAQUE OPTION SÉPARÉE -->
+                <!-- Lotto 5 Options -->
                 <div id="lotto5-options" class="lotto-options">
                     <div class="option-chip active" data-option="1" onclick="toggleLottoOption(5, 1)">
                         <input type="checkbox" id="opt1-5" checked>
@@ -1113,7 +1128,42 @@
             <section id="reports-screen" class="screen">
                 <div style="padding: 20px;">
                     <h2 class="section-title">Rapò Jodi a</h2>
-                    <div class="report-card">
+                    
+                    <!-- Sélecteur de tirage pour rapport -->
+                    <div class="report-draw-selector">
+                        <select id="draw-report-selector" class="chip" style="width: 100%; padding: 12px;" onchange="loadDrawReport()">
+                            <option value="all">Tout Tiraj</option>
+                            <!-- Options seront ajoutées dynamiquement -->
+                        </select>
+                    </div>
+                    
+                    <!-- Rapport du tirage sélectionné -->
+                    <div class="report-card" id="draw-report-card">
+                        <div class="report-row">
+                            <span>Total Tikè:</span>
+                            <span class="val" id="draw-total-tickets">0</span>
+                        </div>
+                        <div class="report-row">
+                            <span>Total Pari:</span>
+                            <span class="val" id="draw-total-bets">0 Gdes</span>
+                        </div>
+                        <div class="report-row">
+                            <span>Total Ganyen:</span>
+                            <span class="val" id="draw-total-wins">0 Gdes</span>
+                        </div>
+                        <div class="report-row">
+                            <span>Pèdi:</span>
+                            <span class="val" id="draw-total-loss">0 Gdes</span>
+                        </div>
+                        <div class="report-row total">
+                            <span>Balans:</span>
+                            <span class="val" id="draw-balance">0 Gdes</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Rapport général -->
+                    <div class="report-card" id="general-report-card">
+                        <h3 style="margin-bottom: 15px;">Rapò Jeneral Jodi a</h3>
                         <div class="report-row">
                             <span>Total Tikè:</span>
                             <span class="val" id="total-tickets">0</span>
@@ -1131,7 +1181,7 @@
                             <span class="val" id="total-loss">0 Gdes</span>
                         </div>
                         <div class="report-row total">
-                            <span>Balans:</span>
+                            <span>Balans Total:</span>
                             <span class="val" id="balance">0 Gdes</span>
                         </div>
                     </div>
@@ -1142,6 +1192,11 @@
                             <!-- Game breakdown will be inserted here -->
                         </div>
                     </div>
+                    
+                    <!-- Bouton pour imprimer rapport -->
+                    <button onclick="printReport()" class="print-report-btn">
+                        <i class="fas fa-print"></i> Enprime Rapò
+                    </button>
                 </div>
             </section>
 
@@ -1151,18 +1206,18 @@
                     <h2 class="section-title">Tikè Ganyen yo</h2>
                     
                     <div class="winners-summary">
-                        <h3 style="margin-bottom: 15px;">Rekapitilatif Tiraj</h3>
+                        <h3 style="margin-bottom: 15px;">Rekapitilatif Jodi a</h3>
                         <div class="summary-row">
-                            <span>Total Vann:</span>
-                            <span class="val">5,000 Gdes</span>
+                            <span>Total Tikè Ganyen:</span>
+                            <span class="val" id="total-winners-today">0</span>
                         </div>
                         <div class="summary-row">
                             <span>Total Ganyen:</span>
-                            <span class="val">1,500 Gdes</span>
+                            <span class="val" id="total-winning-amount">0 Gdes</span>
                         </div>
                         <div class="summary-row total">
-                            <span>Pwòfi/Pèt:</span>
-                            <span class="val profit" id="profit-loss">+3,500 Gdes</span>
+                            <span>Mwayèn Ganyen:</span>
+                            <span class="val" id="average-winning">0 Gdes</span>
                         </div>
                     </div>
 
@@ -1183,32 +1238,6 @@
                 <button onclick="closeWinnerModal()" class="btn-close">OK</button>
             </div>
         </div>
-        
-        <div id="lottery-config" class="lottery-config">
-            <div class="config-modal">
-                <h2>Konfigirasyon Lotri</h2>
-                <div class="config-item">
-                    <label class="config-label">Non Lotri:</label>
-                    <input type="text" id="config-lottery-name" class="config-input" value="LOTATO PRO">
-                </div>
-                <div class="config-item">
-                    <label class="config-label">URL Logo:</label>
-                    <input type="text" id="config-logo-url" class="config-input" placeholder="https://example.com/logo.png">
-                </div>
-                <div class="config-item">
-                    <label class="config-label">Adrès:</label>
-                    <input type="text" id="config-address" class="config-input" placeholder="Adrès biznis la">
-                </div>
-                <div class="config-item">
-                    <label class="config-label">Telefòn:</label>
-                    <input type="text" id="config-phone" class="config-input" placeholder="+509XXXXXXXX">
-                </div>
-                <div style="display: flex; gap: 10px; margin-top: 20px;">
-                    <button onclick="saveLotteryConfig()" style="flex: 1; padding: 12px; background: var(--success); color: black; border: none; border-radius: 12px; font-weight: bold;">Sove</button>
-                    <button onclick="closeLotteryConfig()" style="flex: 1; padding: 12px; background: var(--danger); color: white; border: none; border-radius: 12px; font-weight: bold;">Fèmen</button>
-                </div>
-            </div>
-        </div>
 
         <nav class="nav-bar">
             <a href="#" class="nav-item active" onclick="switchTab('home')">
@@ -1227,7 +1256,7 @@
     </div>
 
     <script>
-        // Configuration de l'API - ADAPTÉE POUR VOTRE SERVEUR RENDER
+        // Configuration de l'API
         const API_CONFIG = {
             BASE_URL: 'https://lotata-islp.onrender.com/api',
             ENDPOINTS: {
@@ -1237,21 +1266,13 @@
                 GET_REPORTS: '/reports',
                 GET_DRAWS: '/draws',
                 GET_WINNERS: '/winners',
+                GET_WINNING_RESULTS: '/winners/results',
                 PAY_WINNER: '/winners/pay',
                 GET_AGENTS: '/agents',
-                CREATE_AGENT: '/agents/create',
-                BLOCK_AGENT: '/agents/:id/block',
-                GET_SUPERVISORS: '/supervisors',
-                UPDATE_FUNDS: '/agents/:id/funds',
-                PUBLISH_DRAW: '/draws/publish',
-                GET_BLOCKED_NUMBERS: '/blocked-numbers',
-                UPDATE_BLOCKED_NUMBERS: '/blocked-numbers',
+                DELETE_TICKET: '/tickets/delete',
+                GET_DRAW_REPORT: '/reports/draw',
                 GET_LOTTERY_CONFIG: '/lottery-config',
-                UPDATE_LOTTERY_CONFIG: '/lottery-config',
-                GET_ACTIVITY: '/activity',
-                HEALTH: '/health',
-                DRAW_STATUS: '/draws/status',
-                GET_AGENT: '/agent/:id'
+                CHECK_WINNING_TICKETS: '/tickets/check-winners'
             }
         };
 
@@ -1280,7 +1301,7 @@
                 { id: 'tn_soir', name: 'Tunisia Soir', time: '17:00', color: 'var(--tunisia)' }
             ],
             LOTTERY_NAME: 'LOTATO PRO',
-            LOTTERY_LOGO: '',
+            LOTTERY_LOGO: '/logo.png', // Logo à la racine
             LOTTERY_ADDRESS: '',
             LOTTERY_PHONE: ''
         };
@@ -1293,15 +1314,17 @@
             currentCart: [],
             ticketsHistory: [],
             winningTickets: [],
-            // MODIFIÉ: Chaque option est maintenant un jeu séparé
-            lotto4Options: [true, true, true],  // [option1, option2, option3]
-            lotto5Options: [true, true, true],  // [option1, option2, option3]
+            winningResults: [],
+            lotto4Options: [true, true, true],
+            lotto5Options: [true, true, true],
             showNumericChips: false,
             showLottoGames: false,
             showSpecialGames: false,
             currentTab: 'home',
             isDrawBlocked: false,
-            agentId: 'agent-01'
+            agentId: 'agent-01',
+            agentName: 'Agent-01',
+            lotteryConfig: null
         };
 
         // Fonction pour vérifier si un tirage est bloqué (3 minutes avant)
@@ -1564,7 +1587,6 @@
                 return autoBets;
             },
             
-            // NOUVELLE FONCTION: Générer des paris Lotto 4/5 avec options
             generateLottoBetsWithOptions(gameType, num, amount) {
                 const bets = [];
                 const cleanNum = this.getCleanNumber(num);
@@ -1597,7 +1619,7 @@
                             drawId: APP_STATE.selectedDraw,
                             timestamp: new Date().toISOString(),
                             isAutoGenerated: false,
-                            option: i + 1 // Option 1, 2 ou 3
+                            option: i + 1
                         });
                     }
                 }
@@ -1618,6 +1640,7 @@
                         body: JSON.stringify({
                             ...ticket,
                             agentId: APP_STATE.agentId,
+                            agentName: APP_STATE.agentName,
                             date: new Date().toISOString()
                         })
                     });
@@ -1661,6 +1684,20 @@
                 }
             },
 
+            async getDrawReport(drawId) {
+                try {
+                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.GET_DRAW_REPORT}?agentId=${APP_STATE.agentId}&drawId=${drawId}`);
+                    
+                    if (!response.ok) throw new Error('Erreur réseau');
+                    
+                    const data = await response.json();
+                    return data;
+                } catch (error) {
+                    console.error('Erreur récupération rapport tirage:', error);
+                    return { totalTickets: 0, totalBets: 0, totalWins: 0, totalLoss: 0, balance: 0 };
+                }
+            },
+
             async getWinningTickets() {
                 try {
                     const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.GET_WINNERS}?agentId=${APP_STATE.agentId}`);
@@ -1673,6 +1710,73 @@
                 } catch (error) {
                     console.error('Erreur récupération gagnants:', error);
                     return { winners: [] };
+                }
+            },
+
+            async getWinningResults() {
+                try {
+                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.GET_WINNING_RESULTS}?agentId=${APP_STATE.agentId}`);
+                    
+                    if (!response.ok) throw new Error('Erreur réseau');
+                    
+                    const data = await response.json();
+                    APP_STATE.winningResults = data.results || [];
+                    return data;
+                } catch (error) {
+                    console.error('Erreur récupération résultats gagnants:', error);
+                    return { results: [] };
+                }
+            },
+
+            async deleteTicket(ticketId) {
+                try {
+                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.DELETE_TICKET}/${ticketId}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    });
+                    
+                    if (!response.ok) throw new Error('Erreur réseau');
+                    
+                    const data = await response.json();
+                    return data;
+                } catch (error) {
+                    console.error('Erreur suppression ticket:', error);
+                    throw error;
+                }
+            },
+
+            async getLotteryConfig() {
+                try {
+                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.GET_LOTTERY_CONFIG}`);
+                    
+                    if (!response.ok) throw new Error('Erreur réseau');
+                    
+                    const data = await response.json();
+                    return data;
+                } catch (error) {
+                    console.error('Erreur récupération configuration:', error);
+                    return null;
+                }
+            },
+
+            async checkWinningTickets() {
+                try {
+                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.CHECK_WINNING_TICKETS}?agentId=${APP_STATE.agentId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    });
+                    
+                    if (!response.ok) throw new Error('Erreur réseau');
+                    
+                    const data = await response.json();
+                    return data;
+                } catch (error) {
+                    console.error('Erreur vérification tickets gagnants:', error);
+                    throw error;
                 }
             }
         };
@@ -1757,59 +1861,199 @@
                     statusClass = 'badge-wait';
                 }
                 
+                // Vérifier si le ticket peut être supprimé (5 minutes après création)
+                const ticketDate = new Date(ticket.date);
+                const now = new Date();
+                const minutesDiff = (now - ticketDate) / (1000 * 60);
+                const canDelete = minutesDiff <= 5;
+                
                 return `
                     <div class="history-card">
                         <div class="card-header">
-                            <span>#${ticket.id}</span>
-                            <span>${new Date(ticket.date).toLocaleDateString('fr-FR')}</span>
+                            <span>#${ticket.ticket_id || ticket.id}</span>
+                            <span>${new Date(ticket.date).toLocaleDateString('fr-FR')} ${new Date(ticket.date).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}</span>
                         </div>
                         <div>
-                            <p><strong>Tiraj:</strong> ${ticket.drawName}</p>
-                            <p><strong>Total:</strong> ${ticket.total} Gdes</p>
-                            <p><strong>Nimewo:</strong> ${ticket.bets.length}</p>
+                            <p><strong>Tiraj:</strong> ${ticket.draw_name}</p>
+                            <p><strong>Total:</strong> ${ticket.total_amount} Gdes</p>
+                            <p><strong>Nimewo:</strong> ${Array.isArray(ticket.bets) ? ticket.bets.length : 0}</p>
                         </div>
                         <div class="card-footer">
                             <span class="badge ${statusClass}">${status}</span>
-                            <button class="btn-small" onclick="viewTicketDetails('${ticket._id || ticket.id}')">
-                                <i class="fas fa-eye"></i> Detay
-                            </button>
+                            <div style="display: flex; gap: 5px;">
+                                <button class="btn-small" onclick="viewTicketDetails('${ticket.id}')">
+                                    <i class="fas fa-eye"></i> Detay
+                                </button>
+                                <button class="delete-history-btn" onclick="deleteTicket('${ticket.id}')" ${canDelete ? '' : 'disabled'}>
+                                    <i class="fas fa-trash"></i> Efase
+                                </button>
+                            </div>
                         </div>
                     </div>
                 `;
             }).join('');
         }
 
+        async function deleteTicket(ticketId) {
+            if (!confirm('Èske ou sèten ou vle efase tikè sa a?')) return;
+            
+            try {
+                await APIService.deleteTicket(ticketId);
+                // Retirer du tableau local
+                APP_STATE.ticketsHistory = APP_STATE.ticketsHistory.filter(t => t.id !== ticketId);
+                renderHistory();
+                alert('Tikè efase ak siksè!');
+            } catch (error) {
+                console.error('Erreur suppression:', error);
+                alert('Erè nan efasman tikè a.');
+            }
+        }
+
         async function loadReports() {
             try {
+                // Charger le rapport général
                 const reports = await APIService.getReports();
                 
+                // Mettre à jour les statistiques générales
                 document.getElementById('total-tickets').textContent = reports.totalTickets || 0;
-                document.getElementById('total-bets').textContent = (reports.totalBets || 0) + ' Gdes';
-                document.getElementById('total-wins').textContent = (reports.totalWins || 0) + ' Gdes';
-                document.getElementById('total-loss').textContent = (reports.totalLoss || 0) + ' Gdes';
-                document.getElementById('balance').textContent = (reports.balance || 0) + ' Gdes';
+                document.getElementById('total-bets').textContent = (reports.totalBets || 0).toLocaleString() + ' Gdes';
+                document.getElementById('total-wins').textContent = (reports.totalWins || 0).toLocaleString() + ' Gdes';
+                document.getElementById('total-loss').textContent = (reports.totalLoss || 0).toLocaleString() + ' Gdes';
+                document.getElementById('balance').textContent = (reports.balance || 0).toLocaleString() + ' Gdes';
                 document.getElementById('balance').style.color = (reports.balance >= 0) ? 'var(--success)' : 'var(--danger)';
                 
-                // Game breakdown - à adapter selon votre API
-                const breakdownContainer = document.getElementById('game-breakdown');
-                if (reports.breakdown) {
-                    breakdownContainer.innerHTML = Object.entries(reports.breakdown).map(([game, data]) => `
-                        <div class="report-row">
-                            <span>${game.toUpperCase()}:</span>
-                            <span class="val">${data.count} jwèt (${data.amount} Gdes)</span>
-                        </div>
-                    `).join('');
-                } else {
-                    breakdownContainer.innerHTML = '<div class="empty-msg">Pa gen done detay</div>';
-                }
+                // Remplir le sélecteur de tirage
+                const drawSelector = document.getElementById('draw-report-selector');
+                drawSelector.innerHTML = '<option value="all">Tout Tiraj</option>';
+                
+                CONFIG.DRAWS.forEach(draw => {
+                    const option = document.createElement('option');
+                    option.value = draw.id;
+                    option.textContent = draw.name;
+                    drawSelector.appendChild(option);
+                });
+                
+                // Charger le rapport pour "Tout Tiraj" par défaut
+                await loadDrawReport('all');
+                
             } catch (error) {
                 console.error('Erreur chargement rapports:', error);
             }
+        }
+
+        async function loadDrawReport(drawId = null) {
+            try {
+                const selectedDrawId = drawId || document.getElementById('draw-report-selector').value;
+                
+                if (selectedDrawId === 'all') {
+                    // Afficher les statistiques générales
+                    document.getElementById('draw-report-card').style.display = 'block';
+                    
+                    // Copier les valeurs générales
+                    document.getElementById('draw-total-tickets').textContent = document.getElementById('total-tickets').textContent;
+                    document.getElementById('draw-total-bets').textContent = document.getElementById('total-bets').textContent;
+                    document.getElementById('draw-total-wins').textContent = document.getElementById('total-wins').textContent;
+                    document.getElementById('draw-total-loss').textContent = document.getElementById('total-loss').textContent;
+                    document.getElementById('draw-balance').textContent = document.getElementById('balance').textContent;
+                    document.getElementById('draw-balance').style.color = document.getElementById('balance').style.color;
+                } else {
+                    // Charger les statistiques spécifiques au tirage
+                    const drawReport = await APIService.getDrawReport(selectedDrawId);
+                    const draw = CONFIG.DRAWS.find(d => d.id === selectedDrawId);
+                    
+                    document.getElementById('draw-report-card').style.display = 'block';
+                    document.getElementById('draw-total-tickets').textContent = drawReport.totalTickets || 0;
+                    document.getElementById('draw-total-bets').textContent = (drawReport.totalBets || 0).toLocaleString() + ' Gdes';
+                    document.getElementById('draw-total-wins').textContent = (drawReport.totalWins || 0).toLocaleString() + ' Gdes';
+                    document.getElementById('draw-total-loss').textContent = (drawReport.totalLoss || 0).toLocaleString() + ' Gdes';
+                    document.getElementById('draw-balance').textContent = (drawReport.balance || 0).toLocaleString() + ' Gdes';
+                    document.getElementById('draw-balance').style.color = (drawReport.balance >= 0) ? 'var(--success)' : 'var(--danger)';
+                }
+                
+            } catch (error) {
+                console.error('Erreur chargement rapport tirage:', error);
+            }
+        }
+
+        function printReport() {
+            const printWindow = window.open('', '_blank', 'width=800,height=600');
+            
+            const drawSelector = document.getElementById('draw-report-selector');
+            const selectedDraw = drawSelector.options[drawSelector.selectedIndex].text;
+            const selectedDrawId = drawSelector.value;
+            
+            let reportData = '';
+            
+            if (selectedDrawId === 'all') {
+                reportData = `
+                    <h2>Rapò Jeneral Jodi a</h2>
+                    <p><strong>Dat:</strong> ${new Date().toLocaleDateString('fr-FR')}</p>
+                    <p><strong>Ajant:</strong> ${APP_STATE.agentName}</p>
+                    <hr>
+                    <p>Total Tikè: ${document.getElementById('total-tickets').textContent}</p>
+                    <p>Total Pari: ${document.getElementById('total-bets').textContent}</p>
+                    <p>Total Ganyen: ${document.getElementById('total-wins').textContent}</p>
+                    <p>Pèdi: ${document.getElementById('total-loss').textContent}</p>
+                    <p><strong>Balans Total: ${document.getElementById('balance').textContent}</strong></p>
+                `;
+            } else {
+                reportData = `
+                    <h2>Rapò Tiraj ${selectedDraw}</h2>
+                    <p><strong>Dat:</strong> ${new Date().toLocaleDateString('fr-FR')}</p>
+                    <p><strong>Ajant:</strong> ${APP_STATE.agentName}</p>
+                    <hr>
+                    <p>Total Tikè: ${document.getElementById('draw-total-tickets').textContent}</p>
+                    <p>Total Pari: ${document.getElementById('draw-total-bets').textContent}</p>
+                    <p>Total Ganyen: ${document.getElementById('draw-total-wins').textContent}</p>
+                    <p>Pèdi: ${document.getElementById('draw-total-loss').textContent}</p>
+                    <p><strong>Balans: ${document.getElementById('draw-balance').textContent}</strong></p>
+                `;
+            }
+            
+            const lotteryConfig = APP_STATE.lotteryConfig || CONFIG;
+            const logoHtml = lotteryConfig.logo ? 
+                `<img src="${lotteryConfig.logo}" style="max-width: 100px; margin: 10px auto; display: block;" alt="${lotteryConfig.name}">` : 
+                '';
+            const addressHtml = lotteryConfig.address ? `<p style="font-size:12px;">${lotteryConfig.address}</p>` : '';
+            const phoneHtml = lotteryConfig.phone ? `<p style="font-size:12px;">Tel: ${lotteryConfig.phone}</p>` : '';
+            
+            const content = `
+                <html>
+                <head>
+                    <title>Rapò ${selectedDraw}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; }
+                        h2 { color: #333; }
+                        hr { border: 1px solid #ccc; margin: 20px 0; }
+                        p { margin: 10px 0; }
+                    </style>
+                </head>
+                <body style="text-align:center;">
+                    ${logoHtml}
+                    <h1>${lotteryConfig.name}</h1>
+                    ${addressHtml}
+                    ${phoneHtml}
+                    <hr>
+                    ${reportData}
+                    <hr>
+                    <p style="font-size:12px;">Jenere nan: ${new Date().toLocaleString('fr-FR')}</p>
+                </body>
+                </html>
+            `;
+
+            printWindow.document.write(content);
+            printWindow.document.close();
+            
+            setTimeout(() => {
+                printWindow.print();
+                printWindow.close();
+            }, 500);
         }
         
         async function loadWinners() {
             try {
                 await APIService.getWinningTickets();
+                await APIService.getWinningResults();
                 updateWinnersDisplay();
             } catch (error) {
                 console.error('Erreur chargement gagnants:', error);
@@ -1821,32 +2065,53 @@
             
             if (APP_STATE.winningTickets.length === 0) {
                 container.innerHTML = '<div class="empty-msg">Pa gen tikè ganyen pou kounye a</div>';
+                
+                // Mettre à jour le résumé
+                document.getElementById('total-winners-today').textContent = '0';
+                document.getElementById('total-winning-amount').textContent = '0 Gdes';
+                document.getElementById('average-winning').textContent = '0 Gdes';
                 return;
             }
             
+            // Calculer les totaux
+            const totalWins = APP_STATE.winningTickets.length;
+            const totalAmount = APP_STATE.winningTickets.reduce((sum, ticket) => sum + (ticket.win_amount || 0), 0);
+            const averageWin = totalAmount / totalWins;
+            
+            // Mettre à jour le résumé
+            document.getElementById('total-winners-today').textContent = totalWins;
+            document.getElementById('total-winning-amount').textContent = totalAmount.toLocaleString() + ' Gdes';
+            document.getElementById('average-winning').textContent = averageWin.toFixed(2).toLocaleString() + ' Gdes';
+            
+            // Afficher les tickets gagnants
             container.innerHTML = APP_STATE.winningTickets.map(ticket => {
                 const isPaid = ticket.paid || false;
+                const winningResults = APP_STATE.winningResults.find(r => r.drawId === ticket.draw_id);
+                const resultStr = winningResults ? winningResults.numbers.join(', ') : 'N/A';
                 
                 return `
                     <div class="winner-ticket">
                         <div class="winner-header">
                             <div>
-                                <strong>Tikè #${ticket.ticketId}</strong>
-                                <div style="font-size: 0.8rem; color: var(--text-dim);">${ticket.drawName} - ${new Date(ticket.date).toLocaleDateString('fr-FR')}</div>
+                                <strong>Tikè #${ticket.ticket_id || ticket.id}</strong>
+                                <div style="font-size: 0.8rem; color: var(--text-dim);">
+                                    ${ticket.draw_name} - ${new Date(ticket.date).toLocaleDateString('fr-FR')}
+                                </div>
                             </div>
                             <div style="font-weight: bold; color: var(--success);">
-                                ${ticket.winningAmount.toLocaleString()} Gdes
+                                ${(ticket.win_amount || 0).toLocaleString()} Gdes
                             </div>
                         </div>
                         <div>
-                            <p><strong>Nimewo Ganyen:</strong> ${ticket.winningNumber}</p>
-                            <p><strong>Jwèt:</strong> ${ticket.gameType.toUpperCase()}</p>
-                            <p><strong>Kliyan:</strong> ${ticket.customerName || 'Pa defini'}</p>
+                            <p><strong>Rezilta Tiraj:</strong> ${resultStr}</p>
+                            <p><strong>Jwèt:</strong> ${ticket.game_type || 'Borlette'}</p>
+                            <p><strong>Nimewo Ganyen:</strong> ${ticket.winning_number || 'N/A'}</p>
+                            <p><strong>Montan Pari:</strong> ${(ticket.bet_amount || 0).toLocaleString()} Gdes</p>
                         </div>
                         <div class="winner-actions">
                             ${isPaid ? 
                                 '<button class="btn-paid" disabled><i class="fas fa-check"></i> Peye</button>' :
-                                ''
+                                '<button class="btn-paid" onclick="markAsPaid(\'' + ticket.id + '\')"><i class="fas fa-money-bill-wave"></i> Make kòm Peye</button>'
                             }
                         </div>
                     </div>
@@ -1854,24 +2119,49 @@
             }).join('');
         }
         
+        async function markAsPaid(ticketId) {
+            try {
+                const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.PAY_WINNER}/${ticketId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                if (!response.ok) throw new Error('Erreur réseau');
+                
+                const data = await response.json();
+                if (data.success) {
+                    alert('Tikè make kòm peye!');
+                    loadWinners();
+                }
+            } catch (error) {
+                console.error('Erreur marquage payé:', error);
+                alert('Erè nan makaj tikè a.');
+            }
+        }
+        
         function viewTicketDetails(ticketId) {
-            const ticket = APP_STATE.ticketsHistory.find(t => t._id === ticketId || t.id === ticketId);
+            const ticket = APP_STATE.ticketsHistory.find(t => t.id === ticketId);
             if (!ticket) return;
             
             let details = `
-                <h3>Detay Tikè #${ticket.id}</h3>
-                <p><strong>Tiraj:</strong> ${ticket.drawName}</p>
+                <h3>Detay Tikè #${ticket.ticket_id || ticket.id}</h3>
+                <p><strong>Tiraj:</strong> ${ticket.draw_name}</p>
                 <p><strong>Dat:</strong> ${new Date(ticket.date).toLocaleString('fr-FR')}</p>
-                <p><strong>Total:</strong> ${ticket.total} Gdes</p>
+                <p><strong>Total:</strong> ${ticket.total_amount} Gdes</p>
+                <p><strong>Statis:</strong> ${ticket.checked ? (ticket.win_amount > 0 ? 'GANYEN' : 'PÈDI') : 'AP TANN'}</p>
                 <hr>
                 <h4>Paray yo:</h4>
             `;
             
-            ticket.bets.forEach(bet => {
-                let gameName = bet.game.toUpperCase();
+            const bets = Array.isArray(ticket.bets) ? ticket.bets : [];
+            
+            bets.forEach(bet => {
+                let gameName = (bet.game || '').toUpperCase();
                 if (bet.specialType) gameName = bet.specialType;
                 if (bet.option) gameName += ` (Opsyon ${bet.option})`;
-                details += `<p>${gameName} ${bet.number} - ${bet.amount} Gdes ${bet.gain ? `(Ganyen: ${bet.gain} Gdes)` : ''}</p>`;
+                details += `<p>${gameName} ${bet.number || ''} - ${bet.amount || 0} Gdes ${bet.gain ? `(Ganyen: ${bet.gain} Gdes)` : ''}</p>`;
             });
             
             alert(details);
@@ -1920,7 +2210,6 @@
                 `;
             }).join('');
             
-            // Mettre à jour le compteur
             document.getElementById('selected-draws-count-multi').textContent = APP_STATE.selectedDraws.length;
         }
 
@@ -1934,7 +2223,6 @@
                 APP_STATE.selectedDraws = APP_STATE.selectedDraws.filter(id => id !== drawId);
             }
             
-            // Mettre à jour les compteurs
             document.getElementById('selected-draws-count-multi').textContent = APP_STATE.selectedDraws.length;
             document.getElementById('selected-draws-count').textContent = APP_STATE.selectedDraws.length;
         }
@@ -2335,7 +2623,7 @@
                     return;
                 }
 
-                // Gestion des Lotto 4/5 avec options MODIFIÉE
+                // Gestion des Lotto 4/5 avec options
                 if (APP_STATE.selectedGame === 'lotto4' || APP_STATE.selectedGame === 'lotto5') {
                     if (!GameEngine.validateEntry(APP_STATE.selectedGame, num)) {
                         alert("Nimewo sa pa bon pou " + APP_STATE.selectedGame);
@@ -2491,145 +2779,156 @@
         };
 
         async function processFinalTicket() {
-  if (APP_STATE.currentCart.length === 0) {
-    alert("Pa gen anyen nan panye an!");
-    return;
-  }
+            if (APP_STATE.currentCart.length === 0) {
+                alert("Pa gen anyen nan panye an!");
+                return;
+            }
 
-  if (APP_STATE.isDrawBlocked) {
-    alert("Tiraj sa a ap rantre nan 3 minit. Ou pa ka enprime fich.");
-    return;
-  }
+            if (APP_STATE.isDrawBlocked) {
+                alert("Tiraj sa a ap rantre nan 3 minit. Ou pa ka enprime fich.");
+                return;
+            }
 
-  const betsByDraw = {};
-  APP_STATE.currentCart.forEach(bet => {
-    if (!betsByDraw[bet.drawId]) {
-      betsByDraw[bet.drawId] = [];
-    }
-    betsByDraw[bet.drawId].push({
-      ...bet,
-      // S'assurer que tous les champs nécessaires sont présents
-      id: bet.id || Date.now() + Math.random(),
-      drawName: bet.drawName || CONFIG.DRAWS.find(d => d.id === bet.drawId)?.name || bet.drawId,
-      timestamp: bet.timestamp || new Date().toISOString(),
-      isAutoGenerated: bet.isAutoGenerated || false,
-      specialType: bet.specialType || null,
-      option: bet.option || null
-    });
-  });
+            const betsByDraw = {};
+            APP_STATE.currentCart.forEach(bet => {
+                if (!betsByDraw[bet.drawId]) {
+                    betsByDraw[bet.drawId] = [];
+                }
+                betsByDraw[bet.drawId].push({
+                    ...bet,
+                    id: bet.id || Date.now() + Math.random(),
+                    drawName: bet.drawName || CONFIG.DRAWS.find(d => d.id === bet.drawId)?.name || bet.drawId,
+                    timestamp: bet.timestamp || new Date().toISOString(),
+                    isAutoGenerated: bet.isAutoGenerated || false,
+                    specialType: bet.specialType || null,
+                    option: bet.option || null
+                });
+            });
 
-  const drawIds = Object.keys(betsByDraw);
-  let tickets = [];
-  
-  try {
-    for (const drawId of drawIds) {
-      const drawBets = betsByDraw[drawId];
-      const draw = CONFIG.DRAWS.find(d => d.id === drawId);
-      
-      const ticketData = {
-        agentId: APP_STATE.agentId,
-        agentName: document.getElementById('agent-name').textContent,
-        drawId: drawId,
-        drawName: draw?.name || drawId,
-        bets: drawBets,
-        total: drawBets.reduce((sum, b) => sum + (parseFloat(b.amount) || 0), 0)
-      };
+            const drawIds = Object.keys(betsByDraw);
+            let tickets = [];
+            
+            try {
+                for (const drawId of drawIds) {
+                    const drawBets = betsByDraw[drawId];
+                    const draw = CONFIG.DRAWS.find(d => d.id === drawId);
+                    
+                    const ticketData = {
+                        agentId: APP_STATE.agentId,
+                        agentName: APP_STATE.agentName,
+                        drawId: drawId,
+                        drawName: draw?.name || drawId,
+                        bets: drawBets,
+                        total: drawBets.reduce((sum, b) => sum + (parseFloat(b.amount) || 0), 0)
+                    };
 
-      console.log('Envoi du ticket:', ticketData);
+                    // Sauvegarde dans l'API
+                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.SAVE_TICKET}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(ticketData)
+                    });
 
-      // Sauvegarde dans l'API
-      const response = await fetch('https://lotata-islp.onrender.com/api/tickets/save', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        },
-        body: JSON.stringify(ticketData)
-      });
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        throw new Error(`Erreur serveur: ${response.status} - ${errorText}`);
+                    }
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Erreur serveur: ${response.status} - ${errorText}`);
-      }
+                    const savedTicket = await response.json();
+                    console.log('Ticket sauvegardé:', savedTicket);
+                    tickets.push(savedTicket.ticket);
+                    
+                    // Ajouter à l'historique local
+                    APP_STATE.ticketsHistory.unshift(savedTicket.ticket);
+                    
+                    // Imprimer le ticket automatiquement
+                    if (savedTicket.ticket) {
+                        printThermalTicket(savedTicket.ticket);
+                    }
+                }
+                
+                // Afficher l'alerte de succès
+                if (tickets.length === 1) {
+                    alert(`✅ Fich #${tickets[0].id} sove ak siksè epi enprime!`);
+                } else {
+                    alert(`✅ ${tickets.length} fich sove ak siksè epi enprime!`);
+                }
+                
+                // Réinitialiser le panier
+                APP_STATE.currentCart = [];
+                CartManager.renderCart();
+                
+            } catch (error) {
+                console.error('❌ Erreur sauvegarde:', error);
+                alert(`❌ Erè sou sèvè a: ${error.message}\nFich la pa sove.`);
+            }
+        }
 
-      const savedTicket = await response.json();
-      console.log('Ticket sauvegardé:', savedTicket);
-      tickets.push(savedTicket.ticket);
-      
-      // Ajouter à l'historique local
-      APP_STATE.ticketsHistory.unshift(savedTicket.ticket);
-    }
-    
-    // Afficher l'alerte de succès
-    if (tickets.length === 1) {
-      alert(`✅ Fich #${tickets[0].id} sove ak siksè!`);
-    } else {
-      alert(`✅ ${tickets.length} fich sove ak siksè!`);
-    }
-    
-    // Réinitialiser le panier
-    APP_STATE.currentCart = [];
-    CartManager.renderCart();
-    
-  } catch (error) {
-    console.error('❌ Erreur sauvegarde:', error);
-    alert(`❌ Erè sou sèvè a: ${error.message}\nFich la pa sove.`);
-  }
-}
         function printThermalTicket(ticket) {
             const printWindow = window.open('', '_blank', 'width=300,height=600');
             
-            let betsHtml = ticket.bets.map(b => {
-                let gameName = '';
-                if (b.isAutoGenerated && b.specialType) {
-                    gameName = b.specialType.toUpperCase();
-                } else if (b.isAutoGenerated) {
-                    gameName = `${b.game.replace('_', ' ').toUpperCase()}*`;
-                } else {
-                    gameName = b.game.toUpperCase();
-                }
-                
-                // Ajouter l'option si elle existe
-                if (b.option) {
-                    gameName += ` (Opsyon ${b.option})`;
-                }
-                
-                return `
-                    <div style="display:flex; justify-content:space-between; font-size:14px;">
-                        <span>${gameName} ${b.number}</span>
-                        <span>${b.amount}G</span>
-                    </div>
-                `;
-            }).join('');
+            let betsHtml = '';
+            if (Array.isArray(ticket.bets)) {
+                betsHtml = ticket.bets.map(b => {
+                    let gameName = '';
+                    if (b.isAutoGenerated && b.specialType) {
+                        gameName = b.specialType.toUpperCase();
+                    } else if (b.isAutoGenerated) {
+                        gameName = `${(b.game || '').replace('_', ' ').toUpperCase()}*`;
+                    } else {
+                        gameName = (b.game || '').toUpperCase();
+                    }
+                    
+                    if (b.option) {
+                        gameName += ` (Opsyon ${b.option})`;
+                    }
+                    
+                    return `
+                        <div style="display:flex; justify-content:space-between; font-size:14px; margin-bottom: 5px;">
+                            <span>${gameName} ${b.number || ''}</span>
+                            <span>${b.amount || 0}G</span>
+                        </div>
+                    `;
+                }).join('');
+            }
 
-            const lotteryName = CONFIG.LOTTERY_NAME;
-            const logoHtml = CONFIG.LOTTERY_LOGO ? 
-                `<img src="${CONFIG.LOTTERY_LOGO}" style="max-width: 100px; margin: 10px auto; display: block;" alt="${lotteryName}">` : 
+            const lotteryConfig = APP_STATE.lotteryConfig || CONFIG;
+            const lotteryName = lotteryConfig.name;
+            const logoHtml = lotteryConfig.logo ? 
+                `<img src="${lotteryConfig.logo}" style="max-width: 100px; margin: 10px auto; display: block;" alt="${lotteryName}">` : 
                 '';
-            const addressHtml = CONFIG.LOTTERY_ADDRESS ? `<p style="font-size:10px;">${CONFIG.LOTTERY_ADDRESS}</p>` : '';
-            const phoneHtml = CONFIG.LOTTERY_PHONE ? `<p style="font-size:10px;">Tel: ${CONFIG.LOTTERY_PHONE}</p>` : '';
+            const addressHtml = lotteryConfig.address ? `<p style="font-size:10px; margin: 5px 0;">${lotteryConfig.address}</p>` : '';
+            const phoneHtml = lotteryConfig.phone ? `<p style="font-size:10px; margin: 5px 0;">Tel: ${lotteryConfig.phone}</p>` : '';
 
             const content = `
                 <html>
                 <head>
-                    <title>Ticket #${ticket.id}</title>
+                    <title>Ticket #${ticket.ticket_id || ticket.id}</title>
+                    <style>
+                        body { font-family: 'Courier New', monospace; width: 100%; padding: 10px; margin: 0; text-align: center; }
+                        h2, h3 { margin: 5px 0; }
+                        p { margin: 3px 0; }
+                        hr { border: 1px dashed #000; margin: 10px 0; }
+                    </style>
                 </head>
-                <body style="font-family:'Courier New', monospace; width:100%; padding:0; margin:0; text-align:center;">
+                <body>
                     ${logoHtml}
                     <h2 style="margin-bottom:5px;">${lotteryName}</h2>
                     ${addressHtml}
                     ${phoneHtml}
-                    <p style="font-size:12px; margin:5px 0;">--------------------------</p>
-                    <p style="font-size:14px; font-weight:bold;">TIRAJ: ${ticket.drawName.toUpperCase()}</p>
-                    <p style="font-size:12px;">TICKET: #${ticket.id}</p>
+                    <hr>
+                    <p style="font-size:14px; font-weight:bold;">TIRAJ: ${(ticket.draw_name || '').toUpperCase()}</p>
+                    <p style="font-size:12px;">TICKET: #${ticket.ticket_id || ticket.id}</p>
                     <p style="font-size:12px;">DATE: ${new Date(ticket.date).toLocaleString('fr-FR')}</p>
-                    <p style="font-size:12px;">AJAN: ${ticket.agentName}</p>
-                    <p style="font-size:12px;">--------------------------</p>
+                    <p style="font-size:12px;">AJAN: ${ticket.agent_name || APP_STATE.agentName}</p>
+                    <hr>
                     <div style="text-align:left; padding:0 10px;">
                         ${betsHtml}
                     </div>
-                    <p style="font-size:12px;">--------------------------</p>
-                    <h3 style="margin-top:5px;">TOTAL: ${ticket.total} Gdes</h3>
+                    <hr>
+                    <h3 style="margin-top:5px;">TOTAL: ${ticket.total_amount || ticket.total} Gdes</h3>
                     <p style="font-size:10px; margin-top:15px;">Mèci paske ou chwazi nou!</p>
                     <p style="font-size:10px;">Bòn Chans!</p>
                     <br><br>
@@ -2645,66 +2944,43 @@
                 printWindow.close();
             }, 500);
         }
-        
-        function openLotteryConfig() {
-            document.getElementById('config-lottery-name').value = CONFIG.LOTTERY_NAME;
-            document.getElementById('config-logo-url').value = CONFIG.LOTTERY_LOGO;
-            document.getElementById('config-address').value = CONFIG.LOTTERY_ADDRESS;
-            document.getElementById('config-phone').value = CONFIG.LOTTERY_PHONE;
-            document.getElementById('lottery-config').style.display = 'flex';
-        }
-        
-        function closeLotteryConfig() {
-            document.getElementById('lottery-config').style.display = 'none';
-        }
-        
-        function saveLotteryConfig() {
-            CONFIG.LOTTERY_NAME = document.getElementById('config-lottery-name').value;
-            CONFIG.LOTTERY_LOGO = document.getElementById('config-logo-url').value;
-            CONFIG.LOTTERY_ADDRESS = document.getElementById('config-address').value;
-            CONFIG.LOTTERY_PHONE = document.getElementById('config-phone').value;
-            
-            // Mettre à jour l'affichage du nom
-            document.getElementById('lottery-name').innerHTML = `${CONFIG.LOTTERY_NAME} <span class="pro-badge">vession 6</span>`;
-            
-            // Sauvegarder dans le localStorage
-            localStorage.setItem('lotteryConfig', JSON.stringify({
-                name: CONFIG.LOTTERY_NAME,
-                logo: CONFIG.LOTTERY_LOGO,
-                address: CONFIG.LOTTERY_ADDRESS,
-                phone: CONFIG.LOTTERY_PHONE
-            }));
-            
-            alert("Konfigirasyon sove!");
-            closeLotteryConfig();
-        }
 
         function closeWinnerModal() {
             document.getElementById('winner-overlay').style.display = 'none';
         }
 
-        async function initApp() {
-            // Charger la configuration du lottery
-            const savedConfig = localStorage.getItem('lotteryConfig');
-            if (savedConfig) {
-                try {
-                    const config = JSON.parse(savedConfig);
-                    CONFIG.LOTTERY_NAME = config.name || CONFIG.LOTTERY_NAME;
-                    CONFIG.LOTTERY_LOGO = config.logo || CONFIG.LOTTERY_LOGO;
-                    CONFIG.LOTTERY_ADDRESS = config.address || CONFIG.LOTTERY_ADDRESS;
-                    CONFIG.LOTTERY_PHONE = config.phone || CONFIG.LOTTERY_PHONE;
+        async function loadLotteryConfig() {
+            try {
+                const config = await APIService.getLotteryConfig();
+                if (config) {
+                    APP_STATE.lotteryConfig = config;
                     
-                    document.getElementById('lottery-name').innerHTML = `${CONFIG.LOTTERY_NAME} <span class="pro-badge">vession 6</span>`;
-                } catch (e) {
-                    console.error('Erreur chargement configuration:', e);
+                    // Mettre à jour l'affichage
+                    document.getElementById('lottery-name').innerHTML = `${config.name} <span class="pro-badge">vession 6</span>`;
+                    
+                    // Mettre à jour CONFIG
+                    CONFIG.LOTTERY_NAME = config.name;
+                    CONFIG.LOTTERY_LOGO = config.logo || '/logo.png';
+                    CONFIG.LOTTERY_ADDRESS = config.address || '';
+                    CONFIG.LOTTERY_PHONE = config.phone || '';
                 }
+            } catch (error) {
+                console.error('Erreur chargement configuration:', error);
             }
+        }
+
+        async function initApp() {
+            // Charger la configuration de la loterie depuis l'API
+            await loadLotteryConfig();
             
             // Charger l'historique depuis MongoDB
             await APIService.getTickets();
             
             // Charger les tickets gagnants
             await APIService.getWinningTickets();
+            
+            // Charger les résultats gagnants
+            await APIService.getWinningResults();
             
             renderDraws();
             updateClock();
@@ -2720,16 +2996,17 @@
             
             updateGameSelector();
             
-            // CORRECTION: Supprimer la référence à 'agent-input' qui n'existe pas
-            // et utiliser un agent fixe ou permettre la modification via configuration
-            
-            document.querySelectorAll('#lotto4-options .option-chip').forEach((chip, index) => {
-                chip.querySelector('input').checked = APP_STATE.lotto4Options[index];
-            });
-            
-            document.querySelectorAll('#lotto5-options .option-chip').forEach((chip, index) => {
-                chip.querySelector('input').checked = APP_STATE.lotto5Options[index];
-            });
+            // Vérifier périodiquement les tickets gagnants
+            setInterval(async () => {
+                if (APP_STATE.currentTab === 'winners') {
+                    try {
+                        await APIService.checkWinningTickets();
+                        await loadWinners();
+                    } catch (error) {
+                        console.error('Erreur vérification tickets gagnants:', error);
+                    }
+                }
+            }, 60000); // Toutes les minutes
             
             // Afficher le statut de synchronisation
             updateSyncStatus();
@@ -2739,7 +3016,6 @@
             const syncBar = document.getElementById('sync-status-bar');
             const syncText = document.getElementById('sync-text');
             
-            // Simuler un statut de synchronisation
             const statuses = [
                 { text: "Sistem OK", class: "sync-idle" },
                 { text: "Synchro...", class: "sync-syncing" },
@@ -2753,8 +3029,8 @@
 
         document.addEventListener('DOMContentLoaded', initApp);
         setInterval(updateClock, 1000);
-        setInterval(checkSelectedDrawStatus, 30000); // Vérifier toutes les 30 secondes
-        setInterval(updateSyncStatus, 10000); // Mettre à jour le statut toutes les 10 secondes
+        setInterval(checkSelectedDrawStatus, 30000);
+        setInterval(updateSyncStatus, 10000);
 
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/service-worker.js')
