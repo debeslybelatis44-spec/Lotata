@@ -1,83 +1,192 @@
 <!DOCTYPE html>
-<html lang="ht">
+<html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LOTATO PRO | Connexion</title>
+    <title>LOTATO PRO - Connexion</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: #ad00f1;
-            --secondary: #00d4ff;
-            --accent: #ff007a;
-            --bg: #0a0b1e;
-            --surface: rgba(255, 255, 255, 0.05);
-            --text-main: #ffffff;
-            --text-dim: #a0a0b8;
-            --success: #00f190;
-            --danger: #ff4d4d;
+            --primary: #6a11cb;
+            --secondary: #2575fc;
+            --success: #00b09b;
+            --danger: #ff416c;
+            --dark: #1a1b3a;
+            --light: #ecf0f1;
         }
 
         * {
-            margin: 0; padding: 0; box-sizing: border-box;
-            font-family: 'Plus Jakarta Sans', sans-serif;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', system-ui, sans-serif;
         }
 
         body {
-            background-color: var(--bg);
-            color: var(--text-main);
+            background: linear-gradient(135deg, #1a1b3a 0%, #0a0b1e 100%);
             min-height: 100vh;
             display: flex;
-            justify-content: center;
             align-items: center;
-            background: radial-gradient(circle at top right, #1a1b3a, #0a0b1e);
+            justify-content: center;
             padding: 20px;
         }
 
         .login-container {
-            max-width: 400px;
             width: 100%;
-            background: var(--surface);
+            max-width: 400px;
+            background: rgba(255, 255, 255, 0.05);
             backdrop-filter: blur(20px);
-            border-radius: 24px;
+            border-radius: 20px;
             padding: 40px;
-            border: 1px solid rgba(81, 6, 75, 0.7);
-            text-align: center;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(81, 6, 75, 0.699);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
         }
 
         .logo {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
-            color: var(--primary);
+            text-align: center;
+            margin-bottom: 30px;
         }
 
-        .logo-text {
-            font-size: 2rem;
+        .logo-icon {
+            font-size: 50px;
+            color: var(--primary);
+            margin-bottom: 15px;
+            text-shadow: 0 0 20px rgba(106, 17, 203, 0.5);
+        }
+
+        .logo h1 {
+            font-size: 28px;
             font-weight: 800;
-            margin-bottom: 30px;
-            background: linear-gradient(135deg, var(--primary), var(--accent));
+            background: linear-gradient(135deg, #6a11cb, #2575fc);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+            margin-bottom: 5px;
         }
 
-        .role-selector {
+        .logo p {
+            color: #a0a0b8;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            color: #a0a0b8;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: white;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(106, 17, 203, 0.2);
+        }
+
+        .password-container {
+            position: relative;
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #666;
+            cursor: pointer;
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 0.3s;
+            margin-top: 20px;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(106, 17, 203, 0.3);
+        }
+
+        .login-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .error-message {
+            background: rgba(255, 65, 108, 0.1);
+            border: 1px solid var(--danger);
+            color: #ff416c;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .error-message.show {
+            display: flex;
+        }
+
+        .success-message {
+            background: rgba(0, 176, 155, 0.1);
+            border: 1px solid var(--success);
+            color: #00b09b;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .success-message.show {
+            display: flex;
+        }
+
+        .role-selection {
             display: flex;
             gap: 10px;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
         }
 
         .role-btn {
             flex: 1;
             padding: 12px;
-            border: 1px solid rgba(81, 6, 75, 0.7);
-            background: transparent;
-            color: var(--text-dim);
-            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: #a0a0b8;
             cursor: pointer;
+            text-align: center;
             transition: all 0.3s;
-            font-weight: 600;
         }
 
         .role-btn.active {
@@ -86,276 +195,321 @@
             border-color: var(--primary);
         }
 
-        .form-group {
-            margin-bottom: 20px;
-            text-align: left;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            color: var(--text-dim);
-            font-size: 0.9rem;
-        }
-
-        .form-group input {
-            width: 100%;
-            padding: 15px;
-            border-radius: 12px;
-            background: rgba(0, 0, 0, 0.2);
-            border: 1px solid rgba(81, 6, 75, 0.7);
-            color: white;
-            font-size: 1rem;
-            outline: none;
-            transition: 0.3s;
-        }
-
-        .form-group input:focus {
-            border-color: var(--primary);
-        }
-
-        .login-btn {
-            width: 100%;
-            padding: 16px;
-            background: linear-gradient(135deg, var(--primary), var(--accent));
-            border: none;
-            border-radius: 12px;
-            color: white;
-            font-size: 1.1rem;
-            font-weight: 700;
-            cursor: pointer;
-            margin-top: 20px;
-            transition: transform 0.3s;
-        }
-
-        .login-btn:hover {
-            transform: translateY(-2px);
-        }
-
-        .login-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .error-message {
-            background: rgba(255, 77, 77, 0.1);
-            border: 1px solid var(--danger);
-            color: var(--danger);
-            padding: 12px;
-            border-radius: 10px;
-            margin-bottom: 20px;
+        .loading-spinner {
             display: none;
-        }
-
-        .success-message {
-            background: rgba(0, 241, 144, 0.1);
-            border: 1px solid var(--success);
-            color: var(--success);
-            padding: 12px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            display: none;
-        }
-
-        .loading {
-            display: none;
-            margin-top: 20px;
-        }
-
-        .spinner {
-            border: 3px solid rgba(255, 255, 255, 0.1);
-            border-top: 3px solid var(--primary);
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
+            border-top-color: white;
             animation: spin 1s linear infinite;
-            margin: 0 auto 10px;
+        }
+
+        .loading-spinner.active {
+            display: inline-block;
         }
 
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            to { transform: rotate(360deg); }
         }
 
-        .demo-credentials {
+        .footer {
+            text-align: center;
             margin-top: 30px;
-            padding: 20px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 12px;
-            font-size: 0.9rem;
+            color: #666;
+            font-size: 12px;
         }
 
-        .demo-credentials h4 {
-            margin-bottom: 15px;
-            color: var(--secondary);
-        }
-
-        .demo-item {
-            margin-bottom: 10px;
-            text-align: left;
-            padding-left: 10px;
-            border-left: 3px solid var(--secondary);
-        }
-
-        .copyright {
-            margin-top: 30px;
-            color: var(--text-dim);
-            font-size: 0.8rem;
+        @media (max-width: 480px) {
+            .login-container {
+                padding: 30px 20px;
+            }
         }
     </style>
-    
-    <!-- ✅ AJOUT DE CONFIG.JS - NE PAS OUBLIER ! -->
-    <script src="config.js"></script>
 </head>
 <body>
     <div class="login-container">
         <div class="logo">
-            <i class="fas fa-dice"></i>
-        </div>
-        <h1 class="logo-text">LOTATO PRO</h1>
-        <p style="color: var(--text-dim); margin-bottom: 30px;">System Lotri Entèlijans</p>
-
-        <div class="role-selector">
-            <button class="role-btn active" data-role="agent" onclick="selectRole('agent')">
-                Ajan
-            </button>
-            <button class="role-btn" data-role="supervisor" onclick="selectRole('supervisor')">
-                Supervizè
-            </button>
-            <button class="role-btn" data-role="owner" onclick="selectRole('owner')">
-                Pwopriyetè
-            </button>
-        </div>
-
-        <div id="error-message" class="error-message"></div>
-        <div id="success-message" class="success-message"></div>
-
-        <div class="form-group">
-            <label for="username">Kòd Itilizatè</label>
-            <input type="text" id="username" placeholder="Eg: AGENT01">
-        </div>
-
-        <div class="form-group">
-            <label for="password">Modpas</label>
-            <input type="password" id="password" placeholder="Antre modpas ou">
-        </div>
-
-        <button class="login-btn" onclick="login()">
-            <span id="login-text">KONEKTE</span>
-        </button>
-
-        <div class="loading" id="loading">
-            <div class="spinner"></div>
-            <p>Ap konekte...</p>
-        </div>
-
-        <div class="demo-credentials">
-            <h4>Kòd Demonstrasyon:</h4>
-            <div class="demo-item">
-                <strong>Pwopriyetè:</strong> owner / admin123
+            <div class="logo-icon">
+                <i class="fas fa-crown"></i>
             </div>
-            <div class="demo-item">
-                <em>Supervizè ak Ajan pou kreye pa pwopriyetè a</em>
-            </div>
+            <h1>LOTATO PRO</h1>
+            <p>Système de gestion de loterie</p>
         </div>
 
-        <div class="copyright">
-            © 2024 LOTATO PRO | Powered by Nova System
+        <div class="error-message" id="error-message">
+            <i class="fas fa-exclamation-triangle"></i>
+            <span id="error-text"></span>
+        </div>
+
+        <div class="success-message" id="success-message">
+            <i class="fas fa-check-circle"></i>
+            <span id="success-text"></span>
+        </div>
+
+        <form id="login-form" onsubmit="handleLogin(event)">
+            <div class="form-group">
+                <label class="form-label">
+                    <i class="fas fa-user"></i> Identifiant
+                </label>
+                <input type="text" id="username" class="form-input" 
+                       placeholder="Entrez votre identifiant" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">
+                    <i class="fas fa-key"></i> Mot de passe
+                </label>
+                <div class="password-container">
+                    <input type="password" id="password" class="form-input" 
+                           placeholder="Entrez votre mot de passe" required>
+                    <button type="button" class="toggle-password" onclick="togglePasswordVisibility()">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">
+                    <i class="fas fa-user-tag"></i> Rôle
+                </label>
+                <div class="role-selection">
+                    <button type="button" class="role-btn active" data-role="agent" onclick="selectRole('agent')">
+                        Agent
+                    </button>
+                    <button type="button" class="role-btn" data-role="supervisor" onclick="selectRole('supervisor')">
+                        Superviseur
+                    </button>
+                    <button type="button" class="role-btn" data-role="owner" onclick="selectRole('owner')">
+                        Propriétaire
+                    </button>
+                </div>
+                <input type="hidden" id="user-role" value="agent">
+            </div>
+
+            <button type="submit" class="login-btn" id="login-btn">
+                <span class="loading-spinner" id="loading-spinner"></span>
+                <span id="login-text">
+                    <i class="fas fa-sign-in-alt"></i> Se connecter
+                </span>
+            </button>
+        </form>
+
+        <div class="footer">
+            <p>© 2024 LOTATO PRO. Tous droits réservés.</p>
+            <p style="margin-top: 5px;">Version 6.0</p>
         </div>
     </div>
 
-    <!-- ✅ NOUVEAU JAVASCRIPT CONNECTÉ AU BACKEND -->
     <script>
-        // Variable pour le rôle sélectionné
-        let selectedRole = 'agent';
+        // Configuration
+        const CONFIG = {
+            API_URL: 'https://lotata-islp.onrender.com/api',
+            ROLES: {
+                AGENT: 'agent',
+                SUPERVISOR: 'supervisor', 
+                OWNER: 'owner'
+            },
+            REDIRECTS: {
+                AGENT: 'agent1.html',
+                SUPERVISOR: 'responsable.html',
+                OWNER: 'owner.html'
+            }
+        };
 
-        // Vérifier si déjà connecté au chargement de la page
-        if (api.isAuthenticated()) {
-            const user = api.getUser();
-            redirectToRolePage(user.role);
+        let currentRole = 'agent';
+
+        // Fonctions d'affichage
+        function showError(message) {
+            const errorEl = document.getElementById('error-message');
+            const errorText = document.getElementById('error-text');
+            errorText.textContent = message;
+            errorEl.classList.add('show');
         }
 
-        // Fonction pour sélectionner un rôle
+        function showSuccess(message) {
+            const successEl = document.getElementById('success-message');
+            const successText = document.getElementById('success-text');
+            successText.textContent = message;
+            successEl.classList.add('show');
+        }
+
+        function hideMessages() {
+            document.getElementById('error-message').classList.remove('show');
+            document.getElementById('success-message').classList.remove('show');
+        }
+
+        function setLoading(loading) {
+            const btn = document.getElementById('login-btn');
+            const spinner = document.getElementById('loading-spinner');
+            const text = document.getElementById('login-text');
+            
+            if (loading) {
+                btn.disabled = true;
+                spinner.classList.add('active');
+                text.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Connexion...';
+            } else {
+                btn.disabled = false;
+                spinner.classList.remove('active');
+                text.innerHTML = '<i class="fas fa-sign-in-alt"></i> Se connecter';
+            }
+        }
+
+        function togglePasswordVisibility() {
+            const input = document.getElementById('password');
+            const icon = document.querySelector('.toggle-password i');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.className = 'fas fa-eye-slash';
+            } else {
+                input.type = 'password';
+                icon.className = 'fas fa-eye';
+            }
+        }
+
         function selectRole(role) {
-            selectedRole = role;
+            currentRole = role;
+            document.getElementById('user-role').value = role;
+            
+            // Mettre à jour l'interface
             document.querySelectorAll('.role-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
-            document.querySelector(`[data-role="${role}"]`).classList.add('active');
+            event.target.classList.add('active');
             
-            // Ajuster le placeholder
+            // Changer le placeholder selon le rôle
             const usernameInput = document.getElementById('username');
-            if (role === 'agent') {
-                usernameInput.placeholder = 'Eg: AGENT01';
-            } else if (role === 'supervisor') {
-                usernameInput.placeholder = 'Eg: supervisor';
-            } else {
-                usernameInput.placeholder = 'Eg: owner';
+            switch(role) {
+                case 'agent':
+                    usernameInput.placeholder = 'Ex: agent-01 ou Jean Pierre';
+                    break;
+                case 'supervisor':
+                    usernameInput.placeholder = 'Email ou identifiant superviseur';
+                    break;
+                case 'owner':
+                    usernameInput.placeholder = 'Email administrateur';
+                    break;
             }
         }
 
-        // Fonction de connexion
-        async function login() {
-            const username = document.getElementById('username').value.trim();
-            const password = document.getElementById('password').value.trim();
-            const loginBtn = document.querySelector('.login-btn');
-            const loadingDiv = document.getElementById('loading');
-            const loginText = document.getElementById('login-text');
-            const errorDiv = document.getElementById('error-message');
+        // Authentification API
+        async function authenticate(username, password, role) {
+            try {
+                const response = await fetch(`${CONFIG.API_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        password: password,
+                        role: role
+                    })
+                });
 
+                if (!response.ok) {
+                    throw new Error('Identifiants incorrects');
+                }
+
+                return await response.json();
+            } catch (error) {
+                console.error('Erreur d\'authentification:', error);
+                throw new Error('Erreur de connexion au serveur');
+            }
+        }
+
+        // Gestion de la connexion
+        async function handleLogin(event) {
+            event.preventDefault();
+            hideMessages();
+            
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const role = currentRole;
+            
             if (!username || !password) {
-                errorDiv.textContent = 'Tanpri ranpli tout chan yo';
-                errorDiv.style.display = 'block';
-                setTimeout(() => errorDiv.style.display = 'none', 5000);
+                showError('Veuillez remplir tous les champs');
                 return;
             }
-
-            // Désactiver le bouton et montrer le chargement
-            loginBtn.disabled = true;
-            loginText.textContent = 'AP KONEKTE...';
-            loadingDiv.style.display = 'block';
-            errorDiv.style.display = 'none';
-
+            
+            setLoading(true);
+            
             try {
-                // Appel API pour se connecter
-                const response = await api.post(API_CONFIG.ENDPOINTS.LOGIN, {
-                    username: username,
-                    password: password,
-                    role: selectedRole
-                }, false); // false = pas besoin d'auth pour login
-
-                // Sauvegarder le token et l'utilisateur
-                api.setToken(response.token);
-                api.setUser(response.user);
-
-                // Afficher succès
-                const successDiv = document.getElementById('success-message');
-                successDiv.textContent = 'Koneksyon reyisi!';
-                successDiv.style.display = 'block';
-
-                // Rediriger vers la bonne page après 1 seconde
-                setTimeout(() => {
-                    redirectToRolePage(response.user.role);
-                }, 1000);
-
+                const authResult = await authenticate(username, password, role);
+                
+                if (authResult.success && authResult.token) {
+                    // Stocker les données selon le rôle
+                    localStorage.setItem('auth_token', authResult.token);
+                    localStorage.setItem('user_role', role);
+                    localStorage.setItem('user_name', authResult.name || username);
+                    
+                    if (role === CONFIG.ROLES.AGENT) {
+                        localStorage.setItem('agent_id', authResult.agentId || username);
+                        localStorage.setItem('agent_name', authResult.name || username);
+                    }
+                    
+                    if (role === CONFIG.ROLES.SUPERVISOR) {
+                        localStorage.setItem('supervisor_id', authResult.id || username);
+                    }
+                    
+                    if (role === CONFIG.ROLES.OWNER) {
+                        localStorage.setItem('owner_id', authResult.id || username);
+                    }
+                    
+                    // Redirection
+                    showSuccess('Connexion réussie! Redirection...');
+                    
+                    setTimeout(() => {
+                        window.location.href = CONFIG.REDIRECTS[role.toUpperCase()];
+                    }, 1000);
+                    
+                } else {
+                    showError('Identifiants incorrects');
+                    setLoading(false);
+                }
+                
             } catch (error) {
-                console.error('Erreur:', error);
-                errorDiv.textContent = error.message || 'Erè koneksyon. Verifye kòd ou yo.';
-                errorDiv.style.display = 'block';
-            } finally {
-                // Réactiver le bouton
-                loginBtn.disabled = false;
-                loginText.textContent = 'KONEKTE';
-                loadingDiv.style.display = 'none';
+                showError(error.message);
+                setLoading(false);
             }
         }
 
-        // Permettre l'appui sur Entrée
-        document.getElementById('password').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                login();
+        // Vérifier si déjà connecté
+        function checkExistingSession() {
+            const token = localStorage.getItem('auth_token');
+            const role = localStorage.getItem('user_role');
+            
+            if (token && role && CONFIG.REDIRECTS[role.toUpperCase()]) {
+                showSuccess('Reconnexion automatique...');
+                setTimeout(() => {
+                    window.location.href = CONFIG.REDIRECTS[role.toUpperCase()];
+                }, 500);
             }
+        }
+
+        // Initialisation
+        document.addEventListener('DOMContentLoaded', () => {
+            checkExistingSession();
+            
+            // Focus sur le premier champ
+            document.getElementById('username').focus();
+            
+            // Gestion des touches
+            document.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    const focused = document.activeElement;
+                    if (focused && focused.type !== 'submit') {
+                        e.preventDefault();
+                        
+                        if (focused.id === 'username') {
+                            document.getElementById('password').focus();
+                        } else if (focused.id === 'password') {
+                            document.getElementById('login-btn').click();
+                        }
+                    }
+                }
+            });
         });
     </script>
 </body>

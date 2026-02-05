@@ -208,7 +208,7 @@
             font-size: 16px;
         }
 
-        /* Dashboard Grid */
+        /* Grid Layouts */
         .dashboard-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -374,34 +374,7 @@
             font-size: 12px;
         }
 
-        /* Forms */
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 500;
-            color: var(--dark);
-        }
-
-        .form-control {
-            width: 100%;
-            padding: 12px 15px;
-            border: 2px solid var(--border);
-            border-radius: 10px;
-            font-size: 14px;
-            transition: all 0.3s;
-        }
-
-        .form-control:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(106, 17, 203, 0.1);
-        }
-
-        /* Users Grid */
+        /* Tables & Lists */
         .users-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -510,6 +483,100 @@
             margin-top: 15px;
         }
 
+        .user-actions .btn {
+            flex: 1;
+        }
+
+        /* Controls Grid */
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 25px;
+        }
+
+        .control-section {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+        }
+
+        .section-title {
+            font-size: 20px;
+            color: var(--dark);
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--dark);
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(106, 17, 203, 0.1);
+        }
+
+        /* Numbers Grid */
+        .numbers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .number-item {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+        }
+
+        .number-item.normal {
+            background: #f8f9fa;
+            color: var(--dark);
+        }
+
+        .number-item.blocked {
+            background: var(--danger);
+            color: white;
+        }
+
+        .number-item.limited {
+            background: var(--warning);
+            color: var(--dark);
+        }
+
+        .number-item:hover {
+            transform: scale(1.1);
+        }
+
         /* Draws List */
         .draws-list {
             display: grid;
@@ -559,53 +626,184 @@
             margin: 15px 0;
         }
 
-        /* Numbers Grid */
-        .numbers-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
-            gap: 10px;
-            margin-top: 15px;
+        .draw-stat {
+            text-align: center;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 10px;
         }
 
-        .number-item {
-            aspect-ratio: 1;
+        /* Draw Results */
+        .draw-results {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .draw-number {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #6a11cb, #2575fc);
+            color: white;
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 10px;
+            font-size: 20px;
             font-weight: bold;
-            cursor: pointer;
-            transition: all 0.3s;
-            border: 2px solid transparent;
+            box-shadow: 0 5px 15px rgba(106, 17, 203, 0.3);
         }
 
-        .number-item.normal {
+        /* Rules Editor */
+        .rules-grid {
+            display: grid;
+            gap: 15px;
+        }
+
+        .rule-item {
             background: #f8f9fa;
-            color: var(--dark);
+            padding: 15px;
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        .number-item.blocked {
-            background: var(--danger);
+        .rule-info h4 {
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+
+        .rule-info p {
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+
+        .rule-control {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .rule-input {
+            width: 100px;
+            padding: 8px 12px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        /* Activity Log */
+        .activity-log {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            padding: 15px;
+            border-left: 4px solid var(--primary);
+            margin-bottom: 10px;
+            background: white;
+            border-radius: 0 10px 10px 0;
+        }
+
+        .log-time {
+            font-size: 12px;
+            color: var(--text-dim);
+            margin-bottom: 5px;
+        }
+
+        .log-message {
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+
+        .log-user {
+            font-size: 12px;
+            color: var(--primary);
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            width: 90%;
+            max-width: 800px;
+            max-height: 90vh;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, #2c3e50, #4a235a);
             color: white;
+            padding: 25px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        .number-item.limited {
-            background: var(--warning);
-            color: var(--dark);
+        .modal-body {
+            padding: 30px;
+            overflow-y: auto;
+            max-height: 60vh;
         }
 
-        .number-item:hover {
-            transform: scale(1.1);
+        /* Publish Draw Modal */
+        .publish-form {
+            display: grid;
+            gap: 20px;
         }
 
-        /* Animations */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+        .auto-publish-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
         }
 
-        .fade-in {
-            animation: fadeIn 0.5s ease-out;
+        .result-preview {
+            background: white;
+            border: 2px dashed var(--border);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .preview-numbers {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .preview-number {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #6a11cb, #2575fc);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
         }
 
         /* Responsive */
@@ -632,6 +830,10 @@
                 display: none;
             }
             
+            .controls-grid {
+                grid-template-columns: 1fr;
+            }
+            
             .tabs {
                 flex-wrap: wrap;
             }
@@ -643,46 +845,58 @@
             }
         }
 
-        /* Loading */
-        .loading {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid var(--primary);
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        /* Auto-fetch settings */
+        .auto-fetch-settings {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+
+        .fetch-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
             border-radius: 50%;
-            animation: spin 1s linear infinite;
         }
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        .status-active { background: var(--success); }
+        .status-inactive { background: var(--danger); }
+
+        /* Draw source tabs */
+        .source-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
         }
 
-        /* Notification */
-        .notification {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 25px;
-            border-radius: 10px;
+        .source-tab {
+            padding: 10px 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .source-tab.active {
+            background: var(--primary);
             color: white;
-            z-index: 10000;
-            animation: slideIn 0.3s;
-        }
-
-        .notification.success { background: var(--success); }
-        .notification.error { background: var(--danger); }
-        .notification.warning { background: var(--warning); color: var(--dark); }
-
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-
-        @keyframes slideOut {
-            from { transform: translateX(0); opacity: 1; }
-            to { transform: translateX(100%); opacity: 0; }
         }
     </style>
 </head>
@@ -723,7 +937,7 @@
                     <div class="admin-avatar">
                         <i class="fas fa-user-shield"></i>
                     </div>
-                    <div class="admin-name" id="admin-name">Chargement...</div>
+                    <div class="admin-name" id="admin-name">ADMIN PROPRIÉTAIRE</div>
                     <div class="admin-role">ADMINISTRATEUR PROPRIÉTAIRE</div>
                 </div>
                 
@@ -751,6 +965,14 @@
                     <li class="nav-item" onclick="ownerManager.switchView('rules')">
                         <i class="fas fa-sliders-h"></i>
                         <span>Règles de Jeu</span>
+                    </li>
+                    <li class="nav-item" onclick="ownerManager.switchView('limits')">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span>Limites et Blocages</span>
+                    </li>
+                    <li class="nav-item" onclick="ownerManager.switchView('reports')">
+                        <i class="fas fa-file-chart-line"></i>
+                        <span>Rapports Avancés</span>
                     </li>
                     <li class="nav-item" onclick="ownerManager.switchView('activity')">
                         <i class="fas fa-history"></i>
@@ -780,13 +1002,13 @@
                                 </div>
                                 <div class="card-title">
                                     <h3>Utilisateurs Totaux</h3>
-                                    <p>Agents et superviseurs</p>
+                                    <p>Actifs ce mois</p>
                                 </div>
                             </div>
                             <div class="card-value" id="dashboard-users">0</div>
                             <div class="card-change change-up">
-                                <i class="fas fa-users"></i>
-                                <span id="dashboard-users-online">0 en ligne</span>
+                                <i class="fas fa-arrow-up"></i>
+                                <span>12% ce mois</span>
                             </div>
                         </div>
                         
@@ -796,48 +1018,14 @@
                                     <i class="fas fa-money-bill-wave"></i>
                                 </div>
                                 <div class="card-title">
-                                    <h3>Ventes Aujourd'hui</h3>
-                                    <p>Total des paris</p>
+                                    <h3>Ventes Totales</h3>
+                                    <p>30 derniers jours</p>
                                 </div>
                             </div>
                             <div class="card-value" id="dashboard-sales">0 Gdes</div>
                             <div class="card-change change-up">
-                                <i class="fas fa-chart-line"></i>
-                                <span>Tous tirages</span>
-                            </div>
-                        </div>
-                        
-                        <div class="dashboard-card">
-                            <div class="card-header">
-                                <div class="card-icon icon-wins">
-                                    <i class="fas fa-trophy"></i>
-                                </div>
-                                <div class="card-title">
-                                    <h3>Gains Aujourd'hui</h3>
-                                    <p>Distribués aux clients</p>
-                                </div>
-                            </div>
-                            <div class="card-value" id="dashboard-wins">0 Gdes</div>
-                            <div class="card-change change-up">
-                                <i class="fas fa-hand-holding-usd"></i>
-                                <span>Paiements</span>
-                            </div>
-                        </div>
-                        
-                        <div class="dashboard-card">
-                            <div class="card-header">
-                                <div class="card-icon icon-blocks">
-                                    <i class="fas fa-ban"></i>
-                                </div>
-                                <div class="card-title">
-                                    <h3>Tirages Actifs</h3>
-                                    <p>Sur 10 disponibles</p>
-                                </div>
-                            </div>
-                            <div class="card-value" id="dashboard-active-draws">0</div>
-                            <div class="card-change change-up">
-                                <i class="fas fa-calendar-check"></i>
-                                <span id="dashboard-total-draws">/0 total</span>
+                                <i class="fas fa-arrow-up"></i>
+                                <span>8% ce mois</span>
                             </div>
                         </div>
                         
@@ -847,14 +1035,48 @@
                                     <i class="fas fa-ticket-alt"></i>
                                 </div>
                                 <div class="card-title">
-                                    <h3>Boules Bloquées</h3>
-                                    <p>Numéros désactivés</p>
+                                    <h3>Tickets Émis</h3>
+                                    <p>Aujourd'hui</p>
                                 </div>
                             </div>
-                            <div class="card-value" id="dashboard-blocked-balls">0</div>
+                            <div class="card-value" id="dashboard-tickets">0</div>
                             <div class="card-change change-up">
-                                <i class="fas fa-dice"></i>
-                                <span>Sur 100 boules</span>
+                                <i class="fas fa-arrow-up"></i>
+                                <span>15% aujourd'hui</span>
+                            </div>
+                        </div>
+                        
+                        <div class="dashboard-card">
+                            <div class="card-header">
+                                <div class="card-icon icon-wins">
+                                    <i class="fas fa-trophy"></i>
+                                </div>
+                                <div class="card-title">
+                                    <h3>Gains Distribués</h3>
+                                    <p>Aujourd'hui</p>
+                                </div>
+                            </div>
+                            <div class="card-value" id="dashboard-wins">0 Gdes</div>
+                            <div class="card-change change-down">
+                                <i class="fas fa-arrow-down"></i>
+                                <span>5% aujourd'hui</span>
+                            </div>
+                        </div>
+                        
+                        <div class="dashboard-card">
+                            <div class="card-header">
+                                <div class="card-icon icon-blocks">
+                                    <i class="fas fa-ban"></i>
+                                </div>
+                                <div class="card-title">
+                                    <h3>Éléments Bloqués</h3>
+                                    <p>Actuellement</p>
+                                </div>
+                            </div>
+                            <div class="card-value" id="dashboard-blocks">0</div>
+                            <div class="card-change change-up">
+                                <i class="fas fa-arrow-up"></i>
+                                <span>3 nouveaux</span>
                             </div>
                         </div>
                         
@@ -864,14 +1086,14 @@
                                     <i class="fas fa-upload"></i>
                                 </div>
                                 <div class="card-title">
-                                    <h3>Balance</h3>
-                                    <p>Ventes - Gains</p>
+                                    <h3>Tirages Publiés</h3>
+                                    <p>Aujourd'hui</p>
                                 </div>
                             </div>
-                            <div class="card-value" id="dashboard-balance">0 Gdes</div>
-                            <div class="card-change change-up" id="dashboard-balance-change">
-                                <i class="fas fa-balance-scale"></i>
-                                <span>Bénéfice net</span>
+                            <div class="card-value" id="dashboard-draws">0</div>
+                            <div class="card-change change-up">
+                                <i class="fas fa-arrow-up"></i>
+                                <span>2 aujourd'hui</span>
                             </div>
                         </div>
                     </div>
@@ -882,27 +1104,13 @@
                             <div style="background: white; border-radius: 20px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.08);">
                                 <h4 style="margin-bottom: 20px;">Activité Récente</h4>
                                 <div id="recent-activity" style="max-height: 300px; overflow-y: auto;">
-                                    <div style="text-align: center; padding: 40px;">
-                                        <div class="loading" style="margin: 0 auto 15px;"></div>
-                                        <p style="color: var(--text-dim);">Chargement des activités...</p>
-                                    </div>
+                                    <!-- Activité récente chargée ici -->
                                 </div>
                             </div>
                             <div style="background: white; border-radius: 20px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.08);">
-                                <h4 style="margin-bottom: 20px;">Actions Rapides</h4>
-                                <div style="display: grid; gap: 15px;">
-                                    <button class="btn btn-success" onclick="ownerManager.initDefaults()">
-                                        <i class="fas fa-database"></i> Initialiser les données
-                                    </button>
-                                    <button class="btn btn-primary" onclick="ownerManager.loadDashboardData()">
-                                        <i class="fas fa-sync-alt"></i> Actualiser les données
-                                    </button>
-                                    <button class="btn btn-warning" onclick="ownerManager.showCreateUserModal('supervisor')">
-                                        <i class="fas fa-user-plus"></i> Ajouter superviseur
-                                    </button>
-                                    <button class="btn btn-info" onclick="ownerManager.switchView('draws')">
-                                        <i class="fas fa-cog"></i> Configurer tirages
-                                    </button>
+                                <h4 style="margin-bottom: 20px;">Alertes</h4>
+                                <div id="alerts-container">
+                                    <!-- Alertes chargées ici -->
                                 </div>
                             </div>
                         </div>
@@ -923,26 +1131,20 @@
                         <button class="btn btn-primary" onclick="ownerManager.showCreateUserModal('agent')">
                             <i class="fas fa-user-plus"></i> Nouvel Agent
                         </button>
-                        <button class="btn btn-secondary" onclick="ownerManager.loadUsers()">
-                            <i class="fas fa-sync-alt"></i> Actualiser
+                        <button class="btn btn-secondary" onclick="ownerManager.exportUsersData()">
+                            <i class="fas fa-download"></i> Exporter Données
                         </button>
                     </div>
                     
                     <div style="margin-bottom: 20px;">
-                        <h3>Superviseurs <span id="supervisors-count" style="color: var(--text-dim); font-size: 14px;">(0)</span></h3>
+                        <h3>Superviseurs</h3>
                         <div id="supervisors-container" class="users-grid" style="margin-bottom: 30px;">
-                            <div style="grid-column: 1 / -1; text-align: center; padding: 40px;">
-                                <div class="loading" style="margin: 0 auto 15px;"></div>
-                                <p style="color: var(--text-dim);">Chargement des superviseurs...</p>
-                            </div>
+                            <!-- Superviseurs chargés ici -->
                         </div>
                         
-                        <h3>Agents <span id="agents-count" style="color: var(--text-dim); font-size: 14px;">(0)</span></h3>
+                        <h3>Agents</h3>
                         <div id="agents-container" class="users-grid">
-                            <div style="grid-column: 1 / -1; text-align: center; padding: 40px;">
-                                <div class="loading" style="margin: 0 auto 15px;"></div>
-                                <p style="color: var(--text-dim);">Chargement des agents...</p>
-                            </div>
+                            <!-- Agents chargés ici -->
                         </div>
                     </div>
                 </div>
@@ -955,10 +1157,7 @@
                     </div>
                     
                     <div class="draws-list" id="draws-container">
-                        <div style="text-align: center; padding: 40px;">
-                            <div class="loading" style="margin: 0 auto 15px;"></div>
-                            <p style="color: var(--text-dim);">Chargement des tirages...</p>
-                        </div>
+                        <!-- Tirages chargés ici -->
                     </div>
                 </div>
 
@@ -966,11 +1165,12 @@
                 <div id="publish-view" class="view-content" style="display: none;">
                     <div class="view-header">
                         <h2><i class="fas fa-upload"></i> Publication des Tirages</h2>
-                        <p>Publiez des tirages manuellement</p>
+                        <p>Publiez des tirages manuellement ou automatiquement</p>
                     </div>
                     
                     <div class="tabs">
                         <button class="tab active" onclick="ownerManager.switchPublishTab('manual')">Publication Manuelle</button>
+                        <button class="tab" onclick="ownerManager.switchPublishTab('auto')">Publication Automatique</button>
                         <button class="tab" onclick="ownerManager.switchPublishTab('history')">Historique</button>
                     </div>
                     
@@ -981,9 +1181,24 @@
                             <form id="manual-publish-form" onsubmit="ownerManager.publishDrawManually(event)">
                                 <div class="form-group">
                                     <label>Nom du Tirage:</label>
-                                    <select class="form-control" name="drawName" required id="draw-name-select">
+                                    <select class="form-control" name="drawName" required>
                                         <option value="">Sélectionner un tirage</option>
+                                        <option value="Florida Matin">Florida Matin</option>
+                                        <option value="Florida Soir">Florida Soir</option>
+                                        <option value="New York Matin">New York Matin</option>
+                                        <option value="New York Soir">New York Soir</option>
+                                        <option value="Georgia Matin">Georgia Matin</option>
+                                        <option value="Georgia Soir">Georgia Soir</option>
+                                        <option value="Texas Matin">Texas Matin</option>
+                                        <option value="Texas Soir">Texas Soir</option>
+                                        <option value="Tunisia Matin">Tunisia Matin</option>
+                                        <option value="Tunisia Soir">Tunisia Soir</option>
                                     </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label>Date et Heure:</label>
+                                    <input type="datetime-local" class="form-control" name="drawDateTime" required>
                                 </div>
                                 
                                 <div class="form-group">
@@ -1017,16 +1232,81 @@
                                 </div>
                             </form>
                             
-                            <div class="result-preview" style="margin-top: 30px; background: #f8f9fa; border-radius: 15px; padding: 20px;">
-                                <h4 style="margin-bottom: 15px;">Aperçu du Résultat</h4>
-                                <div class="preview-numbers" id="result-preview" style="display: flex; gap: 10px; margin: 20px 0; flex-wrap: wrap;">
-                                    <div style="width: 50px; height: 50px; border-radius: 50%; background: #e0e0e0; display: flex; align-items: center; justify-content: center; font-weight: bold; color: var(--text-dim);">00</div>
-                                    <div style="width: 50px; height: 50px; border-radius: 50%; background: #e0e0e0; display: flex; align-items: center; justify-content: center; font-weight: bold; color: var(--text-dim);">00</div>
-                                    <div style="width: 50px; height: 50px; border-radius: 50%; background: #e0e0e0; display: flex; align-items: center; justify-content: center; font-weight: bold; color: var(--text-dim);">00</div>
-                                    <div style="width: 50px; height: 50px; border-radius: 50%; background: #e0e0e0; display: flex; align-items: center; justify-content: center; font-weight: bold; color: var(--text-dim);">00</div>
-                                    <div style="width: 50px; height: 50px; border-radius: 50%; background: #e0e0e0; display: flex; align-items: center; justify-content: center; font-weight: bold; color: var(--text-dim);">00</div>
+                            <div class="result-preview">
+                                <h4>Aperçu du Résultat</h4>
+                                <div class="preview-numbers" id="result-preview">
+                                    <div class="preview-number">00</div>
+                                    <div class="preview-number">00</div>
+                                    <div class="preview-number">00</div>
+                                    <div class="preview-number">00</div>
+                                    <div class="preview-number">00</div>
                                 </div>
-                                <p style="color: var(--text-dim); font-size: 14px; text-align: center;">Les résultats s'afficheront ici</p>
+                                <p style="color: var(--text-dim); font-size: 14px;">Les résultats s'afficheront ici</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Auto Publish Tab -->
+                    <div id="auto-publish-tab" class="tab-content">
+                        <div style="background: white; border-radius: 20px; padding: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.08);">
+                            <h3 style="margin-bottom: 20px;"><i class="fas fa-robot"></i> Publication Automatique</h3>
+                            
+                            <div class="auto-fetch-settings">
+                                <div class="fetch-status">
+                                    <div class="status-indicator status-inactive" id="fetch-status-indicator"></div>
+                                    <span id="fetch-status-text">Récupération automatique désactivée</span>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label>URL Source des Résultats:</label>
+                                    <input type="url" class="form-control" id="fetch-url" placeholder="https://exemple.com/tirages" value="https://loteries-nationales.com/tirages">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label>Intervalle de Récupération (minutes):</label>
+                                    <input type="number" class="form-control" id="fetch-interval" min="1" value="5">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label>Tirages à Récupérer:</label>
+                                    <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;">
+                                        <label style="display: flex; align-items: center; gap: 5px;">
+                                            <input type="checkbox" name="auto-draws" value="Florida Matin" checked>
+                                            Florida Matin
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 5px;">
+                                            <input type="checkbox" name="auto-draws" value="Florida Soir" checked>
+                                            Florida Soir
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 5px;">
+                                            <input type="checkbox" name="auto-draws" value="New York Matin">
+                                            New York Matin
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 5px;">
+                                            <input type="checkbox" name="auto-draws" value="New York Soir">
+                                            New York Soir
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div style="display: flex; gap: 15px; margin-top: 20px;">
+                                    <button class="btn btn-success" onclick="ownerManager.toggleAutoFetch()">
+                                        <i class="fas fa-play"></i> Activer l'Auto-Récupération
+                                    </button>
+                                    <button class="btn btn-warning" onclick="ownerManager.fetchNow()">
+                                        <i class="fas fa-sync"></i> Récupérer Maintenant
+                                    </button>
+                                    <button class="btn btn-secondary" onclick="ownerManager.testFetch()">
+                                        <i class="fas fa-vial"></i> Tester la Connexion
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div style="margin-top: 30px;">
+                                <h4>Dernières Récupérations</h4>
+                                <div id="fetch-log" style="max-height: 300px; overflow-y: auto; margin-top: 15px;">
+                                    <!-- Log de récupération -->
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1036,10 +1316,7 @@
                         <div style="background: white; border-radius: 20px; padding: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.08);">
                             <h3 style="margin-bottom: 20px;"><i class="fas fa-history"></i> Historique des Publications</h3>
                             <div id="publish-history">
-                                <div style="text-align: center; padding: 40px;">
-                                    <div class="loading" style="margin: 0 auto 15px;"></div>
-                                    <p style="color: var(--text-dim);">Chargement de l'historique...</p>
-                                </div>
+                                <!-- Historique des publications -->
                             </div>
                         </div>
                     </div>
@@ -1055,101 +1332,112 @@
                     <div class="tabs">
                         <button class="tab active" onclick="ownerManager.switchNumbersTab('blocks')">Blocages</button>
                         <button class="tab" onclick="ownerManager.switchNumbersTab('limits')">Limites</button>
+                        <button class="tab" onclick="ownerManager.switchNumbersTab('stats')">Statistiques</button>
                     </div>
                     
                     <div id="blocks-tab" class="tab-content active">
-                        <div style="display: grid; grid-template-columns: 1fr 300px; gap: 25px;">
-                            <div>
-                                <div style="background: white; border-radius: 20px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.08);">
-                                    <h3 style="margin-bottom: 20px;">Grille des Boules (0-99)</h3>
-                                    <div class="numbers-grid" id="blocks-numbers-grid">
-                                        <!-- Boules chargées dynamiquement -->
+                        <div class="controls-grid">
+                            <div class="control-section">
+                                <div class="section-title">
+                                    <i class="fas fa-ban"></i> Blocage Manuel
+                                </div>
+                                <div class="form-group">
+                                    <label>Bloquer un boule spécifique:</label>
+                                    <div style="display: flex; gap: 10px;">
+                                        <input type="text" id="block-number-input" class="form-control" 
+                                               placeholder="Ex: 45" maxlength="2" pattern="[0-9]{2}" style="flex: 1;">
+                                        <button class="btn btn-danger" onclick="ownerManager.blockNumber()">
+                                            <i class="fas fa-ban"></i> Bloquer
+                                        </button>
                                     </div>
+                                </div>
+                                <div class="numbers-grid" id="blocks-numbers-grid">
+                                    <!-- Grille des boules avec blocages -->
                                 </div>
                             </div>
                             
-                            <div>
-                                <div style="background: white; border-radius: 20px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); margin-bottom: 20px;">
-                                    <h3 style="margin-bottom: 20px;">Blocage Manuel</h3>
-                                    <div class="form-group">
-                                        <label>Bloquer/débloquer un boule:</label>
-                                        <div style="display: flex; gap: 10px;">
-                                            <input type="text" id="block-number-input" class="form-control" 
-                                                   placeholder="Ex: 45" maxlength="2" pattern="[0-9]{2}" style="flex: 1;">
-                                            <button class="btn btn-danger" onclick="ownerManager.toggleNumberBlock()">
-                                                <i class="fas fa-ban"></i> Toggle
-                                            </button>
-                                        </div>
-                                    </div>
+                            <div class="control-section">
+                                <div class="section-title">
+                                    <i class="fas fa-unlock"></i> Déblocage
                                 </div>
-                                
-                                <div style="background: white; border-radius: 20px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.08);">
-                                    <h3 style="margin-bottom: 20px;">Boules Bloquées</h3>
-                                    <div id="blocked-numbers-list" style="max-height: 200px; overflow-y: auto;">
+                                <div class="form-group">
+                                    <label>Sélectionnez les boules à débloquer:</label>
+                                    <div id="blocked-numbers-list" style="max-height: 200px; overflow-y: auto; margin-top: 10px;">
                                         <!-- Liste des boules bloquées -->
                                     </div>
                                 </div>
+                                <button class="btn btn-success" onclick="ownerManager.unblockSelected()" style="width: 100%;">
+                                    <i class="fas fa-unlock-alt"></i> Débloquer la Sélection
+                                </button>
+                            </div>
+                            
+                            <div class="control-section">
+                                <div class="section-title">
+                                    <i class="fas fa-cog"></i> Configuration Automatique
+                                </div>
+                                <div class="form-group">
+                                    <label>Blocage automatique par seuil:</label>
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+                                        <input type="number" id="auto-block-threshold" class="form-control" placeholder="Seuil (Gdes)" value="100">
+                                        <select id="auto-block-action" class="form-control">
+                                            <option value="block">Bloquer</option>
+                                            <option value="limit">Limiter</option>
+                                            <option value="alert">Alerte seulement</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <button class="btn btn-warning" onclick="ownerManager.configureAutoBlock()" style="width: 100%; margin-top: 10px;">
+                                    <i class="fas fa-robot"></i> Configurer
+                                </button>
                             </div>
                         </div>
                     </div>
                     
                     <div id="limits-tab" class="tab-content">
-                        <div style="display: grid; grid-template-columns: 1fr 300px; gap: 25px;">
-                            <div>
-                                <div style="background: white; border-radius: 20px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.08);">
-                                    <h3 style="margin-bottom: 20px;">Limites Définies</h3>
-                                    <div id="limits-list">
-                                        <!-- Liste des limites -->
-                                    </div>
+                        <div class="controls-grid">
+                            <div class="control-section">
+                                <div class="section-title">
+                                    <i class="fas fa-tachometer-alt"></i> Limites Manuelles
                                 </div>
-                            </div>
-                            
-                            <div>
-                                <div style="background: white; border-radius: 20px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.08);">
-                                    <h3 style="margin-bottom: 20px;">Ajouter une Limite</h3>
-                                    <div class="form-group">
-                                        <label>Numéro de boule:</label>
-                                        <input type="text" id="limit-number" class="form-control" placeholder="Ex: 45" maxlength="2">
+                                <div class="form-group">
+                                    <label>Ajouter une limite:</label>
+                                    <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 10px; margin-bottom: 15px;">
+                                        <input type="text" id="limit-number" class="form-control" placeholder="Boule" maxlength="2">
+                                        <input type="number" id="limit-amount" class="form-control" placeholder="Limite max (Gdes)" min="1">
                                     </div>
-                                    <div class="form-group">
-                                        <label>Limite (Gdes):</label>
-                                        <input type="number" id="limit-amount" class="form-control" placeholder="Ex: 1000" min="1">
-                                    </div>
-                                    <button class="btn btn-primary" onclick="ownerManager.addNumberLimit()" style="width: 100%;">
+                                    <button class="btn btn-primary" onclick="ownerManager.addNumberLimit()">
                                         <i class="fas fa-plus"></i> Ajouter Limite
                                     </button>
                                 </div>
+                                <div id="limits-list">
+                                    <!-- Liste des limites -->
+                                </div>
                             </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Rules View -->
-                <div id="rules-view" class="view-content" style="display: none;">
-                    <div class="view-header">
-                        <h2><i class="fas fa-sliders-h"></i> Règles de Jeu</h2>
-                        <p>Configurez les gains pour chaque type de jeu</p>
-                    </div>
-                    
-                    <div id="rules-container">
-                        <div style="text-align: center; padding: 40px;">
-                            <div class="loading" style="margin: 0 auto 15px;"></div>
-                            <p style="color: var(--text-dim);">Chargement des règles...</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Activity View -->
-                <div id="activity-view" class="view-content" style="display: none;">
-                    <div class="view-header">
-                        <h2><i class="fas fa-history"></i> Journal d'Activité</h2>
-                        <p>Historique complet des actions système</p>
-                    </div>
-                    
-                    <div id="activity-container">
-                        <div style="text-align: center; padding: 40px;">
-                            <div class="loading" style="margin: 0 auto 15px;"></div>
-                            <p style="color: var(--text-dim);">Chargement du journal...</p>
+                            
+                            <div class="control-section">
+                                <div class="section-title">
+                                    <i class="fas fa-chart-line"></i> Ajustement des Limites
+                                </div>
+                                <div class="form-group">
+                                    <label>Pourcentage d'ajustement:</label>
+                                    <input type="range" id="limit-adjustment" class="form-control" min="50" max="200" value="100" 
+                                           oninput="document.getElementById('adjustment-value').textContent = this.value + '%'">
+                                    <div style="text-align: center; margin-top: 10px;">
+                                        <span id="adjustment-value">100%</span>
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                                    <button class="btn btn-warning" onclick="ownerManager.adjustAllLimits('increase')">
+                                        <i class="fas fa-arrow-up"></i> Augmenter
+                                    </button>
+                                    <button class="btn btn-info" onclick="ownerManager.adjustAllLimits('decrease')">
+                                        <i class="fas fa-arrow-down"></i> Réduire
+                                    </button>
+                                    <button class="btn btn-danger" onclick="ownerManager.resetAllLimits()">
+                                        <i class="fas fa-undo"></i> Réinitialiser
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1158,13 +1446,13 @@
     </div>
 
     <!-- Modal pour créer un utilisateur -->
-    <div id="create-user-modal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-        <div class="modal-content" style="background: white; width: 90%; max-width: 500px; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
-            <div class="modal-header" style="background: linear-gradient(135deg, #2c3e50, #4a235a); color: white; padding: 25px 30px; display: flex; justify-content: space-between; align-items: center;">
+    <div id="create-user-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
                 <h3 id="modal-user-title">Créer un Utilisateur</h3>
-                <button class="close-modal" onclick="ownerManager.closeModal()" style="background: none; border: none; color: white; font-size: 24px; cursor: pointer;">&times;</button>
+                <button class="close-modal" onclick="ownerManager.closeModal()" style="background: none; border: none; color: white; font-size: 24px;">&times;</button>
             </div>
-            <div class="modal-body" style="padding: 30px;">
+            <div class="modal-body">
                 <form id="create-user-form" onsubmit="ownerManager.createUser(event)">
                     <!-- Formulaire chargé dynamiquement -->
                 </form>
@@ -1172,933 +1460,517 @@
         </div>
     </div>
 
-    <script>
-        class OwnerManager {
-            constructor() {
-                this.apiBaseUrl = window.location.origin;
-                this.token = localStorage.getItem('lotato_token');
-                this.currentView = 'dashboard';
-                this.currentNumbersTab = 'blocks';
-                this.currentPublishTab = 'manual';
-                
-                if (!this.token) {
-                    window.location.href = '/';
-                    return;
-                }
-                
-                this.init();
-            }
+    <!-- Modal pour configuration avancée -->
+    <div id="advanced-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="advanced-modal-title">Configuration Avancée</h3>
+                <button class="close-modal" onclick="ownerManager.closeModal('advanced-modal')" style="background: none; border: none; color: white; font-size: 24px;">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="advanced-modal-content">
+                    <!-- Contenu dynamique -->
+                </div>
+            </div>
+        </div>
+    </div>
 
-            async init() {
+    <script>
+        // Configuration de l'API - Connecté à votre backend
+        const API_CONFIG = {
+            BASE_URL: 'https://lotata-islp.onrender.com/api',
+            ENDPOINTS: {
+                AUTH: {
+                    LOGIN: '/auth/login',
+                    LOGOUT: '/auth/logout',
+                    VERIFY: '/auth/verify'
+                },
+                USERS: {
+                    LIST: '/users',
+                    CREATE: '/users',
+                    UPDATE: (id) => `/users/${id}`,
+                    BLOCK: (id) => `/users/${id}/block`,
+                    DELETE: (id) => `/users/${id}`,
+                    EXPORT: '/users/export',
+                    STATS: '/users/stats'
+                },
+                DRAWS: {
+                    LIST: '/draws',
+                    CREATE: '/draws',
+                    PUBLISH: '/draws/publish',
+                    BLOCK: (id) => `/draws/${id}/block`,
+                    HISTORY: '/draws/history',
+                    FETCH: '/draws/fetch',
+                    STATS: '/draws/stats'
+                },
+                NUMBERS: {
+                    LIST: '/numbers',
+                    BLOCK: '/numbers/block',
+                    UNBLOCK: '/numbers/unblock',
+                    LIMITS: '/numbers/limits',
+                    STATS: '/numbers/stats'
+                },
+                RULES: {
+                    GET: '/rules',
+                    UPDATE: '/rules'
+                },
+                REPORTS: {
+                    DASHBOARD: '/reports/dashboard',
+                    SALES: '/reports/sales',
+                    ACTIVITY: '/reports/activity'
+                },
+                SETTINGS: {
+                    GET: '/settings',
+                    UPDATE: '/settings'
+                }
+            },
+            getHeaders() {
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+                const token = localStorage.getItem('auth_token');
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                }
+                return headers;
+            }
+        };
+
+        // Service API pour communiquer avec le backend
+        class ApiService {
+            static async request(endpoint, method = 'GET', data = null) {
+                const url = API_CONFIG.BASE_URL + endpoint;
+                const options = {
+                    method: method,
+                    headers: API_CONFIG.getHeaders(),
+                    credentials: 'include'
+                };
+
+                if (data) {
+                    options.body = JSON.stringify(data);
+                }
+
                 try {
-                    // Vérifier la session
-                    const response = await fetch(`${this.apiBaseUrl}/api/auth/verify`, {
-                        headers: {
-                            'Authorization': `Bearer ${this.token}`
-                        }
-                    });
+                    const response = await fetch(url, options);
+                    
+                    // Gérer les erreurs d'authentification
+                    if (response.status === 401) {
+                        localStorage.removeItem('auth_token');
+                        window.location.href = '/login.html';
+                        throw new Error('Session expirée. Veuillez vous reconnecter.');
+                    }
+
+                    const responseData = await response.json();
                     
                     if (!response.ok) {
-                        window.location.href = '/';
+                        throw new Error(responseData.message || `Erreur ${response.status}: ${response.statusText}`);
+                    }
+
+                    return responseData;
+                } catch (error) {
+                    console.error(`Erreur API ${method} ${endpoint}:`, error);
+                    throw error;
+                }
+            }
+
+            static async get(endpoint) {
+                return await this.request(endpoint, 'GET');
+            }
+
+            static async post(endpoint, data) {
+                return await this.request(endpoint, 'POST', data);
+            }
+
+            static async put(endpoint, data) {
+                return await this.request(endpoint, 'PUT', data);
+            }
+
+            static async patch(endpoint, data) {
+                return await this.request(endpoint, 'PATCH', data);
+            }
+
+            static async delete(endpoint) {
+                return await this.request(endpoint, 'DELETE');
+            }
+
+            // Méthodes spécifiques pour l'application LOTATO
+            static async getDashboardData() {
+                return await this.get(API_CONFIG.ENDPOINTS.REPORTS.DASHBOARD);
+            }
+
+            static async getUsers(type = null) {
+                const endpoint = type ? `${API_CONFIG.ENDPOINTS.USERS.LIST}?type=${type}` : API_CONFIG.ENDPOINTS.USERS.LIST;
+                return await this.get(endpoint);
+            }
+
+            static async createUser(userData) {
+                return await this.post(API_CONFIG.ENDPOINTS.USERS.CREATE, userData);
+            }
+
+            static async updateUser(id, userData) {
+                return await this.put(API_CONFIG.ENDPOINTS.USERS.UPDATE(id), userData);
+            }
+
+            static async toggleUserBlock(id, blocked) {
+                return await this.patch(API_CONFIG.ENDPOINTS.USERS.BLOCK(id), { blocked });
+            }
+
+            static async getDraws() {
+                return await this.get(API_CONFIG.ENDPOINTS.DRAWS.LIST);
+            }
+
+            static async publishDraw(drawData) {
+                return await this.post(API_CONFIG.ENDPOINTS.DRAWS.PUBLISH, drawData);
+            }
+
+            static async toggleDrawBlock(id, blocked) {
+                return await this.patch(API_CONFIG.ENDPOINTS.DRAWS.BLOCK(id), { blocked });
+            }
+
+            static async getDrawHistory() {
+                return await this.get(API_CONFIG.ENDPOINTS.DRAWS.HISTORY);
+            }
+
+            static async getNumbers() {
+                return await this.get(API_CONFIG.ENDPOINTS.NUMBERS.LIST);
+            }
+
+            static async blockNumber(number) {
+                return await this.post(API_CONFIG.ENDPOINTS.NUMBERS.BLOCK, { number });
+            }
+
+            static async unblockNumber(number) {
+                return await this.post(API_CONFIG.ENDPOINTS.NUMBERS.UNBLOCK, { number });
+            }
+
+            static async unblockNumbers(numbers) {
+                return await this.post(API_CONFIG.ENDPOINTS.NUMBERS.UNBLOCK, { numbers });
+            }
+
+            static async getNumberLimits() {
+                return await this.get(API_CONFIG.ENDPOINTS.NUMBERS.LIMITS);
+            }
+
+            static async setNumberLimit(number, limit) {
+                return await this.post(API_CONFIG.ENDPOINTS.NUMBERS.LIMITS, { number, limit });
+            }
+
+            static async updateNumberLimits(limits) {
+                return await this.put(API_CONFIG.ENDPOINTS.NUMBERS.LIMITS, { limits });
+            }
+
+            static async getActivityLog() {
+                return await this.get(API_CONFIG.ENDPOINTS.REPORTS.ACTIVITY);
+            }
+
+            static async exportData(type) {
+                return await this.get(`${API_CONFIG.ENDPOINTS.USERS.EXPORT}?type=${type}`);
+            }
+        }
+
+        // État de l'application
+        let APP_STATE = {
+            currentView: 'dashboard',
+            currentNumbersTab: 'blocks',
+            currentPublishTab: 'manual',
+            autoFetchEnabled: false,
+            autoFetchInterval: null,
+            data: {
+                dashboard: null,
+                users: { supervisors: [], agents: [] },
+                draws: [],
+                numbers: { blocked: [], limits: {} },
+                activity: []
+            }
+        };
+
+        class OwnerManager {
+            constructor() {
+                this.initOwner();
+                this.initEventListeners();
+            }
+
+            async initOwner() {
+                try {
+                    // Vérifier l'authentification
+                    const token = localStorage.getItem('auth_token');
+                    if (!token) {
+                        window.location.href = '/login.html';
                         return;
                     }
+
+                    document.getElementById('admin-name').textContent = 'ADMIN PROPRIÉTAIRE';
                     
-                    const data = await response.json();
-                    this.user = data.user;
-                    
-                    document.getElementById('admin-name').textContent = this.user.name;
-                    
-                    // Initialiser les données
+                    // Charger les données depuis l'API
                     await this.loadDashboardData();
-                    await this.initDefaults();
+                    await this.loadUsers();
+                    await this.loadDraws();
+                    await this.loadNumbers();
+                    await this.loadActivity();
                     
-                    // Charger les tirages pour le formulaire
-                    await this.loadDrawsForSelect();
+                    this.loadAlerts();
                     
-                    // Actualiser toutes les 30 secondes
-                    setInterval(() => {
-                        if (this.currentView === 'dashboard') {
-                            this.loadDashboardData();
-                        }
-                    }, 30000);
+                    console.log('Panneau propriétaire initialisé avec le backend');
                     
                 } catch (error) {
-                    console.error('Erreur initialisation:', error);
-                    this.showNotification('Erreur de connexion au serveur', 'error');
-                    setTimeout(() => window.location.href = '/', 2000);
+                    console.error('Erreur lors de l\'initialisation:', error);
+                    this.showNotification('Erreur de chargement des données', 'error');
+                }
+            }
+
+            initEventListeners() {
+                // Écouteurs pour la prévisualisation des résultats
+                const form = document.getElementById('manual-publish-form');
+                if (form) {
+                    form.querySelectorAll('input[type="number"]').forEach(input => {
+                        input.addEventListener('input', () => this.updateResultPreview());
+                    });
                 }
             }
 
             async loadDashboardData() {
                 try {
-                    const response = await fetch(`${this.apiBaseUrl}/api/owner/dashboard`, {
-                        headers: {
-                            'Authorization': `Bearer ${this.token}`
-                        }
-                    });
+                    const data = await ApiService.getDashboardData();
+                    APP_STATE.data.dashboard = data;
                     
-                    if (!response.ok) throw new Error('Erreur API');
+                    // Mettre à jour l'interface
+                    document.getElementById('dashboard-users').textContent = data.totalUsers || 0;
+                    document.getElementById('dashboard-sales').textContent = `${(data.totalSales || 0).toLocaleString()} Gdes`;
+                    document.getElementById('dashboard-tickets').textContent = data.totalTickets || 0;
+                    document.getElementById('dashboard-wins').textContent = `${(data.totalWins || 0).toLocaleString()} Gdes`;
+                    document.getElementById('dashboard-blocks').textContent = data.totalBlocks || 0;
+                    document.getElementById('dashboard-draws').textContent = data.totalDraws || 0;
                     
-                    const data = await response.json();
-                    
-                    // Mettre à jour les statistiques
-                    const stats = data.stats;
-                    
-                    document.getElementById('dashboard-users').textContent = 
-                        stats.totalAgents + stats.totalSupervisors;
-                    document.getElementById('dashboard-users-online').textContent = 
-                        `${stats.onlineAgents + stats.onlineSupervisors} en ligne`;
-                    
-                    document.getElementById('dashboard-sales').textContent = 
-                        `${stats.todaySales.toLocaleString()} Gdes`;
-                    document.getElementById('dashboard-wins').textContent = 
-                        `${stats.todayWins.toLocaleString()} Gdes`;
-                    document.getElementById('dashboard-active-draws').textContent = 
-                        stats.activeDraws;
-                    document.getElementById('dashboard-total-draws').textContent = 
-                        `/ ${stats.totalDraws} total`;
-                    document.getElementById('dashboard-blocked-balls').textContent = 
-                        stats.blockedBalls;
-                    
-                    const balance = stats.todaySales - stats.todayWins;
-                    document.getElementById('dashboard-balance').textContent = 
-                        `${balance.toLocaleString()} Gdes`;
-                    
-                    const balanceChange = document.getElementById('dashboard-balance-change');
-                    if (balance >= 0) {
-                        balanceChange.className = 'card-change change-up';
-                        balanceChange.innerHTML = '<i class="fas fa-arrow-up"></i> <span>Bénéfice</span>';
-                    } else {
-                        balanceChange.className = 'card-change change-down';
-                        balanceChange.innerHTML = '<i class="fas fa-arrow-down"></i> <span>Perte</span>';
-                    }
-                    
-                    // Mettre à jour les en-têtes
-                    document.getElementById('total-users').textContent = 
-                        stats.totalAgents + stats.totalSupervisors;
-                    document.getElementById('total-sales').textContent = 
-                        `${(stats.todaySales / 1000).toFixed(1)}K`;
-                    document.getElementById('online-users').textContent = 
-                        stats.onlineAgents + stats.onlineSupervisors;
-                    
-                    // Mettre à jour les activités récentes
-                    this.renderRecentActivities(data.recentActivities);
+                    document.getElementById('total-users').textContent = data.totalUsers || 0;
+                    document.getElementById('total-sales').textContent = `${((data.totalSales || 0)/1000).toFixed(1)}K`;
+                    document.getElementById('online-users').textContent = data.onlineUsers || 0;
                     
                 } catch (error) {
                     console.error('Erreur chargement dashboard:', error);
-                }
-            }
-
-            async initDefaults() {
-                try {
-                    const response = await fetch(`${this.apiBaseUrl}/api/owner/init-defaults`, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${this.token}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
-                    
-                    if (!response.ok) throw new Error('Erreur initialisation');
-                    
-                    console.log('Données initialisées avec succès');
-                    
-                } catch (error) {
-                    console.error('Erreur initialisation:', error);
+                    this.showNotification('Erreur de chargement du tableau de bord', 'error');
                 }
             }
 
             async loadUsers() {
                 try {
-                    const response = await fetch(`${this.apiBaseUrl}/api/owner/users`, {
-                        headers: {
-                            'Authorization': `Bearer ${this.token}`
-                        }
-                    });
-                    
-                    if (!response.ok) throw new Error('Erreur API');
-                    
-                    const data = await response.json();
-                    this.renderUsers(data.agents, data.supervisors);
-                    
+                    const data = await ApiService.getUsers();
+                    APP_STATE.data.users = data;
                 } catch (error) {
                     console.error('Erreur chargement utilisateurs:', error);
-                    this.showNotification('Erreur chargement utilisateurs', 'error');
-                }
-            }
-
-            renderUsers(agents, supervisors) {
-                // Superviseurs
-                document.getElementById('supervisors-count').textContent = `(${supervisors.length})`;
-                const supervisorsContainer = document.getElementById('supervisors-container');
-                
-                if (supervisors.length === 0) {
-                    supervisorsContainer.innerHTML = `
-                        <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-dim);">
-                            <i class="fas fa-users" style="font-size: 48px; margin-bottom: 15px;"></i>
-                            <p>Aucun superviseur</p>
-                        </div>
-                    `;
-                } else {
-                    supervisorsContainer.innerHTML = supervisors.map(supervisor => `
-                        <div class="user-card ${!supervisor.isActive ? 'blocked' : ''}">
-                            <div class="user-header">
-                                <div class="user-type type-supervisor">SUPERVISEUR</div>
-                                <div class="user-status">
-                                    <span class="status-dot ${supervisor.online ? 'online' : 'offline'}"></span>
-                                    ${supervisor.online ? 'En ligne' : 'Hors ligne'}
-                                </div>
-                            </div>
-                            <div class="user-info">
-                                <h4>${supervisor.name}</h4>
-                                <div class="user-details">
-                                    <p><strong>ID:</strong> ${supervisor.username}</p>
-                                    ${supervisor.email ? `<p><strong>Email:</strong> ${supervisor.email}</p>` : ''}
-                                    ${supervisor.phone ? `<p><strong>Téléphone:</strong> ${supervisor.phone}</p>` : ''}
-                                    <p><strong>Agents:</strong> ${supervisor.agentCount || 0}</p>
-                                </div>
-                            </div>
-                            <div class="user-stats">
-                                <div class="user-stat">
-                                    <div class="stat-label">Créé le</div>
-                                    <div class="stat-value">${new Date(supervisor.createdAt).toLocaleDateString()}</div>
-                                </div>
-                                <div class="user-stat">
-                                    <div class="stat-label">Statut</div>
-                                    <div class="stat-value">${supervisor.isActive ? 'Actif' : 'Bloqué'}</div>
-                                </div>
-                            </div>
-                            <div class="user-actions">
-                                <button class="btn ${!supervisor.isActive ? 'btn-success' : 'btn-danger'} btn-small" 
-                                        onclick="ownerManager.toggleUserBlock('${supervisor.username}', ${!supervisor.isActive})">
-                                    ${!supervisor.isActive ? 'Débloquer' : 'Bloquer'}
-                                </button>
-                            </div>
-                        </div>
-                    `).join('');
-                }
-                
-                // Agents
-                document.getElementById('agents-count').textContent = `(${agents.length})`;
-                const agentsContainer = document.getElementById('agents-container');
-                
-                if (agents.length === 0) {
-                    agentsContainer.innerHTML = `
-                        <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-dim);">
-                            <i class="fas fa-user-friends" style="font-size: 48px; margin-bottom: 15px;"></i>
-                            <p>Aucun agent</p>
-                        </div>
-                    `;
-                } else {
-                    agentsContainer.innerHTML = agents.map(agent => `
-                        <div class="user-card ${!agent.isActive ? 'blocked' : ''}">
-                            <div class="user-header">
-                                <div class="user-type type-agent">AGENT</div>
-                                <div class="user-status">
-                                    <span class="status-dot ${agent.online ? 'online' : 'offline'}"></span>
-                                    ${agent.online ? 'En ligne' : 'Hors ligne'}
-                                </div>
-                            </div>
-                            <div class="user-info">
-                                <h4>${agent.agentName}</h4>
-                                <div class="user-details">
-                                    <p><strong>ID:</strong> ${agent.agentId}</p>
-                                    <p><strong>Superviseur:</strong> ${agent.supervisorId}</p>
-                                    ${agent.location ? `<p><strong>Localisation:</strong> ${agent.location}</p>` : ''}
-                                    <p><strong>Fonds:</strong> ${agent.funds} Gdes</p>
-                                </div>
-                            </div>
-                            <div class="user-stats">
-                                <div class="user-stat">
-                                    <div class="stat-label">Créé le</div>
-                                    <div class="stat-value">${new Date(agent.createdAt).toLocaleDateString()}</div>
-                                </div>
-                                <div class="user-stat">
-                                    <div class="stat-label">Statut</div>
-                                    <div class="stat-value">${agent.isActive ? 'Actif' : 'Bloqué'}</div>
-                                </div>
-                            </div>
-                            <div class="user-actions">
-                                <button class="btn ${!agent.isActive ? 'btn-success' : 'btn-danger'} btn-small" 
-                                        onclick="ownerManager.toggleUserBlock('${agent.agentId}', ${!agent.isActive})">
-                                    ${!agent.isActive ? 'Débloquer' : 'Bloquer'}
-                                </button>
-                            </div>
-                        </div>
-                    `).join('');
                 }
             }
 
             async loadDraws() {
                 try {
-                    const response = await fetch(`${this.apiBaseUrl}/api/owner/draws`, {
-                        headers: {
-                            'Authorization': `Bearer ${this.token}`
-                        }
-                    });
-                    
-                    if (!response.ok) throw new Error('Erreur API');
-                    
-                    const data = await response.json();
-                    this.renderDraws(data.draws);
-                    
+                    const data = await ApiService.getDraws();
+                    APP_STATE.data.draws = data;
                 } catch (error) {
                     console.error('Erreur chargement tirages:', error);
-                    this.showNotification('Erreur chargement tirages', 'error');
                 }
             }
 
-            renderDraws(draws) {
-                const container = document.getElementById('draws-container');
+            async loadNumbers() {
+                try {
+                    const data = await ApiService.getNumbers();
+                    APP_STATE.data.numbers = data;
+                } catch (error) {
+                    console.error('Erreur chargement numéros:', error);
+                }
+            }
+
+            async loadActivity() {
+                try {
+                    const data = await ApiService.getActivityLog();
+                    APP_STATE.data.activity = data;
+                    this.renderRecentActivity();
+                } catch (error) {
+                    console.error('Erreur chargement activité:', error);
+                }
+            }
+
+            switchView(viewName) {
+                document.querySelectorAll('.nav-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                event.target.closest('.nav-item').classList.add('active');
                 
-                if (!draws || draws.length === 0) {
-                    container.innerHTML = `
-                        <div style="text-align: center; padding: 40px; color: var(--text-dim);">
-                            <i class="fas fa-calendar-times" style="font-size: 48px; margin-bottom: 15px;"></i>
-                            <p>Aucun tirage configuré</p>
-                        </div>
-                    `;
+                document.querySelectorAll('.view-content').forEach(view => {
+                    view.style.display = 'none';
+                });
+                
+                document.getElementById(`${viewName}-view`).style.display = 'block';
+                APP_STATE.currentView = viewName;
+                
+                switch(viewName) {
+                    case 'users':
+                        this.renderUsersView();
+                        break;
+                    case 'draws':
+                        this.renderDrawsView();
+                        break;
+                    case 'publish':
+                        this.renderPublishView();
+                        break;
+                    case 'numbers':
+                        this.renderNumbersView();
+                        break;
+                    case 'activity':
+                        this.renderActivityView();
+                        break;
+                }
+            }
+
+            switchPublishTab(tabName) {
+                document.querySelectorAll('#publish-view .tab').forEach(tab => {
+                    tab.classList.remove('active');
+                });
+                event.target.classList.add('active');
+                
+                document.querySelectorAll('#publish-view .tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                
+                document.getElementById(`${tabName}-publish-tab`).classList.add('active');
+                APP_STATE.currentPublishTab = tabName;
+                
+                if (tabName === 'history') {
+                    this.renderPublishHistory();
+                } else if (tabName === 'auto') {
+                    this.updateFetchStatus();
+                    this.renderFetchLog();
+                }
+            }
+
+            switchNumbersTab(tabName) {
+                document.querySelectorAll('#numbers-view .tab').forEach(tab => {
+                    tab.classList.remove('active');
+                });
+                event.target.classList.add('active');
+                
+                document.querySelectorAll('#numbers-view .tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                
+                document.getElementById(`${tabName}-tab`).classList.add('active');
+                APP_STATE.currentNumbersTab = tabName;
+                
+                if (tabName === 'blocks') {
+                    this.renderBlocksTab();
+                } else if (tabName === 'limits') {
+                    this.renderLimitsTab();
+                }
+            }
+
+            // GESTION DES UTILISATEURS
+            renderUsersView() {
+                this.renderSupervisors();
+                this.renderAgents();
+            }
+
+            renderSupervisors() {
+                const container = document.getElementById('supervisors-container');
+                const supervisors = APP_STATE.data.users.supervisors || [];
+                
+                if (supervisors.length === 0) {
+                    container.innerHTML = '<p style="color: var(--text-dim); text-align: center; padding: 20px;">Aucun superviseur trouvé</p>';
                     return;
                 }
                 
-                container.innerHTML = draws.map(draw => `
-                    <div class="draw-item ${!draw.isActive ? 'blocked' : ''}">
-                        <div class="draw-header">
-                            <div class="draw-name">${draw.drawName}</div>
-                            <div class="draw-time">${draw.drawTime}</div>
-                        </div>
-                        <div class="draw-stats">
-                            <div class="draw-stat">
-                                <div style="font-size: 12px; color: var(--text-dim);">Statut</div>
-                                <div style="font-weight: bold; color: ${draw.isActive ? 'var(--success)' : 'var(--danger)'};">${draw.isActive ? 'ACTIF' : 'INACTIF'}</div>
-                            </div>
-                            <div class="draw-stat">
-                                <div style="font-size: 12px; color: var(--text-dim);">Ventes Aujourd'hui</div>
-                                <div style="font-weight: bold;">${draw.sales ? draw.sales.toLocaleString() : '0'} Gdes</div>
-                            </div>
-                            <div class="draw-stat">
-                                <div style="font-size: 12px; color: var(--text-dim);">ID</div>
-                                <div style="font-weight: bold; font-family: monospace;">${draw.drawId}</div>
+                container.innerHTML = supervisors.map(supervisor => `
+                    <div class="user-card ${supervisor.blocked ? 'blocked' : ''}">
+                        <div class="user-header">
+                            <div class="user-type type-supervisor">SUPERVISEUR</div>
+                            <div class="user-status">
+                                <span class="status-dot ${supervisor.online ? 'online' : 'offline'}"></span>
+                                ${supervisor.online ? 'En ligne' : 'Hors ligne'}
                             </div>
                         </div>
-                        <div style="display: flex; gap: 10px; margin-top: 15px;">
-                            <button class="btn ${!draw.isActive ? 'btn-success' : 'btn-danger'} btn-small" 
-                                    onclick="ownerManager.toggleDraw('${draw.drawId}', ${!draw.isActive})">
-                                ${!draw.isActive ? 'Activer' : 'Désactiver'}
+                        <div class="user-info">
+                            <h4>${supervisor.name}</h4>
+                            <div class="user-details">
+                                <p><strong>ID:</strong> ${supervisor.id}</p>
+                                <p><strong>Email:</strong> ${supervisor.email}</p>
+                                <p><strong>Téléphone:</strong> ${supervisor.phone}</p>
+                                <p><strong>Agents:</strong> ${supervisor.agentsCount || 0}</p>
+                            </div>
+                        </div>
+                        <div class="user-stats">
+                            <div class="user-stat">
+                                <div class="stat-label">Ventes</div>
+                                <div class="stat-value">${supervisor.sales || 0} Gdes</div>
+                            </div>
+                            <div class="user-stat">
+                                <div class="stat-label">Depuis</div>
+                                <div class="stat-value">${new Date(supervisor.createdAt).toLocaleDateString()}</div>
+                            </div>
+                        </div>
+                        <div class="user-actions">
+                            <button class="btn ${supervisor.blocked ? 'btn-success' : 'btn-danger'} btn-small" 
+                                    onclick="ownerManager.toggleUserBlock('${supervisor.id}', ${!supervisor.blocked})">
+                                ${supervisor.blocked ? 'Débloquer' : 'Bloquer'}
+                            </button>
+                            <button class="btn btn-warning btn-small" onclick="ownerManager.editUser('${supervisor.id}')">
+                                Éditer
+                            </button>
+                            <button class="btn btn-secondary btn-small" onclick="ownerManager.viewSupervisorAgents('${supervisor.id}')">
+                                Voir Agents
                             </button>
                         </div>
                     </div>
                 `).join('');
             }
 
-            async loadDrawsForSelect() {
-                try {
-                    const response = await fetch(`${this.apiBaseUrl}/api/owner/draws`, {
-                        headers: {
-                            'Authorization': `Bearer ${this.token}`
-                        }
-                    });
-                    
-                    if (response.ok) {
-                        const data = await response.json();
-                        const select = document.getElementById('draw-name-select');
-                        
-                        // Garder le premier option vide
-                        while (select.options.length > 1) {
-                            select.remove(1);
-                        }
-                        
-                        data.draws.forEach(draw => {
-                            if (draw.isActive) {
-                                const option = document.createElement('option');
-                                option.value = draw.drawName;
-                                option.textContent = draw.drawName;
-                                select.appendChild(option);
-                            }
-                        });
-                    }
-                    
-                } catch (error) {
-                    console.error('Erreur chargement tirages pour select:', error);
-                }
-            }
-
-            async loadBalls() {
-                try {
-                    const response = await fetch(`${this.apiBaseUrl}/api/owner/balls`, {
-                        headers: {
-                            'Authorization': `Bearer ${this.token}`
-                        }
-                    });
-                    
-                    if (!response.ok) throw new Error('Erreur API');
-                    
-                    const data = await response.json();
-                    
-                    if (this.currentNumbersTab === 'blocks') {
-                        this.renderBallsGrid(data.balls);
-                        this.renderBlockedNumbersList(data.balls);
-                    } else if (this.currentNumbersTab === 'limits') {
-                        this.renderLimitsList(data.balls);
-                    }
-                    
-                } catch (error) {
-                    console.error('Erreur chargement boules:', error);
-                    this.showNotification('Erreur chargement boules', 'error');
-                }
-            }
-
-            renderBallsGrid(balls) {
-                const container = document.getElementById('blocks-numbers-grid');
+            renderAgents() {
+                const container = document.getElementById('agents-container');
+                const agents = APP_STATE.data.users.agents || [];
                 
-                if (!balls || balls.length === 0) {
-                    container.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 20px; color: var(--text-dim);">Aucune boule</div>';
+                if (agents.length === 0) {
+                    container.innerHTML = '<p style="color: var(--text-dim); text-align: center; padding: 20px;">Aucun agent trouvé</p>';
                     return;
                 }
                 
-                container.innerHTML = balls.map(ball => {
-                    let className = 'number-item normal';
-                    let title = `Boule ${ball.ballNumber}`;
-                    
-                    if (ball.isBlocked) {
-                        className = 'number-item blocked';
-                        title += ' (BLOQUÉ)';
-                    } else if (ball.limitAmount > 0) {
-                        className = 'number-item limited';
-                        title += ` (Limite: ${ball.limitAmount} Gdes)`;
-                    }
-                    
-                    return `
-                        <div class="${className}" title="${title}" 
-                             onclick="ownerManager.toggleBallBlock('${ball.ballNumber}', ${!ball.isBlocked})">
-                            ${ball.ballNumber}
-                        </div>
-                    `;
-                }).join('');
-            }
-
-            renderBlockedNumbersList(balls) {
-                const container = document.getElementById('blocked-numbers-list');
-                const blockedBalls = balls.filter(ball => ball.isBlocked);
-                
-                if (blockedBalls.length === 0) {
-                    container.innerHTML = '<p style="color: var(--text-dim); text-align: center; padding: 20px;">Aucun boule bloqué</p>';
-                    return;
-                }
-                
-                container.innerHTML = blockedBalls.map(ball => `
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f8f9fa; 
-                                border-radius: 8px; margin-bottom: 5px;">
-                        <div>
-                            <strong>Boule ${ball.ballNumber}</strong>
-                            <div style="font-size: 12px; color: var(--text-dim);">
-                                ${ball.blockedAt ? `Bloqué le: ${new Date(ball.blockedAt).toLocaleDateString()}` : ''}
+                container.innerHTML = agents.map(agent => `
+                    <div class="user-card ${agent.blocked ? 'blocked' : ''}">
+                        <div class="user-header">
+                            <div class="user-type type-agent">AGENT</div>
+                            <div class="user-status">
+                                <span class="status-dot ${agent.online ? 'online' : 'offline'}"></span>
+                                ${agent.online ? 'En ligne' : 'Hors ligne'}
                             </div>
                         </div>
-                        <button class="btn btn-success btn-small" onclick="ownerManager.toggleBallBlock('${ball.ballNumber}', false)">
-                            <i class="fas fa-unlock"></i>
-                        </button>
-                    </div>
-                `).join('');
-            }
-
-            renderLimitsList(balls) {
-                const container = document.getElementById('limits-list');
-                const limitedBalls = balls.filter(ball => ball.limitAmount > 0);
-                
-                if (limitedBalls.length === 0) {
-                    container.innerHTML = '<p style="color: var(--text-dim); text-align: center; padding: 40px;">Aucune limite définie</p>';
-                    return;
-                }
-                
-                container.innerHTML = limitedBalls.map(ball => {
-                    const percent = ball.currentAmount ? Math.min((ball.currentAmount / ball.limitAmount) * 100, 100) : 0;
-                    const barColor = percent > 90 ? 'var(--danger)' : percent > 70 ? 'var(--warning)' : 'var(--success)';
-                    
-                    return `
-                        <div style="background: white; padding: 15px; border-radius: 10px; margin-bottom: 10px; 
-                                    border-left: 4px solid ${barColor};">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                                <div>
-                                    <strong>Boule ${ball.ballNumber}</strong><br>
-                                    <span style="font-size: 12px; color: var(--text-dim);">
-                                        ${ball.currentAmount || 0}/${ball.limitAmount} Gdes (${percent.toFixed(1)}%)
-                                    </span>
-                                </div>
-                                <button class="btn btn-danger btn-small" onclick="ownerManager.removeBallLimit('${ball.ballNumber}')">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                            <div style="background: #f8f9fa; height: 8px; border-radius: 4px; overflow: hidden;">
-                                <div style="width: ${percent}%; height: 100%; background: ${barColor};"></div>
+                        <div class="user-info">
+                            <h4>${agent.name}</h4>
+                            <div class="user-details">
+                                <p><strong>ID:</strong> ${agent.id}</p>
+                                <p><strong>Superviseur:</strong> ${agent.supervisorName || 'Non assigné'}</p>
+                                <p><strong>Localisation:</strong> ${agent.location || 'Non spécifié'}</p>
+                                <p><strong>Commission:</strong> ${agent.commission || 5}%</p>
                             </div>
                         </div>
-                    `;
-                }).join('');
-            }
-
-            async loadRules() {
-                try {
-                    const response = await fetch(`${this.apiBaseUrl}/api/owner/rules`, {
-                        headers: {
-                            'Authorization': `Bearer ${this.token}`
-                        }
-                    });
-                    
-                    if (!response.ok) throw new Error('Erreur API');
-                    
-                    const data = await response.json();
-                    this.renderRules(data.rules);
-                    
-                } catch (error) {
-                    console.error('Erreur chargement règles:', error);
-                    this.showNotification('Erreur chargement règles', 'error');
-                }
-            }
-
-            renderRules(rules) {
-                const container = document.getElementById('rules-container');
-                
-                if (!rules || rules.length === 0) {
-                    container.innerHTML = `
-                        <div style="text-align: center; padding: 40px; color: var(--text-dim);">
-                            <i class="fas fa-sliders-h" style="font-size: 48px; margin-bottom: 15px;"></i>
-                            <p>Aucune règle configurée</p>
-                        </div>
-                    `;
-                    return;
-                }
-                
-                container.innerHTML = rules.map(rule => {
-                    const payouts = rule.pouts || {};
-                    const payoutsHTML = Object.entries(payouts).map(([key, value]) => 
-                        `<div style="display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #eee;">
-                            <span>${key}:</span>
-                            <strong>${value}x</strong>
-                        </div>`
-                    ).join('');
-                    
-                    return `
-                        <div style="background: white; border-radius: 15px; padding: 20px; margin-bottom: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.05);">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                                <h3 style="margin: 0;">${rule.gameName}</h3>
-                                <span style="background: ${rule.isActive ? '#d4edda' : '#f8d7da'}; 
-                                      color: ${rule.isActive ? '#155724' : '#721c24'}; 
-                                      padding: 5px 10px; border-radius: 20px; font-size: 12px;">
-                                    ${rule.isActive ? 'ACTIF' : 'INACTIF'}
-                                </span>
+                        <div class="user-stats">
+                            <div class="user-stat">
+                                <div class="stat-label">Ventes</div>
+                                <div class="stat-value">${agent.sales || 0} Gdes</div>
                             </div>
-                            <div style="margin-bottom: 15px;">
-                                <strong style="color: var(--text-dim); font-size: 12px;">Type:</strong> ${rule.gameType}
-                            </div>
-                            <div style="background: #f8f9fa; padding: 15px; border-radius: 10px;">
-                                <strong style="display: block; margin-bottom: 10px;">Gains:</strong>
-                                ${payoutsHTML}
-                            </div>
-                            <div style="display: flex; gap: 10px; margin-top: 15px;">
-                                <button class="btn btn-warning btn-small" onclick="ownerManager.editRule('${rule.gameType}')">
-                                    <i class="fas fa-edit"></i> Modifier
-                                </button>
-                                <button class="btn ${rule.isActive ? 'btn-danger' : 'btn-success'} btn-small" 
-                                        onclick="ownerManager.toggleRule('${rule.gameType}', ${!rule.isActive})">
-                                    ${rule.isActive ? 'Désactiver' : 'Activer'}
-                                </button>
+                            <div class="user-stat">
+                                <div class="stat-label">Tickets</div>
+                                <div class="stat-value">${agent.tickets || 0}</div>
                             </div>
                         </div>
-                    `;
-                }).join('');
-            }
-
-            async loadActivity() {
-                try {
-                    const response = await fetch(`${this.apiBaseUrl}/api/owner/activity?limit=50`, {
-                        headers: {
-                            'Authorization': `Bearer ${this.token}`
-                        }
-                    });
-                    
-                    if (!response.ok) throw new Error('Erreur API');
-                    
-                    const data = await response.json();
-                    this.renderActivity(data.activities);
-                    
-                } catch (error) {
-                    console.error('Erreur chargement journal:', error);
-                    this.showNotification('Erreur chargement journal', 'error');
-                }
-            }
-
-            renderActivity(activities) {
-                const container = document.getElementById('activity-container');
-                
-                if (!activities || activities.length === 0) {
-                    container.innerHTML = `
-                        <div style="text-align: center; padding: 40px; color: var(--text-dim);">
-                            <i class="fas fa-history" style="font-size: 48px; margin-bottom: 15px;"></i>
-                            <p>Aucune activité enregistrée</p>
-                        </div>
-                    `;
-                    return;
-                }
-                
-                container.innerHTML = `
-                    <div style="max-height: 600px; overflow-y: auto;">
-                        ${activities.map(activity => `
-                            <div style="background: white; padding: 15px; border-left: 4px solid var(--primary); 
-                                        margin-bottom: 10px; border-radius: 0 10px 10px 0;">
-                                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                                    <strong>${activity.action}</strong>
-                                    <span style="font-size: 12px; color: var(--text-dim);">
-                                        ${new Date(activity.createdAt).toLocaleString()}
-                                    </span>
-                                </div>
-                                <div style="font-size: 14px; color: var(--text-dim); margin-bottom: 5px;">
-                                    ${activity.details}
-                                </div>
-                                <div style="font-size: 12px; color: var(--primary);">
-                                    <i class="fas fa-user"></i> ${activity.userRole} • ${activity.userId}
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                `;
-            }
-
-            renderRecentActivities(activities) {
-                const container = document.getElementById('recent-activity');
-                
-                if (!activities || activities.length === 0) {
-                    container.innerHTML = `
-                        <div style="text-align: center; padding: 20px; color: var(--text-dim);">
-                            <p>Aucune activité récente</p>
-                        </div>
-                    `;
-                    return;
-                }
-                
-                container.innerHTML = activities.map(activity => `
-                    <div style="padding: 15px; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 15px;">
-                        <div style="width: 10px; height: 10px; background: var(--primary); border-radius: 50%;"></div>
-                        <div style="flex: 1;">
-                            <div style="font-weight: 500; margin-bottom: 5px;">${activity.action}</div>
-                            <div style="font-size: 12px; color: var(--text-dim);">
-                                ${this.formatTime(activity.createdAt)} • Par ${activity.userRole}
-                            </div>
-                            ${activity.details ? `<div style="font-size: 12px; margin-top: 5px;">${activity.details}</div>` : ''}
+                        <div class="user-actions">
+                            <button class="btn ${agent.blocked ? 'btn-success' : 'btn-danger'} btn-small" 
+                                    onclick="ownerManager.toggleUserBlock('${agent.id}', ${!agent.blocked})">
+                                ${agent.blocked ? 'Débloquer' : 'Bloquer'}
+                            </button>
+                            <button class="btn btn-warning btn-small" onclick="ownerManager.editUser('${agent.id}')">
+                                Éditer
+                            </button>
+                            <button class="btn btn-secondary btn-small" onclick="ownerManager.transferAgent('${agent.id}')">
+                                Transférer
+                            </button>
                         </div>
                     </div>
                 `).join('');
-            }
-
-            async loadPublishHistory() {
-                try {
-                    const response = await fetch(`${this.apiBaseUrl}/api/owner/draws/history?limit=20`, {
-                        headers: {
-                            'Authorization': `Bearer ${this.token}`
-                        }
-                    });
-                    
-                    if (!response.ok) throw new Error('Erreur API');
-                    
-                    const data = await response.json();
-                    this.renderPublishHistory(data.history);
-                    
-                } catch (error) {
-                    console.error('Erreur chargement historique:', error);
-                    this.showNotification('Erreur chargement historique', 'error');
-                }
-            }
-
-            renderPublishHistory(history) {
-                const container = document.getElementById('publish-history');
-                
-                if (!history || history.length === 0) {
-                    container.innerHTML = `
-                        <div style="text-align: center; padding: 40px; color: var(--text-dim);">
-                            <i class="fas fa-calendar-times" style="font-size: 48px; margin-bottom: 15px;"></i>
-                            <p>Aucun tirage publié</p>
-                        </div>
-                    `;
-                    return;
-                }
-                
-                container.innerHTML = history.map(draw => `
-                    <div style="background: white; padding: 20px; margin-bottom: 15px; border-radius: 10px; 
-                                border-left: 4px solid ${draw.source === 'manual' ? 'var(--primary)' : 'var(--success)'};">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                            <div>
-                                <strong style="font-size: 18px;">${draw.drawName}</strong>
-                                <span style="background: ${draw.source === 'manual' ? '#e3f2fd' : '#e8f5e9'}; 
-                                      color: ${draw.source === 'manual' ? '#1976d2' : '#2e7d32'}; 
-                                      padding: 2px 8px; border-radius: 12px; font-size: 12px; margin-left: 10px;">
-                                    ${draw.source === 'manual' ? 'MANUEL' : 'AUTO'}
-                                </span>
-                            </div>
-                            <div style="font-size: 14px; color: var(--text-dim);">
-                                ${new Date(draw.publishedAt).toLocaleString()}
-                            </div>
-                        </div>
-                        
-                        <div style="display: flex; gap: 10px; margin: 15px 0; flex-wrap: wrap;">
-                            ${draw.results.map(num => 
-                                `<div style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #6a11cb, #2575fc); 
-                                  color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">
-                                    ${num.toString().padStart(2, '0')}
-                                </div>`
-                            ).join('')}
-                            ${draw.luckyNumber ? 
-                                `<div style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #ff416c, #ff4b2b); 
-                                  color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">
-                                    ${draw.luckyNumber.toString().padStart(2, '0')}
-                                </div>` 
-                                : ''
-                            }
-                        </div>
-                        
-                        <div style="font-size: 14px; color: var(--text-dim);">
-                            <div><strong>Publié par:</strong> ${draw.publishedBy}</div>
-                        </div>
-                    </div>
-                `).join('');
-            }
-
-            // === ACTIONS ===
-
-            async toggleUserBlock(userId, block) {
-                if (!confirm(`${block ? 'Bloquer' : 'Débloquer'} cet utilisateur?`)) return;
-                
-                try {
-                    const response = await fetch(`${this.apiBaseUrl}/api/owner/users/${userId}/block`, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${this.token}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ block })
-                    });
-                    
-                    if (!response.ok) throw new Error('Erreur API');
-                    
-                    await this.loadUsers();
-                    this.showNotification(`Utilisateur ${block ? 'bloqué' : 'débloqué'} avec succès`, 'success');
-                    
-                } catch (error) {
-                    console.error('Erreur blocage utilisateur:', error);
-                    this.showNotification('Erreur lors du blocage', 'error');
-                }
-            }
-
-            async toggleDraw(drawId, isActive) {
-                if (!confirm(`${isActive ? 'Activer' : 'Désactiver'} ce tirage?`)) return;
-                
-                try {
-                    const response = await fetch(`${this.apiBaseUrl}/api/owner/draws/${drawId}/toggle`, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${this.token}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ isActive })
-                    });
-                    
-                    if (!response.ok) throw new Error('Erreur API');
-                    
-                    await this.loadDraws();
-                    this.showNotification(`Tirage ${isActive ? 'activé' : 'désactivé'} avec succès`, 'success');
-                    
-                } catch (error) {
-                    console.error('Erreur modification tirage:', error);
-                    this.showNotification('Erreur lors de la modification', 'error');
-                }
-            }
-
-            async toggleBallBlock(ballNumber, isBlocked) {
-                try {
-                    const response = await fetch(`${this.apiBaseUrl}/api/owner/balls/${ballNumber}/block`, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${this.token}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ isBlocked })
-                    });
-                    
-                    if (!response.ok) throw new Error('Erreur API');
-                    
-                    await this.loadBalls();
-                    this.showNotification(`Boule ${ballNumber} ${isBlocked ? 'bloquée' : 'débloquée'}`, 'success');
-                    
-                } catch (error) {
-                    console.error('Erreur blocage boule:', error);
-                    this.showNotification('Erreur lors du blocage', 'error');
-                }
-            }
-
-            async addNumberLimit() {
-                const number = document.getElementById('limit-number').value.trim().padStart(2, '0');
-                const amount = document.getElementById('limit-amount').value;
-                
-                if (!/^\d{2}$/.test(number)) {
-                    this.showNotification('Veuillez entrer un numéro valide (2 chiffres)', 'error');
-                    return;
-                }
-                
-                if (!amount || isNaN(amount) || parseInt(amount) <= 0) {
-                    this.showNotification('Veuillez entrer une limite valide', 'error');
-                    return;
-                }
-                
-                try {
-                    const response = await fetch(`${this.apiBaseUrl}/api/owner/balls/${number}/limit`, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${this.token}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ limitAmount: parseInt(amount) })
-                    });
-                    
-                    if (!response.ok) throw new Error('Erreur API');
-                    
-                    document.getElementById('limit-number').value = '';
-                    document.getElementById('limit-amount').value = '';
-                    
-                    await this.loadBalls();
-                    this.showNotification(`Limite définie pour boule ${number}: ${amount} Gdes`, 'success');
-                    
-                } catch (error) {
-                    console.error('Erreur définition limite:', error);
-                    this.showNotification('Erreur lors de la définition', 'error');
-                }
-            }
-
-            async removeBallLimit(ballNumber) {
-                if (!confirm(`Supprimer la limite pour le boule ${ballNumber}?`)) return;
-                
-                try {
-                    const response = await fetch(`${this.apiBaseUrl}/api/owner/balls/${ballNumber}/limit`, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${this.token}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ limitAmount: 0 })
-                    });
-                    
-                    if (!response.ok) throw new Error('Erreur API');
-                    
-                    await this.loadBalls();
-                    this.showNotification('Limite supprimée', 'success');
-                    
-                } catch (error) {
-                    console.error('Erreur suppression limite:', error);
-                    this.showNotification('Erreur lors de la suppression', 'error');
-                }
-            }
-
-            async publishDrawManually(event) {
-                event.preventDefault();
-                const form = event.target;
-                const formData = new FormData(form);
-                
-                const drawName = formData.get('drawName');
-                const results = [
-                    formData.get('num1'),
-                    formData.get('num2'),
-                    formData.get('num3'),
-                    formData.get('num4'),
-                    formData.get('num5')
-                ];
-                const luckyNumber = formData.get('luckyNumber');
-                const comment = formData.get('comment');
-                
-                if (results.some(num => !num || num < 0 || num > 99)) {
-                    this.showNotification('Veuillez entrer 5 numéros valides (0-99)', 'error');
-                    return;
-                }
-                
-                try {
-                    const response = await fetch(`${this.apiBaseUrl}/api/owner/draws/publish`, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${this.token}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            drawName,
-                            results: results.map(r => parseInt(r)),
-                            luckyNumber: luckyNumber ? parseInt(luckyNumber) : null,
-                            publishedBy: this.user.name,
-                            source: 'manual',
-                            comment
-                        })
-                    });
-                    
-                    if (!response.ok) throw new Error('Erreur API');
-                    
-                    form.reset();
-                    this.updateResultPreview();
-                    this.showNotification(`Tirage ${drawName} publié avec succès`, 'success');
-                    
-                    // Recharger l'historique si on est sur l'onglet historique
-                    if (this.currentPublishTab === 'history') {
-                        await this.loadPublishHistory();
-                    }
-                    
-                } catch (error) {
-                    console.error('Erreur publication:', error);
-                    this.showNotification('Erreur lors de la publication', 'error');
-                }
-            }
-
-            generateRandomResults() {
-                const form = document.getElementById('manual-publish-form');
-                
-                for (let i = 1; i <= 5; i++) {
-                    const randomNum = Math.floor(Math.random() * 100);
-                    form[`num${i}`].value = randomNum;
-                }
-                
-                if (Math.random() > 0.5) {
-                    form['luckyNumber'].value = Math.floor(Math.random() * 100);
-                }
-                
-                this.updateResultPreview();
-                this.showNotification('Numéros aléatoires générés', 'info');
-            }
-
-            updateResultPreview() {
-                const form = document.getElementById('manual-publish-form');
-                const preview = document.getElementById('result-preview');
-                
-                if (!form || !preview) return;
-                
-                const numbers = [];
-                for (let i = 1; i <= 5; i++) {
-                    const value = form[`num${i}`]?.value;
-                    numbers.push(value ? value.toString().padStart(2, '0') : '00');
-                }
-                
-                preview.innerHTML = numbers.map(num => `
-                    <div style="width: 50px; height: 50px; border-radius: 50%; 
-                          background: linear-gradient(135deg, #6a11cb, #2575fc);
-                          color: white; display: flex; align-items: center; 
-                          justify-content: center; font-weight: bold;">
-                        ${num}
-                    </div>
-                `).join('');
-                
-                const luckyNumber = form['luckyNumber']?.value;
-                if (luckyNumber) {
-                    preview.innerHTML += `
-                        <div style="width: 50px; height: 50px; border-radius: 50%; 
-                              background: linear-gradient(135deg, #ff416c, #ff4b2b);
-                              color: white; display: flex; align-items: center; 
-                              justify-content: center; font-weight: bold;">
-                            ${luckyNumber.toString().padStart(2, '0')}
-                        </div>
-                    `;
-                }
             }
 
             showCreateUserModal(type) {
@@ -2110,24 +1982,20 @@
                     title.textContent = 'Créer un Nouveau Superviseur';
                     form.innerHTML = `
                         <div class="form-group">
-                            <label>Nom d'utilisateur:</label>
-                            <input type="text" class="form-control" name="username" required>
-                        </div>
-                        <div class="form-group">
                             <label>Nom Complet:</label>
                             <input type="text" class="form-control" name="name" required>
                         </div>
                         <div class="form-group">
+                            <label>Email:</label>
+                            <input type="email" class="form-control" name="email" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Téléphone:</label>
+                            <input type="tel" class="form-control" name="phone" required>
+                        </div>
+                        <div class="form-group">
                             <label>Mot de passe:</label>
                             <input type="password" class="form-control" name="password" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Email (optionnel):</label>
-                            <input type="email" class="form-control" name="email">
-                        </div>
-                        <div class="form-group">
-                            <label>Téléphone (optionnel):</label>
-                            <input type="tel" class="form-control" name="phone">
                         </div>
                         <div style="display: flex; gap: 10px; margin-top: 20px;">
                             <button type="button" class="btn btn-secondary" onclick="ownerManager.closeModal()">Annuler</button>
@@ -2137,27 +2005,43 @@
                     `;
                 } else {
                     title.textContent = 'Créer un Nouvel Agent';
+                    const supervisors = APP_STATE.data.users.supervisors || [];
+                    const supervisorsOptions = supervisors
+                        .map(s => `<option value="${s.id}">${s.name} (${s.id})</option>`)
+                        .join('');
                     
                     form.innerHTML = `
-                        <div class="form-group">
-                            <label>ID Agent (ex: AGENT01):</label>
-                            <input type="text" class="form-control" name="username" required style="text-transform: uppercase;">
-                        </div>
                         <div class="form-group">
                             <label>Nom Complet:</label>
                             <input type="text" class="form-control" name="name" required>
                         </div>
                         <div class="form-group">
+                            <label>Email:</label>
+                            <input type="email" class="form-control" name="email" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Téléphone:</label>
+                            <input type="tel" class="form-control" name="phone" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Superviseur Assigné:</label>
+                            <select class="form-control" name="supervisorId" ${supervisors.length ? '' : 'disabled'}>
+                                <option value="">Sélectionner un superviseur</option>
+                                ${supervisorsOptions}
+                            </select>
+                            ${!supervisors.length ? '<p style="color: var(--danger); font-size: 12px; margin-top: 5px;">Aucun superviseur disponible</p>' : ''}
+                        </div>
+                        <div class="form-group">
+                            <label>Localisation:</label>
+                            <input type="text" class="form-control" name="location" placeholder="Ex: Port-au-Prince" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Commission (%):</label>
+                            <input type="number" class="form-control" name="commission" value="5" min="1" max="20" required>
+                        </div>
+                        <div class="form-group">
                             <label>Mot de passe:</label>
                             <input type="password" class="form-control" name="password" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Superviseur:</label>
-                            <input type="text" class="form-control" name="supervisorId" placeholder="Nom d'utilisateur du superviseur" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Localisation (optionnel):</label>
-                            <input type="text" class="form-control" name="location" placeholder="Ex: Port-au-Prince">
                         </div>
                         <div style="display: flex; gap: 10px; margin-top: 20px;">
                             <button type="button" class="btn btn-secondary" onclick="ownerManager.closeModal()">Annuler</button>
@@ -2174,118 +2058,350 @@
                 event.preventDefault();
                 const form = event.target;
                 const formData = new FormData(form);
-                const data = Object.fromEntries(formData.entries());
+                const type = formData.get('type');
                 
                 try {
-                    const response = await fetch(`${this.apiBaseUrl}/api/owner/users`, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${this.token}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(data)
-                    });
+                    const userData = {
+                        name: formData.get('name'),
+                        email: formData.get('email'),
+                        phone: formData.get('phone'),
+                        password: formData.get('password'),
+                        role: type
+                    };
                     
-                    if (!response.ok) throw new Error('Erreur API');
+                    if (type === 'agent') {
+                        userData.supervisorId = formData.get('supervisorId');
+                        userData.location = formData.get('location');
+                        userData.commission = parseInt(formData.get('commission'));
+                    }
                     
+                    const result = await ApiService.createUser(userData);
+                    
+                    this.showNotification(`${type === 'agent' ? 'Agent' : 'Superviseur'} créé avec succès`, 'success');
                     this.closeModal();
+                    
+                    // Recharger les données
                     await this.loadUsers();
-                    this.showNotification(`Utilisateur créé avec succès`, 'success');
+                    await this.loadDashboardData();
+                    this.renderUsersView();
                     
                 } catch (error) {
                     console.error('Erreur création utilisateur:', error);
-                    this.showNotification('Erreur lors de la création', 'error');
+                    this.showNotification(error.message || 'Erreur lors de la création', 'error');
                 }
             }
 
-            closeModal() {
-                document.getElementById('create-user-modal').style.display = 'none';
-            }
-
-            // === NAVIGATION ===
-
-            switchView(viewName) {
-                // Mettre à jour le menu
-                document.querySelectorAll('.nav-item').forEach(item => {
-                    item.classList.remove('active');
-                });
-                event.target.closest('.nav-item').classList.add('active');
-                
-                // Cacher toutes les vues
-                document.querySelectorAll('.view-content').forEach(view => {
-                    view.style.display = 'none';
-                });
-                
-                // Afficher la vue sélectionnée
-                document.getElementById(`${viewName}-view`).style.display = 'block';
-                this.currentView = viewName;
-                
-                // Charger les données spécifiques
-                switch(viewName) {
-                    case 'dashboard':
-                        this.loadDashboardData();
-                        break;
-                    case 'users':
-                        this.loadUsers();
-                        break;
-                    case 'draws':
-                        this.loadDraws();
-                        break;
-                    case 'publish':
-                        this.loadPublishHistory();
-                        break;
-                    case 'numbers':
-                        this.loadBalls();
-                        break;
-                    case 'rules':
-                        this.loadRules();
-                        break;
-                    case 'activity':
-                        this.loadActivity();
-                        break;
+            async toggleUserBlock(userId, blocked) {
+                try {
+                    await ApiService.toggleUserBlock(userId, blocked);
+                    
+                    this.showNotification(`Utilisateur ${blocked ? 'bloqué' : 'débloqué'} avec succès`, 'success');
+                    
+                    // Recharger les données
+                    await this.loadUsers();
+                    this.renderUsersView();
+                    
+                } catch (error) {
+                    console.error('Erreur blocage utilisateur:', error);
+                    this.showNotification(error.message || 'Erreur lors de l\'opération', 'error');
                 }
             }
 
-            switchPublishTab(tabName) {
-                document.querySelectorAll('#publish-view .tab').forEach(tab => {
-                    tab.classList.remove('active');
-                });
-                event.target.classList.add('active');
+            // PUBLICATION DES TIRAGES
+            renderPublishView() {
+                this.updateResultPreview();
+                this.updateFetchStatus();
+                this.renderFetchLog();
+            }
+
+            async publishDrawManually(event) {
+                event.preventDefault();
+                const form = event.target;
+                const formData = new FormData(form);
                 
-                document.querySelectorAll('#publish-view .tab-content').forEach(content => {
-                    content.classList.remove('active');
-                });
+                const results = [
+                    parseInt(formData.get('num1')),
+                    parseInt(formData.get('num2')),
+                    parseInt(formData.get('num3')),
+                    parseInt(formData.get('num4')),
+                    parseInt(formData.get('num5'))
+                ];
                 
-                document.getElementById(`${tabName}-publish-tab`).classList.add('active');
-                this.currentPublishTab = tabName;
+                // Validation
+                if (results.some(num => isNaN(num) || num < 0 || num > 99)) {
+                    this.showNotification('Veuillez entrer 5 numéros valides (0-99)', 'error');
+                    return;
+                }
                 
-                if (tabName === 'history') {
-                    this.loadPublishHistory();
+                try {
+                    const drawData = {
+                        name: formData.get('drawName'),
+                        dateTime: formData.get('drawDateTime'),
+                        results: results,
+                        luckyNumber: formData.get('luckyNumber') ? parseInt(formData.get('luckyNumber')) : null,
+                        comment: formData.get('comment') || '',
+                        source: 'manual'
+                    };
+                    
+                    await ApiService.publishDraw(drawData);
+                    
+                    form.reset();
+                    this.updateResultPreview();
+                    this.showNotification(`Tirage ${drawData.name} publié avec succès`, 'success');
+                    
+                    // Recharger les données
+                    await this.loadDashboardData();
+                    
+                } catch (error) {
+                    console.error('Erreur publication tirage:', error);
+                    this.showNotification(error.message || 'Erreur lors de la publication', 'error');
                 }
             }
 
-            switchNumbersTab(tabName) {
-                document.querySelectorAll('#numbers-view .tab').forEach(tab => {
-                    tab.classList.remove('active');
-                });
-                event.target.classList.add('active');
+            updateResultPreview() {
+                const form = document.getElementById('manual-publish-form');
+                if (!form) return;
                 
-                document.querySelectorAll('#numbers-view .tab-content').forEach(content => {
-                    content.classList.remove('active');
-                });
+                const preview = document.getElementById('result-preview');
+                const inputs = form.querySelectorAll('input[type="number"]');
+                const numbers = Array.from(inputs).map(input => input.value || '00');
                 
-                document.getElementById(`${tabName}-tab`).classList.add('active');
-                this.currentNumbersTab = tabName;
-                
-                this.loadBalls();
+                preview.innerHTML = numbers.map(num => 
+                    `<div class="preview-number">${num.toString().padStart(2, '0')}</div>`
+                ).join('');
             }
 
-            // === UTILITAIRES ===
-
-            formatTime(dateString) {
-                if (!dateString) return 'Jamais';
+            generateRandomResults() {
+                const form = document.getElementById('manual-publish-form');
+                if (!form) return;
                 
-                const date = new Date(dateString);
+                const inputs = form.querySelectorAll('input[type="number"]');
+                inputs.forEach(input => {
+                    if (!input.name.includes('luckyNumber')) {
+                        input.value = Math.floor(Math.random() * 100);
+                    }
+                });
+                
+                this.updateResultPreview();
+                this.showNotification('Numéros aléatoires générés', 'info');
+            }
+
+            // GESTION DES BOULES
+            renderNumbersView() {
+                if (APP_STATE.currentNumbersTab === 'blocks') {
+                    this.renderBlocksTab();
+                } else if (APP_STATE.currentNumbersTab === 'limits') {
+                    this.renderLimitsTab();
+                }
+            }
+
+            renderBlocksTab() {
+                this.renderBlocksGrid();
+                this.renderBlockedNumbersList();
+            }
+
+            renderBlocksGrid() {
+                const container = document.getElementById('blocks-numbers-grid');
+                if (!container) return;
+                
+                const blockedNumbers = APP_STATE.data.numbers.blocked || [];
+                
+                let numbersHTML = '';
+                for (let i = 0; i < 100; i++) {
+                    const num = i.toString().padStart(2, '0');
+                    const isBlocked = blockedNumbers.includes(num);
+                    
+                    let className = 'number-item normal';
+                    let title = `Boule ${num}`;
+                    
+                    if (isBlocked) {
+                        className = 'number-item blocked';
+                        title += ' (BLOQUÉ)';
+                    }
+                    
+                    numbersHTML += `
+                        <div class="${className}" title="${title}" onclick="ownerManager.toggleNumberBlock('${num}')">
+                            ${num}
+                        </div>
+                    `;
+                }
+                
+                container.innerHTML = numbersHTML;
+            }
+
+            renderBlockedNumbersList() {
+                const container = document.getElementById('blocked-numbers-list');
+                if (!container) return;
+                
+                const blockedNumbers = APP_STATE.data.numbers.blocked || [];
+                
+                if (blockedNumbers.length === 0) {
+                    container.innerHTML = '<p style="color: var(--text-dim); text-align: center;">Aucun boule bloqué</p>';
+                    return;
+                }
+                
+                container.innerHTML = blockedNumbers.map(num => `
+                    <div style="display: flex; align-items: center; gap: 10px; padding: 10px; background: white; 
+                                border-radius: 8px; margin-bottom: 5px;">
+                        <input type="checkbox" id="unblock-${num}" value="${num}">
+                        <label for="unblock-${num}" style="flex: 1;">
+                            <strong>Boule ${num}</strong>
+                        </label>
+                        <span style="color: var(--danger); font-size: 12px;">
+                            <i class="fas fa-ban"></i> Bloqué
+                        </span>
+                    </div>
+                `).join('');
+            }
+
+            async blockNumber() {
+                const input = document.getElementById('block-number-input');
+                const number = input.value.trim().padStart(2, '0');
+                
+                if (!/^\d{2}$/.test(number)) {
+                    this.showNotification('Veuillez entrer un nombre valide (2 chiffres)', 'error');
+                    return;
+                }
+                
+                try {
+                    await ApiService.blockNumber(number);
+                    
+                    if (!APP_STATE.data.numbers.blocked) APP_STATE.data.numbers.blocked = [];
+                    if (!APP_STATE.data.numbers.blocked.includes(number)) {
+                        APP_STATE.data.numbers.blocked.push(number);
+                    }
+                    
+                    this.renderBlocksGrid();
+                    this.renderBlockedNumbersList();
+                    this.showNotification(`Boule ${number} bloqué avec succès`, 'success');
+                    input.value = '';
+                    
+                } catch (error) {
+                    console.error('Erreur blocage boule:', error);
+                    this.showNotification(error.message || 'Erreur lors du blocage', 'error');
+                }
+            }
+
+            async toggleNumberBlock(number) {
+                const blockedNumbers = APP_STATE.data.numbers.blocked || [];
+                const isBlocked = blockedNumbers.includes(number);
+                
+                try {
+                    if (isBlocked) {
+                        await ApiService.unblockNumber(number);
+                        APP_STATE.data.numbers.blocked = blockedNumbers.filter(n => n !== number);
+                        this.showNotification(`Boule ${number} débloqué`, 'success');
+                    } else {
+                        await ApiService.blockNumber(number);
+                        if (!APP_STATE.data.numbers.blocked) APP_STATE.data.numbers.blocked = [];
+                        APP_STATE.data.numbers.blocked.push(number);
+                        this.showNotification(`Boule ${number} bloqué`, 'success');
+                    }
+                    
+                    this.renderBlocksGrid();
+                    this.renderBlockedNumbersList();
+                } catch (error) {
+                    console.error('Erreur opération boule:', error);
+                    this.showNotification(error.message || 'Erreur lors de l\'opération', 'error');
+                }
+            }
+
+            async unblockSelected() {
+                const checkboxes = document.querySelectorAll('#blocked-numbers-list input[type="checkbox"]:checked');
+                const numbersToUnblock = Array.from(checkboxes).map(cb => cb.value);
+                
+                if (numbersToUnblock.length === 0) {
+                    this.showNotification('Veuillez sélectionner au moins un boule à débloquer', 'warning');
+                    return;
+                }
+                
+                try {
+                    await ApiService.unblockNumbers(numbersToUnblock);
+                    
+                    APP_STATE.data.numbers.blocked = APP_STATE.data.numbers.blocked.filter(
+                        n => !numbersToUnblock.includes(n)
+                    );
+                    
+                    this.renderBlocksGrid();
+                    this.renderBlockedNumbersList();
+                    this.showNotification(`${numbersToUnblock.length} boule(s) débloqué(s)`, 'success');
+                    
+                } catch (error) {
+                    console.error('Erreur déblocage multiple:', error);
+                    this.showNotification(error.message || 'Erreur lors du déblocage', 'error');
+                }
+            }
+
+            // FONCTIONS UTILITAIRES
+            renderRecentActivity() {
+                const container = document.getElementById('recent-activity');
+                const activities = APP_STATE.data.activity || [];
+                
+                if (activities.length === 0) {
+                    container.innerHTML = '<p style="color: var(--text-dim); text-align: center; padding: 20px;">Aucune activité récente</p>';
+                    return;
+                }
+                
+                container.innerHTML = activities.slice(0, 10).map(activity => `
+                    <div style="padding: 15px; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 15px;">
+                        <div style="width: 10px; height: 10px; background: var(--primary); border-radius: 50%;"></div>
+                        <div style="flex: 1;">
+                            <div style="font-weight: 500; margin-bottom: 5px;">${activity.message}</div>
+                            <div style="font-size: 12px; color: var(--text-dim);">
+                                ${this.formatTime(new Date(activity.timestamp))} • Par ${activity.user || 'Système'}
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            renderActivityView() {
+                const container = document.getElementById('recent-activity');
+                this.renderRecentActivity();
+            }
+
+            loadAlerts() {
+                const alerts = [
+                    { type: 'warning', message: 'Boule 78 approche sa limite (75/100 Gdes)' },
+                    { type: 'danger', message: 'Agent Robert Pierre est bloqué' },
+                    { type: 'info', message: 'Tiraj Georgia Matin est désactivé' }
+                ];
+
+                const container = document.getElementById('alerts-container');
+                container.innerHTML = alerts.map(alert => `
+                    <div style="background: ${alert.type === 'danger' ? '#fff5f5' : alert.type === 'warning' ? '#fff8e1' : '#e3f2fd'}; 
+                                border-left: 4px solid ${alert.type === 'danger' ? 'var(--danger)' : alert.type === 'warning' ? 'var(--warning)' : 'var(--primary)'};
+                                padding: 15px; margin-bottom: 15px; border-radius: 0 8px 8px 0;">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
+                            <i class="fas fa-${alert.type === 'danger' ? 'exclamation-triangle' : alert.type === 'warning' ? 'exclamation-circle' : 'info-circle'}" 
+                               style="color: ${alert.type === 'danger' ? 'var(--danger)' : alert.type === 'warning' ? 'var(--warning)' : 'var(--primary)'};"></i>
+                            <strong>${alert.type === 'danger' ? 'ALERTE' : alert.type === 'warning' ? 'AVERTISSEMENT' : 'INFORMATION'}</strong>
+                        </div>
+                        <div style="font-size: 14px;">${alert.message}</div>
+                    </div>
+                `).join('');
+            }
+
+            async exportUsersData() {
+                try {
+                    const response = await ApiService.exportData('users');
+                    
+                    const dataStr = JSON.stringify(response, null, 2);
+                    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+                    
+                    const linkElement = document.createElement('a');
+                    linkElement.setAttribute('href', dataUri);
+                    linkElement.setAttribute('download', `lotato_users_${new Date().toISOString().split('T')[0]}.json`);
+                    linkElement.click();
+                    
+                    this.showNotification('Données exportées avec succès', 'success');
+                } catch (error) {
+                    console.error('Erreur export données:', error);
+                    this.showNotification(error.message || 'Erreur lors de l\'export', 'error');
+                }
+            }
+
+            formatTime(date) {
                 const now = new Date();
                 const diffMs = now - date;
                 const diffMins = Math.floor(diffMs / 60000);
@@ -2293,12 +2409,27 @@
                 if (diffMins < 1) return 'À l\'instant';
                 if (diffMins < 60) return `Il y a ${diffMins} min`;
                 if (diffMins < 1440) return `Il y a ${Math.floor(diffMins / 60)} h`;
-                return date.toLocaleDateString();
+                return date.toLocaleString();
             }
 
             showNotification(message, type = 'success') {
                 const notification = document.createElement('div');
-                notification.className = `notification ${type}`;
+                notification.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    padding: 15px 25px;
+                    background: ${type === 'success' ? 'var(--success)' : type === 'error' ? 'var(--danger)' : 'var(--warning)'};
+                    color: white;
+                    border-radius: 10px;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+                    z-index: 10000;
+                    animation: slideIn 0.3s;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                `;
+                
                 notification.innerHTML = `
                     <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-triangle' : 'info-circle'}"></i>
                     ${message}
@@ -2310,26 +2441,53 @@
                     notification.style.animation = 'slideOut 0.3s';
                     setTimeout(() => notification.remove(), 300);
                 }, 3000);
+                
+                if (!document.querySelector('#notification-styles')) {
+                    const style = document.createElement('style');
+                    style.id = 'notification-styles';
+                    style.textContent = `
+                        @keyframes slideIn {
+                            from { transform: translateX(100%); opacity: 0; }
+                            to { transform: translateX(0); opacity: 1; }
+                        }
+                        @keyframes slideOut {
+                            from { transform: translateX(0); opacity: 1; }
+                            to { transform: translateX(100%); opacity: 0; }
+                        }
+                    `;
+                    document.head.appendChild(style);
+                }
             }
 
-            logout() {
+            closeModal(modalId = 'create-user-modal') {
+                document.getElementById(modalId).style.display = 'none';
+            }
+
+            async logout() {
                 if (confirm('Déconnexion du panneau propriétaire?')) {
-                    localStorage.removeItem('lotato_token');
-                    window.location.href = '/';
+                    try {
+                        await ApiService.post(API_CONFIG.ENDPOINTS.AUTH.LOGOUT);
+                        localStorage.removeItem('auth_token');
+                        window.location.href = '/login.html';
+                    } catch (error) {
+                        console.error('Erreur déconnexion:', error);
+                        localStorage.removeItem('auth_token');
+                        window.location.href = '/login.html';
+                    }
                 }
             }
         }
 
         // Initialiser l'application
         document.addEventListener('DOMContentLoaded', () => {
-            window.ownerManager = new OwnerManager();
+            // Vérifier si l'utilisateur est authentifié
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                window.location.href = '/login.html';
+                return;
+            }
             
-            // Ajouter des écouteurs pour la prévisualisation
-            document.addEventListener('input', function(e) {
-                if (e.target.name && e.target.name.startsWith('num')) {
-                    window.ownerManager.updateResultPreview();
-                }
-            });
+            window.ownerManager = new OwnerManager();
         });
     </script>
 </body>

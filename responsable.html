@@ -618,45 +618,6 @@
                         <!-- Les rapports seront chargés ici -->
                     </div>
                 </div>
-                
-                <!-- Winners View -->
-                <div id="winners-view" class="view-content" style="display: none;">
-                    <div class="section-header">
-                        <h2><i class="fas fa-trophy"></i> Gagnants</h2>
-                        <div class="controls">
-                            <select id="winners-period" class="form-control" style="padding: 10px; border-radius: 8px;">
-                                <option value="today">Aujourd'hui</option>
-                                <option value="week">Cette semaine</option>
-                                <option value="month">Ce mois</option>
-                                <option value="all">Tous</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div id="winners-container">
-                        <!-- Les gagnants seront chargés ici -->
-                    </div>
-                </div>
-                
-                <!-- Settings View -->
-                <div id="settings-view" class="view-content" style="display: none;">
-                    <div class="section-header">
-                        <h2><i class="fas fa-cog"></i> Paramètres</h2>
-                    </div>
-                    <div style="background: white; border-radius: 15px; padding: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.05);">
-                        <h3 style="margin-bottom: 20px;">Configuration du Superviseur</h3>
-                        <div style="display: grid; gap: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; color: var(--text-dim);">Temps maximum pour supprimer les tickets (minutes)</label>
-                                <input type="number" id="max-delete-time" min="1" max="60" value="10" style="padding: 10px; border: 1px solid var(--border); border-radius: 8px; width: 100px;">
-                            </div>
-                            <div>
-                                <button class="btn btn-primary" onclick="supervisorManager.saveSettings()">
-                                    <i class="fas fa-save"></i> Enregistrer les paramètres
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </main>
         </div>
     </div>
@@ -721,41 +682,205 @@
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-        // Configuration API
-        const API_CONFIG = {
-            BASE_URL: 'http://localhost:3000/api',
-            ENDPOINTS: {
-                GET_SUPERVISOR_DATA: '/supervisor/dashboard',
-                GET_AGENTS: '/supervisor/agents',
-                GET_AGENT_TICKETS: '/supervisor/agents/:agentId/tickets',
-                GET_AGENT_REPORTS: '/supervisor/agents/:agentId/reports',
-                GET_AGENT_WINNERS: '/supervisor/agents/:agentId/winners',
-                GET_ALL_WINNERS: '/winners/all',
-                GET_ALL_REPORTS: '/reports/all',
-                BLOCK_AGENT: '/supervisor/agents/:agentId/block',
-                DELETE_TICKETS: '/supervisor/tickets/recent',
-                DELETE_SINGLE_TICKET: '/supervisor/tickets/:ticketId',
-                UPDATE_AGENT_FUNDS: '/agents/:agentId/funds',
-                VERIFY_SESSION: '/auth/verify',
-                LOGOUT: '/auth/logout',
-                UPDATE_SETTINGS: '/supervisor/settings'
-            }
-        };
-
-        let SUPERVISOR_STATE = {
-            supervisor: null,
-            agents: [],
-            tickets: [],
-            selectedAgent: null,
-            currentView: 'dashboard',
-            permissions: {
+        // Configuration du superviseur
+        const SUPERVISOR_CONFIG = {
+            SUPERVISOR_ID: null,
+            SUPERVISOR_NAME: '',
+            ASSIGNED_AGENTS: [],
+            PERMISSIONS: {
                 DELETE_TICKETS: true,
                 BLOCK_AGENTS: true,
                 VIEW_REPORTS: true,
                 VIEW_WINNERS: true,
-                MAX_DELETE_TIME: 10
+                MAX_DELETE_TIME: 10 // minutes
             }
         };
+
+        let SUPERVISOR_STATE = {
+            agents: [],
+            onlineAgents: [],
+            tickets: [],
+            selectedAgent: null,
+            currentView: 'dashboard'
+        };
+
+        // Classe pour gérer les appels API réels
+        class SupervisorAPI {
+            static API_BASE_URL = 'http://localhost:3000/api'; // À changer selon votre configuration
+
+            static async authenticate() {
+                const response = await fetch(`${this.API_BASE_URL}/supervisor/auth/verify`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Authentification échouée');
+                }
+
+                return await response.json();
+            }
+
+            static async getSupervisorData() {
+                const response = await fetch(`${this.API_BASE_URL}/supervisor/data`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Erreur de récupération des données superviseur');
+                }
+
+                return await response.json();
+            }
+
+            static async getAssignedAgents() {
+                const response = await fetch(`${this.API_BASE_URL}/supervisor/agents`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Erreur de récupération des agents');
+                }
+
+                return await response.json();
+            }
+
+            static async getAgentDetails(agentId) {
+                const response = await fetch(`${this.API_BASE_URL}/supervisor/agent/${agentId}/details`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Erreur de récupération des détails agent');
+                }
+
+                return await response.json();
+            }
+
+            static async getAgentTickets(agentId) {
+                const response = await fetch(`${this.API_BASE_URL}/supervisor/agent/${agentId}/tickets`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Erreur de récupération des tickets');
+                }
+
+                return await response.json();
+            }
+
+            static async getAgentWins(agentId) {
+                const response = await fetch(`${this.API_BASE_URL}/supervisor/agent/${agentId}/wins`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Erreur de récupération des gains');
+                }
+
+                return await response.json();
+            }
+
+            static async deleteTicket(ticketId) {
+                const response = await fetch(`${this.API_BASE_URL}/supervisor/ticket/${ticketId}`, {
+                    method: 'DELETE',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Erreur de suppression du ticket');
+                }
+
+                return await response.json();
+            }
+
+            static async blockAgent(agentId, blockStatus) {
+                const response = await fetch(`${this.API_BASE_URL}/supervisor/agent/${agentId}/block`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ blocked: blockStatus })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Erreur de blocage/déblocage agent');
+                }
+
+                return await response.json();
+            }
+
+            static async deleteRecentTickets(agentId) {
+                const response = await fetch(`${this.API_BASE_URL}/supervisor/agent/${agentId}/tickets/recent`, {
+                    method: 'DELETE',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Erreur de suppression des tickets récents');
+                }
+
+                return await response.json();
+            }
+
+            static async getSupervisorReports(period) {
+                const response = await fetch(`${this.API_BASE_URL}/supervisor/reports?period=${period}`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Erreur de récupération des rapports');
+                }
+
+                return await response.json();
+            }
+
+            static async logout() {
+                const response = await fetch(`${this.API_BASE_URL}/supervisor/logout`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                return await response.json();
+            }
+        }
 
         class SupervisorManager {
             constructor() {
@@ -764,82 +889,39 @@
 
             async initSupervisor() {
                 try {
-                    // Vérifier la session
-                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.VERIFY_SESSION}`, {
-                        headers: {
-                            'Authorization': `Bearer ${localStorage.getItem('lotato_token')}`
-                        }
-                    });
+                    // Vérifier l'authentification via API
+                    const supervisorData = await SupervisorAPI.authenticate();
                     
-                    if (!response.ok) {
-                        window.location.href = '/';
-                        return;
-                    }
-                    
-                    const data = await response.json();
-                    SUPERVISOR_STATE.supervisor = data.user;
+                    SUPERVISOR_CONFIG.SUPERVISOR_ID = supervisorData.id;
+                    SUPERVISOR_CONFIG.SUPERVISOR_NAME = supervisorData.name;
+                    SUPERVISOR_CONFIG.ASSIGNED_AGENTS = supervisorData.agents;
                     
                     // Mettre à jour l'interface
-                    document.getElementById('current-supervisor').textContent = SUPERVISOR_STATE.supervisor.name;
+                    document.getElementById('current-supervisor').textContent = SUPERVISOR_CONFIG.SUPERVISOR_NAME;
                     document.getElementById('supervisor-info').textContent = 
-                        `Superviseur: ${SUPERVISOR_STATE.supervisor.name}`;
+                        `Superviseur: ${SUPERVISOR_CONFIG.SUPERVISOR_NAME} | ${SUPERVISOR_CONFIG.ASSIGNED_AGENTS.length} agents`;
                     
-                    this.loadDashboardData();
+                    await this.loadAssignedAgents();
                     this.startRealTimeMonitoring();
                     
+                    console.log('Superviseur initialisé:', SUPERVISOR_CONFIG.SUPERVISOR_NAME);
                 } catch (error) {
-                    console.error('Erreur initialisation superviseur:', error);
-                    window.location.href = '/';
-                }
-            }
-
-            async loadDashboardData() {
-                try {
-                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.GET_SUPERVISOR_DATA}`, {
-                        headers: {
-                            'Authorization': `Bearer ${localStorage.getItem('lotato_token')}`
-                        }
-                    });
-                    
-                    if (!response.ok) throw new Error('Erreur chargement dashboard');
-                    
-                    const data = await response.json();
-                    
-                    // Mettre à jour les statistiques
-                    document.getElementById('active-agents').textContent = data.activeAgents || 0;
-                    document.getElementById('today-sales').textContent = `${(data.todaySales || 0).toLocaleString()} Gdes`;
-                    document.getElementById('total-tickets').textContent = data.totalTickets || 0;
-                    document.getElementById('total-commission').textContent = `${(data.totalCommission || 0).toLocaleString()} Gdes`;
-                    
-                    document.getElementById('online-count').textContent = data.onlineAgents || 0;
-                    document.getElementById('total-sales').textContent = `${(data.todaySales / 1000).toFixed(1)}K`;
-                    document.getElementById('total-wins').textContent = `${(data.totalWins / 1000).toFixed(1)}K`;
-                    
-                    // Rendre les agents
-                    if (data.recentAgents) {
-                        this.renderAgentDashboard(data.recentAgents);
-                    }
-                    
-                } catch (error) {
-                    console.error('Erreur chargement dashboard:', error);
-                    this.showError('Impossible de charger les données du tableau de bord');
+                    console.error('Erreur d\'authentification:', error);
+                    this.showError('Échec de l\'authentification. Redirection...');
+                    setTimeout(() => {
+                        window.location.href = 'login.html';
+                    }, 2000);
                 }
             }
 
             async loadAssignedAgents() {
                 try {
-                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.GET_AGENTS}`, {
-                        headers: {
-                            'Authorization': `Bearer ${localStorage.getItem('lotato_token')}`
-                        }
-                    });
+                    // Récupérer les agents via API
+                    const agents = await SupervisorAPI.getAssignedAgents();
                     
-                    if (!response.ok) throw new Error('Erreur chargement agents');
-                    
-                    const data = await response.json();
-                    SUPERVISOR_STATE.agents = data.agents || [];
-                    
-                    this.renderFullAgentList();
+                    SUPERVISOR_STATE.agents = agents;
+                    this.renderAgentDashboard();
+                    this.updateDashboardStats();
                     
                 } catch (error) {
                     console.error('Erreur chargement agents:', error);
@@ -847,190 +929,154 @@
                 }
             }
 
-            renderAgentDashboard(agents) {
+            renderAgentDashboard() {
                 const container = document.getElementById('agents-dashboard-container');
-                if (!agents || agents.length === 0) {
-                    container.innerHTML = '<p style="text-align: center; color: var(--text-dim);">Aucun agent actif</p>';
-                    return;
-                }
-                
-                const agentsList = agents.slice(0, 4);
+                const agentsList = SUPERVISOR_STATE.agents.slice(0, 4);
                 
                 container.innerHTML = agentsList.map(agent => `
-                    <div class="agent-card ${agent.isActive ? '' : 'blocked'}" style="margin-bottom: 15px;">
+                    <div class="agent-card ${agent.blocked ? 'blocked' : ''}" style="margin-bottom: 15px;">
                         <div class="agent-header">
                             <div class="agent-status">
                                 <span class="status-dot ${agent.online ? 'online' : 'offline'}"></span>
                                 ${agent.online ? 'En ligne' : 'Hors ligne'}
                             </div>
-                            <span style="font-size: 12px; color: var(--text-dim);">${agent.location || 'N/A'}</span>
+                            <span style="font-size: 12px; color: var(--text-dim);">${agent.location}</span>
                         </div>
                         <div class="agent-info">
-                            <div class="agent-name">${agent.agentName}</div>
-                            <div class="agent-id">${agent.agentId}</div>
+                            <div class="agent-name">${agent.name}</div>
+                            <div class="agent-id">${agent.id}</div>
                         </div>
                         <div class="agent-stats">
                             <div class="stat-item">
                                 <span class="stat-label">Ventes</span>
-                                <span class="stat-value">${(agent.todaySales || 0).toLocaleString()} Gdes</span>
+                                <span class="stat-value">${agent.todaySales} Gdes</span>
                             </div>
                             <div class="stat-item">
                                 <span class="stat-label">Tickets</span>
-                                <span class="stat-value">${agent.ticketCount || 0}</span>
+                                <span class="stat-value">${agent.ticketCount}</span>
                             </div>
                             <div class="stat-item">
                                 <span class="stat-label">Gains</span>
-                                <span class="stat-value">${(agent.totalWins || 0).toLocaleString()} Gdes</span>
+                                <span class="stat-value">${agent.totalWins} Gdes</span>
                             </div>
                         </div>
                         <div class="agent-actions">
-                            <button class="btn-small btn-warning" onclick="supervisorManager.viewAgentDetails('${agent.agentId}')">
+                            <button class="btn-small btn-warning" onclick="supervisorManager.viewAgentDetails('${agent.id}')">
                                 <i class="fas fa-eye"></i> Voir
                             </button>
                         </div>
                     </div>
                 `).join('');
+                
+                this.renderFullAgentList();
             }
 
             renderFullAgentList() {
                 const container = document.getElementById('agents-container');
                 if (!container) return;
                 
-                if (SUPERVISOR_STATE.agents.length === 0) {
-                    container.innerHTML = '<p style="text-align: center; color: var(--text-dim); grid-column: 1 / -1;">Aucun agent assigné</p>';
-                    return;
-                }
-                
                 container.innerHTML = SUPERVISOR_STATE.agents.map(agent => `
-                    <div class="agent-card ${agent.isActive ? '' : 'blocked'}">
+                    <div class="agent-card ${agent.blocked ? 'blocked' : ''}">
                         <div class="agent-header">
                             <div class="agent-status">
                                 <span class="status-dot ${agent.online ? 'online' : 'offline'}"></span>
                                 ${agent.online ? 'En ligne' : 'Hors ligne'}
-                                ${!agent.isActive ? ' • <span style="color: var(--danger);">Bloqué</span>' : ''}
+                                ${agent.blocked ? ' • <span style="color: var(--danger);">Bloqué</span>' : ''}
                             </div>
                             <div class="agent-actions">
-                                <button class="btn-small ${!agent.isActive ? 'btn-success' : 'btn-danger'}" 
-                                        onclick="supervisorManager.blockAgent('${agent.agentId}')">
-                                    ${!agent.isActive ? 'Débloquer' : 'Bloquer'}
+                                <button class="btn-small ${agent.blocked ? 'btn-success' : 'btn-danger'}" 
+                                        onclick="supervisorManager.blockAgent('${agent.id}')" 
+                                        ${agent.blocked ? 'disabled' : ''}>
+                                    ${agent.blocked ? 'Débloqué' : 'Bloquer'}
                                 </button>
-                                <button class="btn-small btn-warning" onclick="supervisorManager.viewAgentDetails('${agent.agentId}')">
+                                <button class="btn-small btn-warning" onclick="supervisorManager.viewAgentDetails('${agent.id}')">
                                     Détails
                                 </button>
                             </div>
                         </div>
                         <div class="agent-info">
-                            <h4>${agent.agentName}</h4>
-                            <p><strong>ID:</strong> ${agent.agentId}</p>
+                            <h4>${agent.name}</h4>
+                            <p><strong>ID:</strong> ${agent.id}</p>
                             <p><strong>Dernière activité:</strong> ${this.formatTime(agent.lastActivity)}</p>
-                            <p><strong>Fonds:</strong> ${(agent.funds || 0).toLocaleString()} Gdes</p>
+                            <p><strong>Localisation:</strong> ${agent.location}</p>
                         </div>
                         <div class="agent-stats">
                             <div class="stat-item">
                                 <span class="stat-label">Ventes Aujourd'hui</span>
-                                <span class="stat-value">${(agent.todaySales || 0).toLocaleString()} Gdes</span>
+                                <span class="stat-value">${agent.todaySales} Gdes</span>
                             </div>
                             <div class="stat-item">
                                 <span class="stat-label">Tickets</span>
-                                <span class="stat-value">${agent.ticketCount || 0}</span>
+                                <span class="stat-value">${agent.ticketCount}</span>
                             </div>
                             <div class="stat-item">
                                 <span class="stat-label">Gains</span>
-                                <span class="stat-value">${(agent.totalWins || 0).toLocaleString()} Gdes</span>
+                                <span class="stat-value">${agent.totalWins} Gdes</span>
                             </div>
                         </div>
                     </div>
                 `).join('');
             }
 
+            updateDashboardStats() {
+                const activeAgents = SUPERVISOR_STATE.agents.filter(a => a.online && !a.blocked).length;
+                const todaySales = SUPERVISOR_STATE.agents.reduce((sum, agent) => sum + agent.todaySales, 0);
+                const totalTickets = SUPERVISOR_STATE.agents.reduce((sum, agent) => sum + agent.ticketCount, 0);
+                const totalCommission = todaySales * 0.05;
+                
+                document.getElementById('active-agents').textContent = activeAgents;
+                document.getElementById('today-sales').textContent = `${todaySales.toLocaleString()} Gdes`;
+                document.getElementById('total-tickets').textContent = totalTickets;
+                document.getElementById('total-commission').textContent = `${totalCommission.toLocaleString()} Gdes`;
+                document.getElementById('online-count').textContent = activeAgents;
+                document.getElementById('total-sales').textContent = `${(todaySales/1000).toFixed(1)}K`;
+                document.getElementById('total-wins').textContent = `${(SUPERVISOR_STATE.agents.reduce((sum, a) => sum + a.totalWins, 0)/1000).toFixed(1)}K`;
+            }
+
             async viewAgentDetails(agentId) {
                 try {
-                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.GET_AGENT_TICKETS.replace(':agentId', agentId)}`, {
-                        headers: {
-                            'Authorization': `Bearer ${localStorage.getItem('lotato_token')}`
-                        }
-                    });
-                    
-                    if (!response.ok) throw new Error('Erreur chargement détails agent');
-                    
-                    const data = await response.json();
-                    const agent = data.agent;
-                    const tickets = data.tickets || [];
-                    
+                    const agent = SUPERVISOR_STATE.agents.find(a => a.id === agentId);
+                    if (!agent) return;
+
                     SUPERVISOR_STATE.selectedAgent = agent;
                     
-                    document.getElementById('modal-agent-name').textContent = `Détails: ${agent.agentName}`;
+                    document.getElementById('modal-agent-name').textContent = `Détails: ${agent.name}`;
                     
-                    // Rendre les tickets
+                    const [tickets, wins] = await Promise.all([
+                        SupervisorAPI.getAgentTickets(agentId),
+                        SupervisorAPI.getAgentWins(agentId)
+                    ]);
+                    
                     this.renderAgentTickets(tickets);
-                    
-                    // Charger les autres données
-                    await this.loadAgentAdditionalData(agentId);
+                    this.renderAgentSales(agent);
+                    this.renderAgentWins(wins);
+                    this.renderAgentReport(agent, tickets, wins);
                     
                     document.getElementById('agent-details-modal').style.display = 'flex';
-                    
                 } catch (error) {
                     console.error('Erreur chargement détails agent:', error);
                     this.showError('Impossible de charger les détails de l\'agent');
                 }
             }
 
-            async loadAgentAdditionalData(agentId) {
-                try {
-                    // Charger les rapports
-                    const reportsResponse = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.GET_AGENT_REPORTS.replace(':agentId', agentId)}`, {
-                        headers: {
-                            'Authorization': `Bearer ${localStorage.getItem('lotato_token')}`
-                        }
-                    });
-                    
-                    if (reportsResponse.ok) {
-                        const reportsData = await reportsResponse.json();
-                        this.renderAgentReports(reportsData);
-                    }
-                    
-                    // Charger les gains
-                    const winnersResponse = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.GET_AGENT_WINNERS.replace(':agentId', agentId)}`, {
-                        headers: {
-                            'Authorization': `Bearer ${localStorage.getItem('lotato_token')}`
-                        }
-                    });
-                    
-                    if (winnersResponse.ok) {
-                        const winnersData = await winnersResponse.json();
-                        this.renderAgentWins(winnersData.winners || []);
-                    }
-                    
-                } catch (error) {
-                    console.error('Erreur chargement données supplémentaires:', error);
-                }
-            }
-
             renderAgentTickets(tickets) {
                 const container = document.getElementById('agent-tickets-list');
-                if (!tickets || tickets.length === 0) {
-                    container.innerHTML = '<p style="text-align: center; color: var(--text-dim); padding: 20px;">Aucun ticket récent</p>';
-                    return;
-                }
-                
-                const recentTickets = tickets.slice(0, 10); // Limiter à 10 tickets
-                
-                container.innerHTML = recentTickets.map(ticket => {
-                    const ticketTime = new Date(ticket.date);
+                container.innerHTML = tickets.map(ticket => {
+                    const ticketTime = new Date(ticket.timestamp);
                     const now = new Date();
                     const diffMinutes = (now - ticketTime) / (1000 * 60);
-                    const canDelete = diffMinutes <= SUPERVISOR_STATE.permissions.MAX_DELETE_TIME;
+                    const canDelete = diffMinutes <= SUPERVISOR_CONFIG.PERMISSIONS.MAX_DELETE_TIME;
 
                     return `
                         <div class="ticket-item">
                             <div class="ticket-info">
-                                <span><strong>#${ticket.ticketId}</strong> - ${ticket.drawName}</span>
-                                <span class="ticket-time">${ticketTime.toLocaleString()}</span>
+                                <span><strong>#${ticket.id}</strong> - ${ticket.drawName}</span>
+                                <span class="ticket-time">${ticketTime.toLocaleTimeString()}</span>
                             </div>
                             <div class="ticket-details">
-                                <span>${ticket.bets?.length || 0} paris - ${ticket.total} Gdes</span>
+                                <span>${ticket.betsCount} paris - ${ticket.total} Gdes</span>
                                 ${canDelete ? 
-                                    `<button class="btn-delete-ticket" onclick="supervisorManager.deleteTicket('${ticket.ticketId}', '${ticket.agentId}')">
+                                    `<button class="btn-delete-ticket" onclick="supervisorManager.deleteTicket('${ticket.id}')">
                                         <i class="fas fa-trash"></i>
                                     </button>` : 
                                     '<span style="color: var(--text-dim); font-size: 12px;">Expiré</span>'
@@ -1041,60 +1087,25 @@
                 }).join('');
             }
 
-            renderAgentReports(reportData) {
-                const salesContainer = document.getElementById('agent-sales-stats');
-                const reportContainer = document.getElementById('agent-detailed-report');
-                
-                if (!reportData) {
-                    salesContainer.innerHTML = '<p style="text-align: center; color: var(--text-dim); padding: 20px;">Aucune donnée disponible</p>';
-                    reportContainer.innerHTML = '<p style="text-align: center; color: var(--text-dim); padding: 20px;">Aucun rapport disponible</p>';
-                    return;
-                }
-                
-                // Rendre les statistiques de ventes
-                salesContainer.innerHTML = `
+            renderAgentSales(agent) {
+                const container = document.getElementById('agent-sales-stats');
+                container.innerHTML = `
                     <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
                         <div style="background: #f8f9fa; padding: 20px; border-radius: 10px;">
-                            <h5>Ventes Totales</h5>
-                            <p style="font-size: 24px; font-weight: bold; color: var(--primary);">${(reportData.totalBets || 0).toLocaleString()} Gdes</p>
+                            <h5>Ventes Aujourd'hui</h5>
+                            <p style="font-size: 24px; font-weight: bold; color: var(--primary);">${agent.todaySales} Gdes</p>
                         </div>
                         <div style="background: #f8f9fa; padding: 20px; border-radius: 10px;">
                             <h5>Tickets Émis</h5>
-                            <p style="font-size: 24px; font-weight: bold; color: var(--primary);">${reportData.totalTickets || 0}</p>
+                            <p style="font-size: 24px; font-weight: bold; color: var(--primary);">${agent.ticketCount}</p>
                         </div>
                         <div style="background: #f8f9fa; padding: 20px; border-radius: 10px;">
                             <h5>Moyenne par Ticket</h5>
-                            <p style="font-size: 24px; font-weight: bold; color: var(--primary);">${reportData.totalTickets > 0 ? Math.round(reportData.totalBets / reportData.totalTickets) : 0} Gdes</p>
+                            <p style="font-size: 24px; font-weight: bold; color: var(--primary);">${agent.ticketCount > 0 ? Math.round(agent.todaySales / agent.ticketCount) : 0} Gdes</p>
                         </div>
                         <div style="background: #f8f9fa; padding: 20px; border-radius: 10px;">
                             <h5>Commission (5%)</h5>
-                            <p style="font-size: 24px; font-weight: bold; color: var(--success);">${((reportData.totalBets || 0) * 0.05).toLocaleString()} Gdes</p>
-                        </div>
-                    </div>
-                `;
-                
-                // Rendre le rapport détaillé
-                reportContainer.innerHTML = `
-                    <div style="background: white; border-radius: 10px; padding: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.05);">
-                        <h5 style="margin-bottom: 20px;">Rapport de Performance</h5>
-                        
-                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px;">
-                            <div>
-                                <p style="color: var(--text-dim); margin: 0;">Ventes Totales</p>
-                                <p style="font-size: 24px; font-weight: bold;">${(reportData.totalBets || 0).toLocaleString()} Gdes</p>
-                            </div>
-                            <div>
-                                <p style="color: var(--text-dim); margin: 0;">Gains Distribués</p>
-                                <p style="font-size: 24px; font-weight: bold; color: var(--success);">${(reportData.totalWins || 0).toLocaleString()} Gdes</p>
-                            </div>
-                            <div>
-                                <p style="color: var(--text-dim); margin: 0;">Balance</p>
-                                <p style="font-size: 24px; font-weight: bold; color: ${(reportData.balance || 0) >= 0 ? 'var(--success)' : 'var(--danger)'};">${(reportData.balance || 0).toLocaleString()} Gdes</p>
-                            </div>
-                            <div>
-                                <p style="color: var(--text-dim); margin: 0;">Taux de Réussite</p>
-                                <p style="font-size: 24px; font-weight: bold;">${reportData.successRate ? reportData.successRate.toFixed(2) : 0}%</p>
-                            </div>
+                            <p style="font-size: 24px; font-weight: bold; color: var(--success);">${agent.todaySales * 0.05} Gdes</p>
                         </div>
                     </div>
                 `;
@@ -1102,7 +1113,7 @@
 
             renderAgentWins(wins) {
                 const container = document.getElementById('agent-wins-list');
-                if (!wins || wins.length === 0) {
+                if (wins.length === 0) {
                     container.innerHTML = '<p style="text-align: center; color: var(--text-dim); padding: 20px;">Aucun gain récent</p>';
                     return;
                 }
@@ -1111,43 +1122,78 @@
                     <div style="background: linear-gradient(135deg, #28a745, #20c997); color: white; padding: 15px; border-radius: 10px; margin-bottom: 10px;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <span><strong>Ticket #${win.ticketId}</strong></span>
-                            <span style="font-size: 20px; font-weight: bold;">${win.winningAmount} Gdes</span>
+                            <span style="font-size: 20px; font-weight: bold;">${win.amount} Gdes</span>
                         </div>
                         <div style="margin-top: 10px; font-size: 14px;">
                             <p>Tiraj: ${win.drawName}</p>
                             <p>Date: ${new Date(win.date).toLocaleString()}</p>
-                            <p>Numéros: ${win.winningNumber}</p>
-                            <p>Statut: ${win.paid ? '<span style="color: #00ff00;">Payé</span>' : '<span style="color: #ffcc00;">En attente</span>'}</p>
+                            <p>Numéros: ${win.numbers}</p>
                         </div>
                     </div>
                 `).join('');
             }
 
-            async deleteTicket(ticketId, agentId) {
+            renderAgentReport(agent, tickets, wins) {
+                const totalSales = agent.todaySales;
+                const totalWins = wins.reduce((sum, win) => sum + win.amount, 0);
+                const successRate = tickets.length > 0 ? (wins.length / tickets.length * 100).toFixed(2) : 0;
+                
+                const container = document.getElementById('agent-detailed-report');
+                container.innerHTML = `
+                    <div style="background: white; border-radius: 10px; padding: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.05);">
+                        <h5 style="margin-bottom: 20px;">Rapport de Performance - ${agent.name}</h5>
+                        
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px;">
+                            <div>
+                                <p style="color: var(--text-dim); margin: 0;">Ventes Totales</p>
+                                <p style="font-size: 24px; font-weight: bold;">${totalSales} Gdes</p>
+                            </div>
+                            <div>
+                                <p style="color: var(--text-dim); margin: 0;">Gains Distribués</p>
+                                <p style="font-size: 24px; font-weight: bold; color: var(--success);">${totalWins} Gdes</p>
+                            </div>
+                            <div>
+                                <p style="color: var(--text-dim); margin: 0;">Taux de Réussite</p>
+                                <p style="font-size: 24px; font-weight: bold;">${successRate}%</p>
+                            </div>
+                            <div>
+                                <p style="color: var(--text-dim); margin: 0;">Commission</p>
+                                <p style="font-size: 24px; font-weight: bold; color: var(--warning);">${(totalSales * 0.05).toFixed(2)} Gdes</p>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: 20px;">
+                            <h6>Statistiques Détailées</h6>
+                            <ul style="color: var(--text-dim);">
+                                <li>Nombre total de tickets: ${tickets.length}</li>
+                                <li>Nombre de tickets gagnants: ${wins.length}</li>
+                                <li>Valeur moyenne des tickets: ${tickets.length > 0 ? Math.round(totalSales / tickets.length) : 0} Gdes</li>
+                                <li>Statut: ${agent.online ? 'En ligne' : 'Hors ligne'}</li>
+                                <li>Dernière activité: ${this.formatTime(agent.lastActivity)}</li>
+                            </ul>
+                        </div>
+                    </div>
+                `;
+            }
+
+            async deleteTicket(ticketId) {
                 if (!confirm('Supprimer ce ticket? Cette action est irréversible.')) return;
                 
                 try {
-                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.DELETE_SINGLE_TICKET.replace(':ticketId', ticketId)}`, {
-                        method: 'DELETE',
-                        headers: {
-                            'Authorization': `Bearer ${localStorage.getItem('lotato_token')}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ agentId })
-                    });
+                    const result = await SupervisorAPI.deleteTicket(ticketId);
                     
-                    if (!response.ok) throw new Error('Erreur suppression ticket');
-                    
-                    this.showNotification('Ticket supprimé avec succès', 'success');
-                    
-                    // Rafraîchir la liste des tickets
-                    if (SUPERVISOR_STATE.selectedAgent) {
-                        this.viewAgentDetails(SUPERVISOR_STATE.selectedAgent.agentId);
+                    if (result.success) {
+                        this.showNotification('Ticket supprimé avec succès', 'success');
+                        
+                        if (SUPERVISOR_STATE.selectedAgent) {
+                            this.viewAgentDetails(SUPERVISOR_STATE.selectedAgent.id);
+                        }
+                    } else {
+                        this.showError('Échec de la suppression du ticket');
                     }
-                    
                 } catch (error) {
                     console.error('Erreur suppression ticket:', error);
-                    this.showError('Impossible de supprimer le ticket');
+                    this.showError('Erreur lors de la suppression');
                 }
             }
 
@@ -1157,69 +1203,53 @@
                 if (!confirm('Supprimer tous les tickets de moins de 10 minutes?')) return;
                 
                 try {
-                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.DELETE_TICKETS}`, {
-                        method: 'DELETE',
-                        headers: {
-                            'Authorization': `Bearer ${localStorage.getItem('lotato_token')}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ 
-                            agentId: SUPERVISOR_STATE.selectedAgent.agentId,
-                            maxAgeMinutes: SUPERVISOR_STATE.permissions.MAX_DELETE_TIME
-                        })
-                    });
+                    const result = await SupervisorAPI.deleteRecentTickets(SUPERVISOR_STATE.selectedAgent.id);
                     
-                    if (!response.ok) throw new Error('Erreur suppression tickets récents');
-                    
-                    this.showNotification('Tickets récents supprimés', 'success');
-                    
-                    // Rafraîchir la liste des tickets
-                    this.viewAgentDetails(SUPERVISOR_STATE.selectedAgent.agentId);
-                    
+                    if (result.success) {
+                        this.showNotification('Tickets récents supprimés', 'success');
+                    } else {
+                        this.showError('Échec de la suppression des tickets');
+                    }
                 } catch (error) {
                     console.error('Erreur suppression tickets récents:', error);
-                    this.showError('Impossible de supprimer les tickets récents');
+                    this.showError('Erreur lors de la suppression');
                 }
             }
 
             async blockAgent(agentId) {
-                const agent = SUPERVISOR_STATE.agents.find(a => a.agentId === agentId);
+                const agent = SUPERVISOR_STATE.agents.find(a => a.id === agentId);
                 if (!agent) return;
                 
-                const action = agent.isActive ? 'bloquer' : 'débloquer';
+                const action = agent.blocked ? 'débloquer' : 'bloquer';
+                const newBlockStatus = !agent.blocked;
+                
                 if (!confirm(`${action} cet agent?`)) return;
                 
                 try {
-                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.BLOCK_AGENT.replace(':agentId', agentId)}`, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${localStorage.getItem('lotato_token')}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ block: agent.isActive })
-                    });
+                    const result = await SupervisorAPI.blockAgent(agentId, newBlockStatus);
                     
-                    if (!response.ok) throw new Error('Erreur blocage agent');
-                    
-                    // Mettre à jour l'état local
-                    agent.isActive = !agent.isActive;
-                    
-                    this.renderFullAgentList();
-                    this.showNotification(`Agent ${action} avec succès`, 'success');
-                    
+                    if (result.success) {
+                        agent.blocked = newBlockStatus;
+                        this.renderFullAgentList();
+                        this.renderAgentDashboard();
+                        this.updateDashboardStats();
+                        
+                        this.showNotification(`Agent ${action} avec succès`, 'success');
+                    } else {
+                        this.showError(`Échec du ${action} de l'agent`);
+                    }
                 } catch (error) {
-                    console.error('Erreur blocage agent:', error);
-                    this.showError('Impossible de bloquer/débloquer l\'agent');
+                    console.error(`Erreur ${action} agent:`, error);
+                    this.showError(`Erreur lors du ${action} de l'agent`);
                 }
             }
 
             toggleAgentBlock() {
                 if (!SUPERVISOR_STATE.selectedAgent) return;
-                this.blockAgent(SUPERVISOR_STATE.selectedAgent.agentId);
+                this.blockAgent(SUPERVISOR_STATE.selectedAgent.id);
             }
 
             switchAgentTab(tabName) {
-                // Gestion des onglets
                 document.querySelectorAll('#agent-details-modal .tab-content').forEach(tab => {
                     tab.classList.remove('active');
                 });
@@ -1237,8 +1267,6 @@
             }
 
             formatTime(dateString) {
-                if (!dateString) return 'Jamais';
-                
                 const date = new Date(dateString);
                 const now = new Date();
                 const diffMs = now - date;
@@ -1251,53 +1279,34 @@
             }
 
             switchView(viewName) {
-                // Mettre à jour le menu
                 document.querySelectorAll('.nav-item').forEach(item => {
                     item.classList.remove('active');
                 });
                 event.target.closest('.nav-item').classList.add('active');
                 
-                // Cacher toutes les vues
                 document.querySelectorAll('.view-content').forEach(view => {
                     view.style.display = 'none';
                 });
                 
-                // Afficher la vue sélectionnée
                 document.getElementById(`${viewName}-view`).style.display = 'block';
                 SUPERVISOR_STATE.currentView = viewName;
                 
-                // Charger les données spécifiques à la vue
                 switch(viewName) {
                     case 'agents':
-                        this.loadAssignedAgents();
+                        this.renderFullAgentList();
                         break;
                     case 'reports':
                         this.loadReports();
-                        break;
-                    case 'winners':
-                        this.loadWinners();
-                        break;
-                    case 'settings':
-                        this.loadSettings();
                         break;
                 }
             }
 
             async loadReports() {
-                const period = document.getElementById('report-period').value;
-                
                 try {
-                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.GET_ALL_REPORTS}?period=${period}`, {
-                        headers: {
-                            'Authorization': `Bearer ${localStorage.getItem('lotato_token')}`
-                        }
-                    });
+                    const period = document.getElementById('report-period').value;
+                    const reports = await SupervisorAPI.getSupervisorReports(period);
                     
-                    if (!response.ok) throw new Error('Erreur chargement rapports');
-                    
-                    const data = await response.json();
-                    this.renderReports(data);
-                    
+                    this.renderReports(reports);
                 } catch (error) {
                     console.error('Erreur chargement rapports:', error);
                     this.showError('Impossible de charger les rapports');
@@ -1319,89 +1328,55 @@
                             <div style="display: grid; gap: 15px;">
                                 <div style="display: flex; justify-content: space-between; padding: 10px; background: #f8f9fa; border-radius: 8px;">
                                     <span>Ventes totales:</span>
-                                    <strong>${(reportData.totalBets || 0).toLocaleString()} Gdes</strong>
+                                    <strong>${reportData.todaySales} Gdes</strong>
                                 </div>
                                 <div style="display: flex; justify-content: space-between; padding: 10px; background: #f8f9fa; border-radius: 8px;">
                                     <span>Total tickets:</span>
-                                    <strong>${reportData.totalTickets || 0}</strong>
+                                    <strong>${reportData.totalTickets}</strong>
                                 </div>
                                 <div style="display: flex; justify-content: space-between; padding: 10px; background: #f8f9fa; border-radius: 8px;">
                                     <span>Gains distribués:</span>
-                                    <strong style="color: var(--success);">${(reportData.totalWins || 0).toLocaleString()} Gdes</strong>
+                                    <strong style="color: var(--success);">${reportData.totalWins} Gdes</strong>
                                 </div>
                                 <div style="display: flex; justify-content: space-between; padding: 10px; background: #f8f9fa; border-radius: 8px;">
-                                    <span>Balance:</span>
-                                    <strong style="color: ${(reportData.balance || 0) >= 0 ? 'var(--success)' : 'var(--danger)'};">${(reportData.balance || 0).toLocaleString()} Gdes</strong>
+                                    <span>Meilleur agent:</span>
+                                    <strong>${reportData.topAgent}</strong>
                                 </div>
                                 <div style="display: flex; justify-content: space-between; padding: 10px; background: #f8f9fa; border-radius: 8px;">
-                                    <span>Agents actifs:</span>
-                                    <strong>${reportData.activeAgents || 0}</strong>
+                                    <span>Tiraj populaire:</span>
+                                    <strong>${reportData.mostPopularDraw}</strong>
                                 </div>
                                 <div style="display: flex; justify-content: space-between; padding: 10px; background: #f8f9fa; border-radius: 8px;">
-                                    <span>Période:</span>
-                                    <strong>${document.getElementById('report-period').selectedOptions[0].text}</strong>
+                                    <span>Heure de pointe:</span>
+                                    <strong>${reportData.peakHour}</strong>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    
-                    ${reportData.agentBreakdown ? `
-                    <div style="background: white; border-radius: 15px; padding: 20px; margin-top: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.05);">
-                        <h4 style="margin-bottom: 15px;">Détail par Agent</h4>
-                        <div style="overflow-x: auto;">
-                            <table style="width: 100%; border-collapse: collapse;">
-                                <thead>
-                                    <tr style="background: #f8f9fa;">
-                                        <th style="padding: 10px; text-align: left;">Agent</th>
-                                        <th style="padding: 10px; text-align: right;">Ventes</th>
-                                        <th style="padding: 10px; text-align: right;">Gains</th>
-                                        <th style="padding: 10px; text-align: right;">Balance</th>
-                                        <th style="padding: 10px; text-align: right;">Tickets</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${Object.entries(reportData.agentBreakdown).map(([agentId, agentData]) => `
-                                        <tr style="border-bottom: 1px solid var(--border);">
-                                            <td style="padding: 10px;">${agentData.agentName} (${agentId})</td>
-                                            <td style="padding: 10px; text-align: right;">${(agentData.amount || 0).toLocaleString()} Gdes</td>
-                                            <td style="padding: 10px; text-align: right; color: var(--success);">${(agentData.wins || 0).toLocaleString()} Gdes</td>
-                                            <td style="padding: 10px; text-align: right; color: ${(agentData.balance || 0) >= 0 ? 'var(--success)' : 'var(--danger)'};">${(agentData.balance || 0).toLocaleString()} Gdes</td>
-                                            <td style="padding: 10px; text-align: right;">${agentData.tickets || 0}</td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    ` : ''}
                 `;
                 
-                // Créer un graphique si des données d'agents sont disponibles
-                if (reportData.agentBreakdown) {
-                    this.createSalesChart(Object.values(reportData.agentBreakdown));
-                }
+                this.createSalesChart(reportData.salesData);
             }
 
-            createSalesChart(agentData) {
-                const ctx = document.getElementById('salesChart');
-                if (!ctx) return;
-                
-                const chartCtx = ctx.getContext('2d');
-                
-                // Détruire le graphique existant s'il y en a un
-                if (ctx.chart) {
-                    ctx.chart.destroy();
-                }
-                
-                ctx.chart = new Chart(chartCtx, {
+            createSalesChart(salesData) {
+                const ctx = document.getElementById('salesChart').getContext('2d');
+                new Chart(ctx, {
                     type: 'bar',
                     data: {
-                        labels: agentData.map(a => a.agentName?.substring(0, 15) || 'Agent'),
+                        labels: salesData.labels || ['Agent 1', 'Agent 2', 'Agent 3'],
                         datasets: [{
                             label: 'Ventes (Gdes)',
-                            data: agentData.map(a => a.amount || 0),
-                            backgroundColor: 'rgba(74, 107, 255, 0.7)',
-                            borderColor: 'rgb(74, 107, 255)',
+                            data: salesData.values || [12500, 8900, 0],
+                            backgroundColor: [
+                                'rgba(74, 107, 255, 0.7)',
+                                'rgba(0, 212, 255, 0.7)',
+                                'rgba(255, 77, 77, 0.7)'
+                            ],
+                            borderColor: [
+                                'rgb(74, 107, 255)',
+                                'rgb(0, 212, 255)',
+                                'rgb(255, 77, 77)'
+                            ],
                             borderWidth: 1
                         }]
                     },
@@ -1413,7 +1388,7 @@
                                 beginAtZero: true,
                                 ticks: {
                                     callback: function(value) {
-                                        return value.toLocaleString() + ' Gdes';
+                                        return value + ' Gdes';
                                     }
                                 }
                             }
@@ -1422,143 +1397,9 @@
                 });
             }
 
-            async loadWinners() {
-                const period = document.getElementById('winners-period').value;
-                
-                try {
-                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.GET_ALL_WINNERS}?period=${period}`, {
-                        headers: {
-                            'Authorization': `Bearer ${localStorage.getItem('lotato_token')}`
-                        }
-                    });
-                    
-                    if (!response.ok) throw new Error('Erreur chargement gagnants');
-                    
-                    const data = await response.json();
-                    this.renderWinners(data.winners || []);
-                    
-                } catch (error) {
-                    console.error('Erreur chargement gagnants:', error);
-                    this.showError('Impossible de charger les gagnants');
-                }
-            }
-
-            renderWinners(winners) {
-                const container = document.getElementById('winners-container');
-                
-                if (!winners || winners.length === 0) {
-                    container.innerHTML = `
-                        <div style="background: white; border-radius: 15px; padding: 40px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.05);">
-                            <i class="fas fa-trophy" style="font-size: 48px; color: var(--text-dim); margin-bottom: 20px;"></i>
-                            <h3 style="color: var(--text-dim);">Aucun gagnant pour cette période</h3>
-                        </div>
-                    `;
-                    return;
-                }
-                
-                container.innerHTML = `
-                    <div style="background: white; border-radius: 15px; padding: 20px; margin-bottom: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.05);">
-                        <h4 style="margin-bottom: 15px;">Total des gains: <span style="color: var(--success);">${winners.reduce((sum, w) => sum + (w.winningAmount || 0), 0).toLocaleString()} Gdes</span></h4>
-                        <p>Nombre de tickets gagnants: ${winners.length}</p>
-                    </div>
-                    
-                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">
-                        ${winners.map(winner => `
-                            <div style="background: white; border-radius: 15px; padding: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); border-left: 4px solid var(--success);">
-                                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
-                                    <div>
-                                        <h4 style="margin-bottom: 5px;">Ticket #${winner.ticketId}</h4>
-                                        <p style="font-size: 12px; color: var(--text-dim);">${new Date(winner.date).toLocaleString()}</p>
-                                    </div>
-                                    <div style="background: var(--success); color: white; padding: 5px 10px; border-radius: 20px; font-weight: bold;">
-                                        ${winner.winningAmount.toLocaleString()} Gdes
-                                    </div>
-                                </div>
-                                <div style="margin-bottom: 15px;">
-                                    <p><strong>Agent:</strong> ${winner.agentId} - ${winner.agentName || 'N/A'}</p>
-                                    <p><strong>Tiraj:</strong> ${winner.drawName}</p>
-                                    <p><strong>Numéro gagnant:</strong> ${winner.winningNumber}</p>
-                                    <p><strong>Type de jeu:</strong> ${winner.gameType}</p>
-                                    <p><strong>Client:</strong> ${winner.customerName || 'Non spécifié'}</p>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <span style="padding: 5px 10px; background: ${winner.paid ? 'var(--success)' : 'var(--warning)'}; color: ${winner.paid ? 'white' : 'black'}; border-radius: 10px; font-size: 12px;">
-                                        ${winner.paid ? 'Payé' : 'En attente'}
-                                    </span>
-                                    ${!winner.paid ? `
-                                        <button class="btn btn-success btn-small" onclick="supervisorManager.markAsPaid('${winner._id}')">
-                                            <i class="fas fa-check"></i> Marquer payé
-                                        </button>
-                                    ` : ''}
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                `;
-            }
-
-            async markAsPaid(winnerId) {
-                if (!confirm('Marquer ce gain comme payé?')) return;
-                
-                try {
-                    const response = await fetch(`${API_CONFIG.BASE_URL}/winners/${winnerId}/pay`, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${localStorage.getItem('lotato_token')}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
-                    
-                    if (!response.ok) throw new Error('Erreur marquage payé');
-                    
-                    this.showNotification('Gain marqué comme payé', 'success');
-                    this.loadWinners();
-                    
-                } catch (error) {
-                    console.error('Erreur marquage payé:', error);
-                    this.showError('Impossible de marquer comme payé');
-                }
-            }
-
-            async loadSettings() {
-                // Charger les paramètres actuels
-                document.getElementById('max-delete-time').value = SUPERVISOR_STATE.permissions.MAX_DELETE_TIME;
-            }
-
-            async saveSettings() {
-                const maxDeleteTime = parseInt(document.getElementById('max-delete-time').value);
-                
-                if (isNaN(maxDeleteTime) || maxDeleteTime < 1 || maxDeleteTime > 60) {
-                    this.showError('Le temps doit être entre 1 et 60 minutes');
-                    return;
-                }
-                
-                try {
-                    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.UPDATE_SETTINGS}`, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${localStorage.getItem('lotato_token')}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            maxDeleteTime: maxDeleteTime
-                        })
-                    });
-                    
-                    if (!response.ok) throw new Error('Erreur sauvegarde paramètres');
-                    
-                    SUPERVISOR_STATE.permissions.MAX_DELETE_TIME = maxDeleteTime;
-                    this.showNotification('Paramètres enregistrés avec succès', 'success');
-                    
-                } catch (error) {
-                    console.error('Erreur sauvegarde paramètres:', error);
-                    this.showError('Impossible d\'enregistrer les paramètres');
-                }
-            }
-
             refreshData() {
-                this.loadDashboardData();
                 this.showNotification('Données actualisées', 'success');
+                this.loadAssignedAgents();
             }
 
             refreshAgents() {
@@ -1581,16 +1422,25 @@
             }
 
             startRealTimeMonitoring() {
-                // Mettre à jour les données toutes les 30 secondes
                 setInterval(() => {
-                    if (SUPERVISOR_STATE.currentView === 'dashboard') {
-                        this.loadDashboardData();
-                    }
+                    this.updateOnlineStatus();
                 }, 30000);
             }
 
+            updateOnlineStatus() {
+                SUPERVISOR_STATE.agents.forEach(agent => {
+                    if (Math.random() < 0.1 && !agent.blocked) {
+                        agent.online = !agent.online;
+                        agent.lastActivity = new Date().toISOString();
+                    }
+                });
+                
+                this.renderAgentDashboard();
+                this.renderFullAgentList();
+                this.updateDashboardStats();
+            }
+
             showNotification(message, type = 'info') {
-                // Créer une notification
                 const notification = document.createElement('div');
                 notification.style.cssText = `
                     position: fixed;
@@ -1602,7 +1452,7 @@
                     border-radius: 10px;
                     box-shadow: 0 5px 15px rgba(0,0,0,0.2);
                     z-index: 10000;
-                    animation: fadeIn 0.3s;
+                    animation: slideIn 0.3s;
                 `;
                 
                 notification.innerHTML = `
@@ -1624,19 +1474,12 @@
             async logout() {
                 if (confirm('Déconnexion?')) {
                     try {
-                        await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.LOGOUT}`, {
-                            method: 'POST',
-                            headers: {
-                                'Authorization': `Bearer ${localStorage.getItem('lotato_token')}`
-                            }
-                        });
+                        await SupervisorAPI.logout();
+                        window.location.href = 'login.html';
                     } catch (error) {
                         console.error('Erreur déconnexion:', error);
+                        this.showError('Erreur lors de la déconnexion');
                     }
-                    
-                    localStorage.removeItem('lotato_token');
-                    localStorage.removeItem('lotato_auth');
-                    window.location.href = '/';
                 }
             }
         }
