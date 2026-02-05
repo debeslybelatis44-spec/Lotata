@@ -220,9 +220,46 @@
             font-size: 12px;
         }
 
+        /* Bouton pour effacer la session */
+        .clear-btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #ff416c, #ff4b2b);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 0.3s;
+        }
+
+        .clear-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(255, 65, 108, 0.3);
+        }
+
+        .button-container {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .button-container button {
+            flex: 1;
+        }
+
         @media (max-width: 480px) {
             .login-container {
                 padding: 30px 20px;
+            }
+            
+            .button-container {
+                flex-direction: column;
             }
         }
     </style>
@@ -287,12 +324,14 @@
                 <input type="hidden" id="user-role" value="agent">
             </div>
 
-            <button type="submit" class="login-btn" id="login-btn">
-                <span class="loading-spinner" id="loading-spinner"></span>
-                <span id="login-text">
-                    <i class="fas fa-sign-in-alt"></i> Se connecter
-                </span>
-            </button>
+            <div id="button-container" class="button-container">
+                <button type="submit" class="login-btn" id="login-btn">
+                    <span class="loading-spinner" id="loading-spinner"></span>
+                    <span id="login-text">
+                        <i class="fas fa-sign-in-alt"></i> Se connecter
+                    </span>
+                </button>
+            </div>
         </form>
 
         <div class="footer">
@@ -325,6 +364,11 @@
             const errorText = document.getElementById('error-text');
             errorText.textContent = message;
             errorEl.classList.add('show');
+            
+            // Cacher après 5 secondes
+            setTimeout(() => {
+                errorEl.classList.remove('show');
+            }, 5000);
         }
 
         function showSuccess(message) {
@@ -332,6 +376,11 @@
             const successText = document.getElementById('success-text');
             successText.textContent = message;
             successEl.classList.add('show');
+            
+            // Cacher après 5 secondes
+            setTimeout(() => {
+                successEl.classList.remove('show');
+            }, 5000);
         }
 
         function hideMessages() {
@@ -347,7 +396,7 @@
             if (loading) {
                 btn.disabled = true;
                 spinner.classList.add('active');
-                text.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Connexion...';
+                text.innerHTML = 'Connexion...';
             } else {
                 btn.disabled = false;
                 spinner.classList.remove('active');
@@ -393,6 +442,59 @@
             }
         }
 
+        // Fonction pour effacer la session et recharger
+        function clearSessionAndReload() {
+            // Effacer toutes les données de session
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('user_role');
+            localStorage.removeItem('user_name');
+            localStorage.removeItem('agent_id');
+            localStorage.removeItem('agent_name');
+            localStorage.removeItem('supervisor_id');
+            localStorage.removeItem('owner_id');
+            localStorage.removeItem('last_username');
+            
+            // Recharger la page
+            window.location.reload();
+        }
+
+        // Vérifier si déjà connecté - MODIFIÉ POUR ÉVITER REDIRECTION AUTOMATIQUE
+        function checkExistingSession() {
+            const token = localStorage.getItem('auth_token');
+            const role = localStorage.getItem('user_role');
+            
+            // Ne pas rediriger automatiquement - permettre à l'utilisateur de choisir
+            if (token && role && CONFIG.REDIRECTS[role.toUpperCase()]) {
+                // Pré-remplir les champs avec les dernières infos
+                const lastUsername = localStorage.getItem('last_username');
+                if (lastUsername) {
+                    document.getElementById('username').value = lastUsername;
+                }
+                
+                // Pré-sélectionner le dernier rôle
+                selectRole(role);
+                
+                // Afficher un message informatif
+                showSuccess(`Session précédente détectée (${role}). Vous pouvez vous reconnecter ou changer d'utilisateur.`);
+                
+                // Créer un bouton "Effacer session"
+                const buttonContainer = document.getElementById('button-container');
+                const clearBtn = document.createElement('button');
+                clearBtn.type = 'button';
+                clearBtn.className = 'clear-btn';
+                clearBtn.innerHTML = '<i class="fas fa-times"></i> Effacer session';
+                clearBtn.onclick = function() {
+                    clearSessionAndReload();
+                };
+                
+                // Ajouter le bouton après le bouton de connexion
+                buttonContainer.appendChild(clearBtn);
+                
+                return false; // Ne pas rediriger automatiquement
+            }
+            return true;
+        }
+
         // Authentification API
         async function authenticate(username, password, role) {
             try {
@@ -409,13 +511,14 @@
                 });
 
                 if (!response.ok) {
-                    throw new Error('Identifiants incorrects');
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Identifiants incorrects');
                 }
 
                 return await response.json();
             } catch (error) {
                 console.error('Erreur d\'authentification:', error);
-                throw new Error('Erreur de connexion au serveur');
+                throw error;
             }
         }
 
@@ -427,6 +530,9 @@
             const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value;
             const role = currentRole;
+            
+            // Sauvegarder le nom d'utilisateur pour la prochaine fois
+            localStorage.setItem('last_username', username);
             
             if (!username || !password) {
                 showError('Veuillez remplir tous les champs');
@@ -470,21 +576,8 @@
                 }
                 
             } catch (error) {
-                showError(error.message);
+                showError(error.message || 'Erreur de connexion au serveur');
                 setLoading(false);
-            }
-        }
-
-        // Vérifier si déjà connecté
-        function checkExistingSession() {
-            const token = localStorage.getItem('auth_token');
-            const role = localStorage.getItem('user_role');
-            
-            if (token && role && CONFIG.REDIRECTS[role.toUpperCase()]) {
-                showSuccess('Reconnexion automatique...');
-                setTimeout(() => {
-                    window.location.href = CONFIG.REDIRECTS[role.toUpperCase()];
-                }, 500);
             }
         }
 
@@ -510,6 +603,20 @@
                     }
                 }
             });
+            
+            // Ajouter une vérification pour afficher le bouton "Effacer session" si nécessaire
+            const token = localStorage.getItem('auth_token');
+            if (token && !document.querySelector('.clear-btn')) {
+                const buttonContainer = document.getElementById('button-container');
+                const clearBtn = document.createElement('button');
+                clearBtn.type = 'button';
+                clearBtn.className = 'clear-btn';
+                clearBtn.innerHTML = '<i class="fas fa-times"></i> Effacer session';
+                clearBtn.onclick = function() {
+                    clearSessionAndReload();
+                };
+                buttonContainer.appendChild(clearBtn);
+            }
         });
     </script>
 </body>
