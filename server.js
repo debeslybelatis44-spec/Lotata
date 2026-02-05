@@ -54,6 +54,102 @@ pool.on('error', (err) => {
   console.error('❌ Erreur PostgreSQL:', err);
 });
 
+// Fonction pour réparer complètement la table tickets
+async function repairTicketsTable() {
+  try {
+    console.log('🔧 Vérification complète de la table tickets...');
+    
+    // Vérifier si la table existe
+    const tableExists = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'tickets'
+      )
+    `);
+    
+    if (!tableExists.rows[0].exists) {
+      console.log('⚠️ Table tickets n\'existe pas, création...');
+      await pool.query(`
+        CREATE TABLE tickets (
+          id SERIAL PRIMARY KEY,
+          ticket_id VARCHAR(50),
+          agent_id VARCHAR(50),
+          agent_name VARCHAR(100),
+          draw_id VARCHAR(50),
+          draw_name VARCHAR(100),
+          bets JSONB,
+          total_amount DECIMAL(10,2),
+          win_amount DECIMAL(10,2) DEFAULT 0,
+          date TIMESTAMP DEFAULT NOW(),
+          checked BOOLEAN DEFAULT false,
+          paid BOOLEAN DEFAULT false
+        )
+      `);
+      console.log('✅ Table tickets créée avec succès');
+      return;
+    }
+    
+    // Vérifier si la colonne id existe et est correcte
+    const idColumn = await pool.query(`
+      SELECT column_name, data_type, column_default
+      FROM information_schema.columns 
+      WHERE table_name = 'tickets' AND column_name = 'id'
+    `);
+    
+    if (idColumn.rows.length === 0) {
+      console.log('⚠️ Colonne id manquante, ajout...');
+      await pool.query(`
+        ALTER TABLE tickets 
+        ADD COLUMN id SERIAL PRIMARY KEY
+      `);
+      console.log('✅ Colonne id ajoutée');
+    } else if (!idColumn.rows[0].column_default) {
+      console.log('⚠️ Colonne id sans valeur par défaut, correction...');
+      // Supprimer et recréer la colonne id
+      await pool.query(`
+        ALTER TABLE tickets DROP COLUMN IF EXISTS id CASCADE;
+        ALTER TABLE tickets ADD COLUMN id SERIAL PRIMARY KEY;
+      `);
+      console.log('✅ Colonne id corrigée');
+    }
+    
+    // Vérifier la colonne ticket_id
+    const ticketIdColumn = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'tickets' AND column_name = 'ticket_id'
+    `);
+    
+    if (ticketIdColumn.rows.length === 0) {
+      console.log('⚠️ Colonne ticket_id manquante, ajout...');
+      await pool.query(`
+        ALTER TABLE tickets 
+        ADD COLUMN ticket_id VARCHAR(50)
+      `);
+      console.log('✅ Colonne ticket_id ajoutée');
+    }
+    
+    // Mettre à jour les tickets existants avec ticket_id
+    const nullTickets = await pool.query(`
+      SELECT COUNT(*) as count FROM tickets WHERE ticket_id IS NULL
+    `);
+    
+    if (parseInt(nullTickets.rows[0].count) > 0) {
+      console.log(`⚠️ ${nullTickets.rows[0].count} tickets sans ticket_id, correction...`);
+      await pool.query(`
+        UPDATE tickets 
+        SET ticket_id = 'T' || EXTRACT(EPOCH FROM date)::BIGINT || id
+        WHERE ticket_id IS NULL
+      `);
+      console.log('✅ Tickets sans ticket_id corrigés');
+    }
+    
+    console.log('✅ Table tickets vérifiée et réparée avec succès');
+  } catch (error) {
+    console.error('❌ Erreur réparation table tickets:', error.message);
+  }
+}
+
 // Initialiser les tables si elles n'existent pas
 async function initializeDatabase() {
   try {
@@ -149,10 +245,11 @@ async function initializeDatabase() {
       )
     `);
 
-    // Table des tickets - VERSION CORRIGÉE (sans ticket_id dans la définition)
+    // Table des tickets - VERSION SIMPLIFIÉE
     await pool.query(`
       CREATE TABLE IF NOT EXISTS tickets (
         id SERIAL PRIMARY KEY,
+        ticket_id VARCHAR(50),
         agent_id VARCHAR(50),
         agent_name VARCHAR(100),
         draw_id VARCHAR(50),
@@ -213,71 +310,6 @@ async function initializeDatabase() {
     console.log('✅ Tables initialisées avec succès');
   } catch (error) {
     console.error('❌ Erreur initialisation base de données:', error);
-  }
-}
-
-// Fonction pour réparer la table tickets (ajouter ticket_id si manquant)
-async function repairTicketsTable() {
-  try {
-    console.log('🔧 Vérification de la structure de la table tickets...');
-    
-    // Vérifier si la colonne ticket_id existe
-    const checkQuery = `
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'tickets' AND column_name = 'ticket_id'
-    `;
-    
-    const checkResult = await pool.query(checkQuery);
-    
-    if (checkResult.rows.length === 0) {
-      console.log('⚠️ Colonne ticket_id manquante, ajout...');
-      
-      try {
-        // Ajouter la colonne ticket_id
-        await pool.query(`
-          ALTER TABLE tickets 
-          ADD COLUMN ticket_id VARCHAR(50)
-        `);
-        
-        console.log('✅ Colonne ticket_id ajoutée');
-        
-        // Mettre à jour les tickets existants avec un ticket_id
-        await pool.query(`
-          UPDATE tickets 
-          SET ticket_id = 'T' || EXTRACT(EPOCH FROM date)::BIGINT || id
-          WHERE ticket_id IS NULL
-        `);
-        
-        console.log('✅ Anciens tickets mis à jour avec ticket_id');
-      } catch (alterError) {
-        console.log('ℹ️ La colonne ticket_id existe peut-être déjà:', alterError.message);
-      }
-    } else {
-      console.log('✅ Colonne ticket_id déjà présente');
-    }
-    
-    // Vérifier les tickets sans ticket_id et les corriger
-    const nullTickets = await pool.query(`
-      SELECT COUNT(*) as count FROM tickets WHERE ticket_id IS NULL
-    `);
-    
-    if (parseInt(nullTickets.rows[0].count) > 0) {
-      console.log(`⚠️ ${nullTickets.rows[0].count} tickets sans ticket_id, correction...`);
-      
-      await pool.query(`
-        UPDATE tickets 
-        SET ticket_id = 'T' || EXTRACT(EPOCH FROM date)::BIGINT || id
-        WHERE ticket_id IS NULL
-      `);
-      
-      console.log('✅ Tickets sans ticket_id corrigés');
-    }
-    
-    console.log('✅ Structure de la table tickets vérifiée et réparée si nécessaire');
-  } catch (error) {
-    console.error('⚠️ Erreur lors de la vérification de la table tickets:', error.message);
-    // Ne pas bloquer le démarrage en cas d'erreur
   }
 }
 
@@ -410,144 +442,120 @@ app.post('/api/tickets/save', async (req, res) => {
       return res.status(400).json({ error: 'Données invalides' });
     }
 
-    // Générer un ID de ticket
+    // Formatage des paris
+    const formattedBets = bets.map(bet => ({
+      id: bet.id || Date.now() + Math.random(),
+      game: bet.game || 'unknown',
+      number: bet.number || '',
+      cleanNumber: bet.cleanNumber || '',
+      amount: parseFloat(bet.amount) || 0,
+      isAutoGenerated: bet.isAutoGenerated || false,
+      specialType: bet.specialType || null,
+      option: bet.option || null,
+      timestamp: new Date().toISOString()
+    }));
+
+    // Calcul du montant total
+    const totalAmount = formattedBets.reduce((sum, bet) => sum + bet.amount, 0);
+    
+    // APPROCHE SIMPLIFIÉE : Insérer sans spécifier l'id
+    const query = `
+      INSERT INTO tickets (
+        agent_id, agent_name, draw_id, draw_name, 
+        bets, total_amount, date, ticket_id
+      ) 
+      VALUES ($1, $2, $3, $4, $5::jsonb, $6, NOW(), $7)
+      RETURNING *
+    `;
+    
     const ticketId = 'T' + Date.now() + Math.floor(Math.random() * 1000);
-    const now = new Date().toISOString();
-
-    try {
-      // Formatage correct des paris pour JSONB
-      const formattedBets = bets.map(bet => {
-        return {
-          id: bet.id || Date.now() + Math.random(),
-          game: bet.game || 'unknown',
-          number: bet.number || '',
-          cleanNumber: bet.cleanNumber || '',
-          amount: parseFloat(bet.amount) || 0,
-          isAutoGenerated: bet.isAutoGenerated || false,
-          specialType: bet.specialType || null,
-          option: bet.option || null,
-          timestamp: bet.timestamp || now
-        };
-      });
-
-      // REQUÊTE CORRIGÉE : Ne pas inclure ticket_id dans l'INSERT
-      // La colonne sera remplie automatiquement par la valeur par défaut ou nous l'ajouterons après
-      const ticketQuery = `
-        INSERT INTO tickets (agent_id, agent_name, draw_id, draw_name, bets, total_amount, date)
-        VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7)
-        RETURNING *
-      `;
-      
-      console.log('📝 Exécution requête SQL avec:', {
-        agentId,
-        agentName,
-        drawId,
-        drawName,
-        total
-      });
-
-      const ticketResult = await pool.query(ticketQuery, [
-        agentId,
-        agentName || 'Agent Inconnu',
-        drawId,
-        drawName || drawId,
-        JSON.stringify(formattedBets),
-        parseFloat(total) || 0,
-        now
-      ]);
-
-      const savedTicketId = ticketResult.rows[0].id;
-      
-      // Mettre à jour le ticket avec un ticket_id
-      await pool.query(
-        'UPDATE tickets SET ticket_id = $1 WHERE id = $2',
-        [ticketId, savedTicketId]
-      );
-      
-      console.log('✅ Ticket sauvegardé avec succès:', ticketId);
-      
-      const savedTicket = {
-        id: savedTicketId,
-        ticket_id: ticketId,
-        agentId,
-        agentName,
-        drawId,
-        drawName,
-        bets: formattedBets,
-        total_amount: parseFloat(total) || 0,
-        date: now,
-        checked: false,
-        paid: false
-      };
-
-      res.json({
-        success: true,
-        ticket: savedTicket
-      });
-
-    } catch (dbError) {
-      console.error('❌ Erreur base de données:', dbError);
-      
-      // Tentative alternative si la colonne ticket_id n'existe pas
-      if (dbError.message.includes('ticket_id')) {
-        try {
-          // Réessayer sans ticket_id
-          const ticketQuery = `
-            INSERT INTO tickets (agent_id, agent_name, draw_id, draw_name, bets, total_amount, date)
-            VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7)
-            RETURNING *
-          `;
-          
-          const ticketResult = await pool.query(ticketQuery, [
-            agentId,
-            agentName || 'Agent Inconnu',
-            drawId,
-            drawName || drawId,
-            JSON.stringify(formattedBets),
-            parseFloat(total) || 0,
-            now
-          ]);
-          
-          const savedTicket = {
-            id: ticketResult.rows[0].id,
-            ticket_id: 'TEMP_' + ticketResult.rows[0].id,
-            agentId,
-            agentName,
-            drawId,
-            drawName,
-            bets: formattedBets,
-            total_amount: parseFloat(total) || 0,
-            date: now,
-            checked: false,
-            paid: false
-          };
-
-          res.json({
-            success: true,
-            ticket: savedTicket,
-            warning: 'Ticket enregistré sans ticket_id, colonne manquante'
-          });
-          
-        } catch (retryError) {
-          res.status(500).json({ 
-            error: 'Erreur base de données (2ème tentative)',
-            details: retryError.message 
-          });
-        }
-      } else {
-        res.status(500).json({ 
-          error: 'Erreur base de données',
-          details: dbError.message 
-        });
+    
+    console.log('📝 Exécution requête SQL...');
+    
+    const result = await pool.query(query, [
+      agentId,
+      agentName || 'Agent Inconnu',
+      drawId,
+      drawName || drawId,
+      JSON.stringify(formattedBets),
+      totalAmount,
+      ticketId
+    ]);
+    
+    const savedTicket = result.rows[0];
+    console.log('✅ Ticket sauvegardé avec succès:', savedTicket.id);
+    
+    res.json({
+      success: true,
+      ticket: {
+        ...savedTicket,
+        bets: formattedBets
       }
-    }
+    });
 
   } catch (error) {
     console.error('❌ Erreur traitement ticket:', error);
-    res.status(500).json({ 
-      error: 'Erreur lors de la sauvegarde du ticket',
-      details: error.message 
-    });
+    
+    // Si l'erreur persiste, créer la table dynamiquement
+    if (error.message.includes('tickets') || error.message.includes('id')) {
+      try {
+        console.log('🔄 Tentative de création de table dynamique...');
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS tickets_backup (
+            id SERIAL PRIMARY KEY,
+            ticket_id VARCHAR(50),
+            agent_id VARCHAR(50),
+            agent_name VARCHAR(100),
+            draw_id VARCHAR(50),
+            draw_name VARCHAR(100),
+            bets JSONB,
+            total_amount DECIMAL(10,2),
+            win_amount DECIMAL(10,2) DEFAULT 0,
+            date TIMESTAMP DEFAULT NOW(),
+            checked BOOLEAN DEFAULT false,
+            paid BOOLEAN DEFAULT false
+          )
+        `);
+        
+        // Réessayer l'insertion
+        const ticketId = 'T' + Date.now() + Math.floor(Math.random() * 1000);
+        const totalAmount = formattedBets.reduce((sum, bet) => sum + bet.amount, 0);
+        
+        const result = await pool.query(`
+          INSERT INTO tickets_backup (
+            agent_id, agent_name, draw_id, draw_name, 
+            bets, total_amount, ticket_id
+          ) 
+          VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7)
+          RETURNING *
+        `, [
+          agentId,
+          agentName || 'Agent Inconnu',
+          drawId,
+          drawName || drawId,
+          JSON.stringify(formattedBets),
+          totalAmount,
+          ticketId
+        ]);
+        
+        res.json({
+          success: true,
+          ticket: result.rows[0],
+          warning: 'Ticket sauvegardé dans table de secours'
+        });
+        
+      } catch (backupError) {
+        res.status(500).json({ 
+          error: 'Erreur critique',
+          details: backupError.message 
+        });
+      }
+    } else {
+      res.status(500).json({ 
+        error: 'Erreur lors de la sauvegarde du ticket',
+        details: error.message 
+      });
+    }
   }
 });
 
