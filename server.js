@@ -1479,3 +1479,68 @@ initializeDatabase().then(() => {
     console.log(`👤 Interface agent: http://0.0.0.0:${PORT}/agent1.html`);
   });
 });
+// Ajoutez cette fonction après initializeDatabase()
+async function repairTicketsTable() {
+  try {
+    // Vérifier si la colonne ticket_id existe
+    const checkQuery = `
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name='tickets' AND column_name='ticket_id'
+    `;
+    
+    const checkResult = await pool.query(checkQuery);
+    
+    if (checkResult.rows.length === 0) {
+      console.log('⚠️ Colonne ticket_id manquante, réparation de la table...');
+      
+      // Créer une table temporaire
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS tickets_new (
+          id SERIAL PRIMARY KEY,
+          ticket_id VARCHAR(50),
+          agent_id VARCHAR(50),
+          agent_name VARCHAR(100),
+          draw_id VARCHAR(50),
+          draw_name VARCHAR(100),
+          bets JSONB,
+          total_amount DECIMAL(10,2),
+          win_amount DECIMAL(10,2) DEFAULT 0,
+          date TIMESTAMP DEFAULT NOW(),
+          checked BOOLEAN DEFAULT false,
+          paid BOOLEAN DEFAULT false
+        )
+      `);
+      
+      // Copier les données si l'ancienne table existe
+      try {
+        await pool.query(`
+          INSERT INTO tickets_new (agent_id, agent_name, draw_id, draw_name, bets, total_amount, win_amount, date, checked, paid)
+          SELECT agent_id, agent_name, draw_id, draw_name, bets, total_amount, win_amount, date, checked, paid
+          FROM tickets
+        `);
+        console.log('✅ Données migrées vers nouvelle table');
+      } catch (e) {
+        console.log('ℹ️ Pas de données à migrer');
+      }
+      
+      // Supprimer l'ancienne table et renommer la nouvelle
+      await pool.query('DROP TABLE IF EXISTS tickets');
+      await pool.query('ALTER TABLE tickets_new RENAME TO tickets');
+      
+      console.log('✅ Table tickets réparée avec succès');
+    }
+  } catch (error) {
+    console.error('❌ Erreur réparation table tickets:', error);
+  }
+}
+
+// Appeler cette fonction après initializeDatabase()
+initializeDatabase().then(async () => {
+  await repairTicketsTable(); // <-- Ajoutez cette ligne
+  
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Serveur LOTATO démarré sur http://0.0.0.0:${PORT}`);
+    // ... reste du code
+  });
+});
