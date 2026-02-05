@@ -357,6 +357,7 @@
         };
 
         let currentRole = 'agent';
+        let isLoggingIn = false; // Variable pour empêcher les connexions multiples
 
         // Fonctions d'affichage
         function showError(message) {
@@ -397,10 +398,12 @@
                 btn.disabled = true;
                 spinner.classList.add('active');
                 text.innerHTML = 'Connexion...';
+                isLoggingIn = true;
             } else {
                 btn.disabled = false;
                 spinner.classList.remove('active');
                 text.innerHTML = '<i class="fas fa-sign-in-alt"></i> Se connecter';
+                isLoggingIn = false;
             }
         }
 
@@ -495,8 +498,11 @@
             return true;
         }
 
-        // Authentification API
+        // Authentification API avec timeout
         async function authenticate(username, password, role) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 secondes timeout
+            
             try {
                 const response = await fetch(`${CONFIG.API_URL}/auth/login`, {
                     method: 'POST',
@@ -507,37 +513,57 @@
                         username: username,
                         password: password,
                         role: role
-                    })
+                    }),
+                    signal: controller.signal
                 });
 
+                clearTimeout(timeoutId);
+
                 if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Identifiants incorrects');
+                    let errorMessage = 'Identifiants incorrects';
+                    try {
+                        const errorData = await response.json();
+                        errorMessage = errorData.error || errorMessage;
+                    } catch (e) {
+                        // Si la réponse n'est pas du JSON, on utilise le statut
+                        errorMessage = `Erreur ${response.status}: ${response.statusText}`;
+                    }
+                    throw new Error(errorMessage);
                 }
 
                 return await response.json();
             } catch (error) {
-                console.error('Erreur d\'authentification:', error);
+                clearTimeout(timeoutId);
+                if (error.name === 'AbortError') {
+                    throw new Error('La connexion a expiré. Veuillez réessayer.');
+                }
                 throw error;
             }
         }
 
-        // Gestion de la connexion
+        // Gestion de la connexion - CORRIGÉE POUR ÉVITER LE SPINNER INFINI
         async function handleLogin(event) {
             event.preventDefault();
+            
+            // Empêcher les connexions multiples
+            if (isLoggingIn) {
+                return;
+            }
+            
             hideMessages();
             
             const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value;
             const role = currentRole;
             
-            // Sauvegarder le nom d'utilisateur pour la prochaine fois
-            localStorage.setItem('last_username', username);
-            
+            // Validation basique
             if (!username || !password) {
                 showError('Veuillez remplir tous les champs');
                 return;
             }
+            
+            // Sauvegarder le nom d'utilisateur pour la prochaine fois
+            localStorage.setItem('last_username', username);
             
             setLoading(true);
             
@@ -563,6 +589,9 @@
                         localStorage.setItem('owner_id', authResult.id || username);
                     }
                     
+                    // Désactiver le spinner avant la redirection
+                    setLoading(false);
+                    
                     // Redirection
                     showSuccess('Connexion réussie! Redirection...');
                     
@@ -571,12 +600,13 @@
                     }, 1000);
                     
                 } else {
-                    showError('Identifiants incorrects');
+                    showError(authResult.error || 'Identifiants incorrects');
                     setLoading(false);
                 }
                 
             } catch (error) {
-                showError(error.message || 'Erreur de connexion au serveur');
+                console.error('Erreur de connexion:', error);
+                showError(error.message || 'Erreur de connexion au serveur. Veuillez vérifier votre connexion internet.');
                 setLoading(false);
             }
         }
@@ -592,7 +622,7 @@
             document.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
                     const focused = document.activeElement;
-                    if (focused && focused.type !== 'submit') {
+                    if (focused && focused.type !== 'submit' && !isLoggingIn) {
                         e.preventDefault();
                         
                         if (focused.id === 'username') {
@@ -617,6 +647,14 @@
                 };
                 buttonContainer.appendChild(clearBtn);
             }
+            
+            // Ajouter un gestionnaire pour reset le spinner si la page est rafraîchie
+            window.addEventListener('beforeunload', () => {
+                setLoading(false);
+            });
+            
+            // S'assurer que le spinner est désactivé au chargement
+            setLoading(false);
         });
     </script>
 </body>
