@@ -161,8 +161,20 @@ async function initializeDatabase() {
         bets JSONB,
         total_amount DECIMAL(10,2),
         win_amount DECIMAL(10,2) DEFAULT 0,
+        paid BOOLEAN DEFAULT false,
         date TIMESTAMP DEFAULT NOW(),
         checked BOOLEAN DEFAULT false
+      )
+    `);
+
+    // Table des paiements
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS payments (
+        id SERIAL PRIMARY KEY,
+        ticket_id INTEGER REFERENCES tickets(id),
+        amount DECIMAL(10,2),
+        paid_at TIMESTAMP DEFAULT NOW(),
+        confirmed_by VARCHAR(100)
       )
     `);
 
@@ -320,6 +332,181 @@ app.get('/api/auth/verify', authenticateToken, (req, res) => {
 // Appliquer l'authentification aux routes API
 app.use('/api', authenticateToken);
 
+// ============= ROUTES SUPERVISEURS SPÉCIFIQUES =============
+
+// Route pour récupérer les superviseurs
+app.get('/api/supervisor/auth/verify', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'supervisor' && req.user.role !== 'owner') {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+    
+    const supervisorId = req.user.id.replace('supervisor-', '');
+    
+    const result = await pool.query(
+      'SELECT * FROM supervisors WHERE id = $1',
+      [parseInt(supervisorId)]
+    );
+    
+    if (result.rows.length === 0) {
+      // Retourner les informations de base pour le développement
+      return res.json({
+        id: 1,
+        name: req.user.name || 'Superviseur Test',
+        email: 'supervisor@test.com',
+        phone: '+509XXXXXXXX'
+      });
+    }
+    
+    const supervisor = result.rows[0];
+    res.json({
+      id: supervisor.id,
+      name: supervisor.name,
+      email: supervisor.email,
+      phone: supervisor.phone
+    });
+  } catch (error) {
+    console.error('Erreur récupération superviseur:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Récupérer les agents d'un superviseur
+app.get('/api/supervisor/agents', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'supervisor' && req.user.role !== 'owner') {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+    
+    const supervisorId = req.user.id.replace('supervisor-', '');
+    
+    const result = await pool.query(
+      `SELECT a.*, 
+              (SELECT COUNT(*) FROM tickets t WHERE t.agent_id = a.id::text AND DATE(t.date) = CURRENT_DATE) as tickets_today,
+              (SELECT COALESCE(SUM(t.total_amount), 0) FROM tickets t WHERE t.agent_id = a.id::text AND DATE(t.date) = CURRENT_DATE) as sales_today
+       FROM agents a 
+       WHERE a.supervisor_id = $1 AND a.active = true
+       ORDER BY a.name`,
+      [parseInt(supervisorId)]
+    );
+    
+    // Formater les agents
+    const agents = result.rows.map(agent => ({
+      id: agent.id.toString(),
+      name: agent.name,
+      email: agent.email,
+      phone: agent.phone,
+      location: agent.location,
+      commission: parseFloat(agent.commission),
+      active: agent.active,
+      online: Math.random() > 0.5, // Simulation
+      ticketsToday: parseInt(agent.tickets_today) || 0,
+      salesToday: parseFloat(agent.sales_today) || 0,
+      supervisorId: agent.supervisor_id
+    }));
+    
+    // Si aucun agent, retourner des agents de test pour le développement
+    if (agents.length === 0) {
+      agents.push({
+        id: 'agent-01',
+        name: 'Pierre Agent',
+        email: 'agent1@test.com',
+        phone: '+50911111111',
+        location: 'Port-au-Prince',
+        commission: 5,
+        active: true,
+        online: true,
+        ticketsToday: 15,
+        salesToday: 7500,
+        supervisorId: 1
+      });
+      
+      agents.push({
+        id: 'agent-02', 
+        name: 'Marc Agent',
+        email: 'agent2@test.com',
+        phone: '+50922222222',
+        location: 'Pétion-Ville',
+        commission: 5,
+        active: true,
+        online: false,
+        ticketsToday: 8,
+        salesToday: 4200,
+        supervisorId: 1
+      });
+    }
+    
+    res.json(agents);
+  } catch (error) {
+    console.error('Erreur récupération agents superviseur:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Récupérer les tickets d'un agent spécifique
+app.get('/api/tickets/agent/:agentId', authenticateToken, async (req, res) => {
+  try {
+    const { agentId } = req.params;
+    
+    const result = await pool.query(
+      `SELECT t.*, a.name as agent_name
+       FROM tickets t
+       LEFT JOIN agents a ON t.agent_id = a.id::text
+       WHERE t.agent_id = $1
+       ORDER BY t.date DESC
+       LIMIT 50`,
+      [agentId]
+    );
+    
+    const tickets = result.rows.map(ticket => ({
+      ...ticket,
+      bets: typeof ticket.bets === 'string' ? JSON.parse(ticket.bets) : ticket.bets || []
+    }));
+    
+    res.json({ tickets });
+  } catch (error) {
+    console.error('Erreur récupération tickets agent:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Récupérer les gains d'un agent
+app.get('/api/winners/agent/:agentId', authenticateToken, async (req, res) => {
+  try {
+    const { agentId } = req.params;
+    
+    const result = await pool.query(
+      `SELECT * FROM tickets 
+       WHERE agent_id = $1 AND win_amount > 0
+       ORDER BY date DESC
+       LIMIT 20`,
+      [agentId]
+    );
+    
+    res.json({ winners: result.rows });
+  } catch (error) {
+    console.error('Erreur récupération gains agent:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Marquer un gain comme payé
+app.post('/api/winners/pay/:ticketId', authenticateToken, async (req, res) => {
+  try {
+    const { ticketId } = req.params;
+    
+    await pool.query(
+      'UPDATE tickets SET paid = true WHERE id = $1',
+      [parseInt(ticketId)]
+    );
+    
+    res.json({ success: true, message: 'Gain marqué comme payé' });
+  } catch (error) {
+    console.error('Erreur marquage payé:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 // ============= ROUTES TICKETS =============
 app.post('/api/tickets/save', async (req, res) => {
   try {
@@ -424,6 +611,40 @@ app.get('/api/tickets', async (req, res) => {
   } catch (error) {
     console.error('Erreur récupération tickets:', error);
     res.json({ tickets: [] });
+  }
+});
+
+// Supprimer un ticket
+app.delete('/api/tickets/delete/:ticketId', async (req, res) => {
+  try {
+    const { ticketId } = req.params;
+    
+    // Vérifier si le ticket a moins de 10 minutes
+    const ticketResult = await pool.query(
+      'SELECT * FROM tickets WHERE id = $1',
+      [parseInt(ticketId)]
+    );
+    
+    if (ticketResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Ticket non trouvé' });
+    }
+    
+    const ticket = ticketResult.rows[0];
+    const ticketTime = new Date(ticket.date);
+    const now = new Date();
+    const diffMinutes = (now - ticketTime) / (1000 * 60);
+    
+    // Autoriser la suppression seulement si moins de 10 minutes
+    if (diffMinutes > 10) {
+      return res.status(400).json({ error: 'Ticket trop ancien pour être supprimé (max 10 minutes)' });
+    }
+    
+    await pool.query('DELETE FROM tickets WHERE id = $1', [parseInt(ticketId)]);
+    
+    res.json({ success: true, message: 'Ticket supprimé avec succès' });
+  } catch (error) {
+    console.error('Erreur suppression ticket:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -1311,7 +1532,7 @@ app.get('/api/users/export', async (req, res) => {
 
 app.get('/api/reports', async (req, res) => {
   try {
-    const { agentId } = req.query;
+    const { agentId, drawId } = req.query;
     
     let query = `
       SELECT 
@@ -1326,6 +1547,11 @@ app.get('/api/reports', async (req, res) => {
     if (agentId) {
       params.push(agentId);
       query += ` AND agent_id = $${params.length}`;
+    }
+    
+    if (drawId && drawId !== 'all') {
+      params.push(drawId);
+      query += ` AND draw_id = $${params.length}`;
     }
     
     const result = await pool.query(query, params);
@@ -1354,6 +1580,55 @@ app.get('/api/reports', async (req, res) => {
   }
 });
 
+// Rapport par tirage
+app.get('/api/reports/draw', async (req, res) => {
+  try {
+    const { agentId, drawId } = req.query;
+    
+    let query = `
+      SELECT 
+        COUNT(*) as total_tickets,
+        COALESCE(SUM(total_amount), 0) as total_bets,
+        COALESCE(SUM(win_amount), 0) as total_wins
+      FROM tickets 
+      WHERE DATE(date) = CURRENT_DATE
+    `;
+    
+    const params = [];
+    if (agentId) {
+      params.push(agentId);
+      query += ` AND agent_id = $${params.length}`;
+    }
+    
+    if (drawId && drawId !== 'all') {
+      params.push(drawId);
+      query += ` AND draw_id = $${params.length}`;
+    }
+    
+    const result = await pool.query(query, params);
+    const stats = result.rows[0] || { total_tickets: 0, total_bets: 0, total_wins: 0 };
+    
+    const totalLoss = stats.total_bets - stats.total_wins;
+    
+    res.json({
+      totalTickets: parseInt(stats.total_tickets),
+      totalBets: parseFloat(stats.total_bets),
+      totalWins: parseFloat(stats.total_wins),
+      totalLoss: parseFloat(totalLoss),
+      balance: parseFloat(totalLoss)
+    });
+  } catch (error) {
+    console.error('Erreur rapport tirage:', error);
+    res.json({
+      totalTickets: 0,
+      totalBets: 0,
+      totalWins: 0,
+      totalLoss: 0,
+      balance: 0
+    });
+  }
+});
+
 // ============= ROUTES GAGNANTS =============
 app.get('/api/winners', async (req, res) => {
   try {
@@ -1378,6 +1653,65 @@ app.get('/api/winners', async (req, res) => {
   } catch (error) {
     console.error('Erreur gagnants:', error);
     res.json({ winners: [] });
+  }
+});
+
+// Vérifier les tickets gagnants
+app.post('/api/tickets/check-winners', async (req, res) => {
+  try {
+    const { agentId } = req.query;
+    
+    // Simulation de vérification
+    const query = agentId 
+      ? 'SELECT * FROM tickets WHERE agent_id = $1 AND win_amount > 0 AND checked = false'
+      : 'SELECT * FROM tickets WHERE win_amount > 0 AND checked = false';
+    
+    const params = agentId ? [agentId] : [];
+    
+    const result = await pool.query(query, params);
+    
+    // Marquer comme vérifié
+    for (const ticket of result.rows) {
+      await pool.query(
+        'UPDATE tickets SET checked = true WHERE id = $1',
+        [ticket.id]
+      );
+    }
+    
+    res.json({ 
+      success: true, 
+      count: result.rows.length,
+      tickets: result.rows 
+    });
+  } catch (error) {
+    console.error('Erreur vérification tickets gagnants:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Résultats gagnants
+app.get('/api/winners/results', async (req, res) => {
+  try {
+    // Récupérer les derniers résultats de tirages
+    const result = await pool.query(`
+      SELECT dr.* 
+      FROM draw_results dr
+      ORDER BY dr.published_at DESC 
+      LIMIT 10
+    `);
+    
+    const results = result.rows.map(row => ({
+      drawId: row.draw_id,
+      name: row.name,
+      numbers: typeof row.results === 'string' ? JSON.parse(row.results) : row.results,
+      drawTime: row.draw_time,
+      publishedAt: row.published_at
+    }));
+    
+    res.json({ results });
+  } catch (error) {
+    console.error('Erreur résultats gagnants:', error);
+    res.json({ results: [] });
   }
 });
 
@@ -1526,5 +1860,7 @@ initializeDatabase().then(() => {
     console.log(`📊 Health: http://0.0.0.0:${PORT}/api/health`);
     console.log(`🔐 Login test: curl -X POST http://0.0.0.0:${PORT}/api/auth/login -H "Content-Type: application/json" -d '{"username":"admin","password":"admin123","role":"owner"}'`);
     console.log(`👑 Panneau propriétaire: http://0.0.0.0:${PORT}/owner.html`);
+    console.log(`👨‍💼 Panneau superviseur: http://0.0.0.0:${PORT}/responsable.html`);
+    console.log(`👤 Panneau agent: http://0.0.0.0:${PORT}/agent1.html`);
   });
 });
