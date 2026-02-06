@@ -980,6 +980,223 @@ app.post('/api/lottery-config', async (req, res) => {
     res.status(500).json({ error: 'Erreur sauvegarde' });
   }
 });
+// ============= ROUTES SUPERVISEURS SPÉCIFIQUES =============
+
+// Route de vérification pour superviseur
+app.get('/api/supervisor/auth/verify', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'supervisor') {
+            return res.status(403).json({ error: 'Accès non autorisé' });
+        }
+        
+        // Récupérer les données du superviseur
+        const result = await pool.query(
+            'SELECT * FROM supervisors WHERE id = $1',
+            [req.user.id.replace('supervisor-', '')]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Superviseur non trouvé' });
+        }
+        
+        const supervisor = result.rows[0];
+        
+        res.json({
+            id: req.user.id,
+            name: req.user.name,
+            email: supervisor.email,
+            phone: supervisor.phone
+        });
+    } catch (error) {
+        console.error('Erreur vérification superviseur:', error);
+        res.status(500).json({ error: 'Erreur serveur' });
+    }
+});
+
+// Route pour récupérer les données superviseur
+app.get('/api/supervisor/data', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'supervisor') {
+            return res.status(403).json({ error: 'Accès non autorisé' });
+        }
+        
+        const supervisorId = req.user.id.replace('supervisor-', '');
+        
+        // Récupérer le superviseur
+        const supervisorResult = await pool.query(
+            'SELECT * FROM supervisors WHERE id = $1',
+            [supervisorId]
+        );
+        
+        if (supervisorResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Superviseur non trouvé' });
+        }
+        
+        // Récupérer les agents assignés
+        const agentsResult = await pool.query(
+            `SELECT a.*, 
+                    COUNT(t.id) as ticket_count,
+                    COALESCE(SUM(t.total_amount), 0) as total_sales,
+                    COALESCE(SUM(t.win_amount), 0) as total_wins
+             FROM agents a
+             LEFT JOIN tickets t ON a.id::text = t.agent_id AND DATE(t.date) = CURRENT_DATE
+             WHERE a.supervisor_id = $1
+             GROUP BY a.id`,
+            [supervisorId]
+        );
+        
+        const agents = agentsResult.rows.map(agent => ({
+            id: agent.id.toString(),
+            name: agent.name,
+            email: agent.email,
+            phone: agent.phone,
+            location: agent.location,
+            commission: parseFloat(agent.commission),
+            active: agent.active,
+            online: Math.random() > 0.3, // Simulation
+            lastActivity: new Date().toISOString(),
+            ticketCount: parseInt(agent.ticket_count) || 0,
+            todaySales: parseFloat(agent.total_sales) || 0,
+            totalWins: parseFloat(agent.total_wins) || 0
+        }));
+        
+        res.json({
+            id: req.user.id,
+            name: req.user.name,
+            agents: agents
+        });
+    } catch (error) {
+        console.error('Erreur récupération données superviseur:', error);
+        res.status(500).json({ error: 'Erreur serveur' });
+    }
+});
+
+// Route simplifiée pour les agents du superviseur
+app.get('/api/supervisor/agents', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'supervisor') {
+            return res.status(403).json({ error: 'Accès non autorisé' });
+        }
+        
+        const supervisorId = req.user.id.replace('supervisor-', '');
+        
+        const result = await pool.query(
+            `SELECT a.*, 
+                    COUNT(t.id) as ticket_count,
+                    COALESCE(SUM(t.total_amount), 0) as total_sales,
+                    COALESCE(SUM(t.win_amount), 0) as total_wins
+             FROM agents a
+             LEFT JOIN tickets t ON a.id::text = t.agent_id AND DATE(t.date) = CURRENT_DATE
+             WHERE a.supervisor_id = $1
+             GROUP BY a.id`,
+            [supervisorId]
+        );
+        
+        const agents = result.rows.map(agent => ({
+            id: agent.id.toString(),
+            name: agent.name,
+            email: agent.email,
+            phone: agent.phone,
+            location: agent.location,
+            commission: parseFloat(agent.commission),
+            active: agent.active,
+            blocked: !agent.active,
+            online: Math.random() > 0.3,
+            lastActivity: new Date().toISOString(),
+            ticketCount: parseInt(agent.ticket_count) || 0,
+            todaySales: parseFloat(agent.total_sales) || 0,
+            totalWins: parseFloat(agent.total_wins) || 0
+        }));
+        
+        res.json(agents);
+    } catch (error) {
+        console.error('Erreur récupération agents:', error);
+        res.status(500).json({ error: 'Erreur serveur' });
+    }
+});
+
+// Détails d'un agent spécifique
+app.get('/api/supervisor/agent/:id/details', authenticateToken, async (req, res) => {
+    try {
+        const agentId = req.params.id;
+        
+        const result = await pool.query(
+            'SELECT * FROM agents WHERE id = $1',
+            [agentId]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Agent non trouvé' });
+        }
+        
+        const agent = result.rows[0];
+        
+        // Statistiques du jour
+        const statsResult = await pool.query(
+            `SELECT COUNT(*) as ticket_count,
+                    COALESCE(SUM(total_amount), 0) as total_sales,
+                    COALESCE(SUM(win_amount), 0) as total_wins
+             FROM tickets 
+             WHERE agent_id = $1 AND DATE(date) = CURRENT_DATE`,
+            [agentId]
+        );
+        
+        const stats = statsResult.rows[0];
+        
+        res.json({
+            id: agent.id.toString(),
+            name: agent.name,
+            email: agent.email,
+            phone: agent.phone,
+            location: agent.location,
+            active: agent.active,
+            blocked: !agent.active,
+            online: Math.random() > 0.3,
+            lastActivity: new Date().toISOString(),
+            ticketCount: parseInt(stats.ticket_count) || 0,
+            todaySales: parseFloat(stats.total_sales) || 0,
+            totalWins: parseFloat(stats.total_wins) || 0
+        });
+    } catch (error) {
+        console.error('Erreur détails agent:', error);
+        res.status(500).json({ error: 'Erreur serveur' });
+    }
+});
+
+// Tickets d'un agent
+app.get('/api/supervisor/agent/:id/tickets', authenticateToken, async (req, res) => {
+    try {
+        const agentId = req.params.id;
+        
+        const result = await pool.query(
+            `SELECT id, ticket_id, draw_id, draw_name, total_amount, date, bets
+             FROM tickets 
+             WHERE agent_id = $1 
+             ORDER BY date DESC 
+             LIMIT 20`,
+            [agentId]
+        );
+        
+        const tickets = result.rows.map(ticket => {
+            const bets = typeof ticket.bets === 'string' ? JSON.parse(ticket.bets) : ticket.bets;
+            return {
+                id: ticket.id,
+                ticketId: ticket.ticket_id,
+                drawId: ticket.draw_id,
+                drawName: ticket.draw_name,
+                total: parseFloat(ticket.total_amount),
+                timestamp: ticket.date,
+                betsCount: bets.length,
+                bets: bets
+            };
+        });
+        
+        res.json(tickets);
+    } catch (error) {
+        console.error('Erreur tickets agent:', error);
+        res.status(500).json({ error: 'Erreur serveur' });
+    }
+});
 
 // ============= ROUTES PROPRIÉTAIRE =============
 
