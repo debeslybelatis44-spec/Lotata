@@ -308,15 +308,49 @@ async function initializeDatabase() {
     `);
 
     console.log('✅ Tables initialisées avec succès');
+    
+    // Créer un superviseur par défaut si la table est vide
+    const supervisorsCount = await pool.query('SELECT COUNT(*) FROM supervisors');
+    if (parseInt(supervisorsCount.rows[0].count) === 0) {
+      const hashedPassword = await bcrypt.hash('super123', 10);
+      await pool.query(
+        'INSERT INTO supervisors (name, email, phone, password, active) VALUES ($1, $2, $3, $4, $5)',
+        ['Jean Supervisor', 'supervisor1@lotato.com', '+50912345678', hashedPassword, true]
+      );
+      console.log('✅ Superviseur par défaut créé');
+    }
+    
+    // Créer des agents par défaut
+    const agentsCount = await pool.query('SELECT COUNT(*) FROM agents');
+    if (parseInt(agentsCount.rows[0].count) === 0) {
+      const supervisor = await pool.query('SELECT id FROM supervisors LIMIT 1');
+      if (supervisor.rows.length > 0) {
+        const supervisorId = supervisor.rows[0].id;
+        const hashedPassword = await bcrypt.hash('agent123', 10);
+        
+        await pool.query(
+          'INSERT INTO agents (name, email, phone, password, supervisor_id, location, commission, active) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+          ['Pierre Agent', 'agent01@lotato.com', '+50911111111', hashedPassword, supervisorId, 'Port-au-Prince', 5.00, true]
+        );
+        
+        await pool.query(
+          'INSERT INTO agents (name, email, phone, password, supervisor_id, location, commission, active) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+          ['Marc Agent', 'agent02@lotato.com', '+50922222222', hashedPassword, supervisorId, 'Delmas', 5.00, true]
+        );
+        
+        console.log('✅ Agents par défaut créés');
+      }
+    }
+    
   } catch (error) {
     console.error('❌ Erreur initialisation base de données:', error);
   }
 }
 
-// Middleware d'authentification
-const authenticateToken = (req, res, next) => {
+// Middleware d'authentification amélioré
+const authenticateToken = async (req, res, next) => {
   // Pour les routes publiques, on passe
-  const publicRoutes = ['/api/health', '/api/auth/login', '/api/draws/public'];
+  const publicRoutes = ['/api/health', '/api/auth/login'];
   if (publicRoutes.includes(req.path)) {
     return next();
   }
@@ -325,21 +359,17 @@ const authenticateToken = (req, res, next) => {
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
-    // Pour le développement, on accepte les requêtes sans token
-    console.log('⚠️ Requête sans token, on accepte pour le moment');
-    req.user = { id: 'dev-user', role: 'agent' };
-    return next();
+    return res.status(401).json({ error: 'Token manquant' });
   }
 
-  jwt.verify(token, process.env.JWT_SECRET || 'lotato-secret-key', (err, user) => {
-    if (err) {
-      console.log('⚠️ Token invalide, on continue quand même pour le dev');
-      req.user = { id: 'dev-user', role: 'agent' };
-      return next();
-    }
+  try {
+    const user = jwt.verify(token, process.env.JWT_SECRET || 'lotato-secret-key');
     req.user = user;
     next();
-  });
+  } catch (err) {
+    console.error('❌ Token invalide:', err.message);
+    return res.status(403).json({ error: 'Token invalide ou expiré' });
+  }
 };
 
 // ============= ROUTES PUBLIQUES =============
@@ -361,59 +391,118 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-// LOGIN avec utilisateurs de test
+// LOGIN amélioré avec vérification dans la base de données
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password, role } = req.body;
-    console.log('Login attempt:', { username, role });
+    console.log('🔐 Tentative de connexion:', { username, role });
 
-    // Vérification des identifiants de test
-    const testUsers = {
-      'agent': [
-        { id: 'agent-01', username: 'agent01', password: 'agent123', name: 'Pierre Agent' },
-        { id: 'agent-02', username: 'agent02', password: 'agent456', name: 'Marc Agent' },
-        { id: 'agent-03', username: 'agent03', password: 'agent789', name: 'Sophie Agent' }
-      ],
-      'supervisor': [
-        { id: 'supervisor-01', username: 'supervisor1', password: 'super123', name: 'Jean Supervisor' }
-      ],
-      'owner': [
-        { id: 'owner-01', username: 'admin', password: 'admin123', name: 'Admin Propriétaire' }
-      ]
-    };
+    // Vérification dans la base de données
+    if (role === 'supervisor') {
+      const result = await pool.query(
+        'SELECT * FROM supervisors WHERE email = $1 AND active = true',
+        [username]
+      );
+      
+      if (result.rows.length === 0) {
+        return res.status(401).json({ error: 'Superviseur non trouvé ou inactif' });
+      }
+      
+      const supervisor = result.rows[0];
+      const validPassword = await bcrypt.compare(password, supervisor.password);
+      
+      if (!validPassword) {
+        return res.status(401).json({ error: 'Mot de passe incorrect' });
+      }
+      
+      // Générer le token
+      const token = jwt.sign(
+        {
+          id: `supervisor-${supervisor.id}`,
+          username: supervisor.email,
+          role: 'supervisor',
+          name: supervisor.name
+        },
+        process.env.JWT_SECRET || 'lotato-secret-key',
+        { expiresIn: '24h' }
+      );
 
-    const users = testUsers[role] || [];
-    const user = users.find(u => u.username === username && u.password === password);
+      res.json({
+        success: true,
+        token,
+        name: supervisor.name,
+        role: 'supervisor',
+        supervisorId: `supervisor-${supervisor.id}`
+      });
+      
+    } else if (role === 'agent') {
+      const result = await pool.query(
+        'SELECT * FROM agents WHERE email = $1 AND active = true',
+        [username]
+      );
+      
+      if (result.rows.length === 0) {
+        return res.status(401).json({ error: 'Agent non trouvé ou inactif' });
+      }
+      
+      const agent = result.rows[0];
+      const validPassword = await bcrypt.compare(password, agent.password);
+      
+      if (!validPassword) {
+        return res.status(401).json({ error: 'Mot de passe incorrect' });
+      }
+      
+      // Générer le token
+      const token = jwt.sign(
+        {
+          id: `agent-${agent.id}`,
+          username: agent.email,
+          role: 'agent',
+          name: agent.name
+        },
+        process.env.JWT_SECRET || 'lotato-secret-key',
+        { expiresIn: '24h' }
+      );
 
-    if (!user) {
-      return res.status(401).json({ error: 'Identifiants incorrects' });
+      res.json({
+        success: true,
+        token,
+        name: agent.name,
+        role: 'agent',
+        agentId: `agent-${agent.id}`
+      });
+      
+    } else if (role === 'owner') {
+      // Vérification de l'admin
+      if (username === 'admin' && password === 'admin123') {
+        const token = jwt.sign(
+          {
+            id: 'owner-01',
+            username: 'admin',
+            role: 'owner',
+            name: 'Admin Propriétaire'
+          },
+          process.env.JWT_SECRET || 'lotato-secret-key',
+          { expiresIn: '24h' }
+        );
+
+        res.json({
+          success: true,
+          token,
+          name: 'Admin Propriétaire',
+          role: 'owner',
+          ownerId: 'owner-01'
+        });
+      } else {
+        res.status(401).json({ error: 'Identifiants administrateur incorrects' });
+      }
+    } else {
+      res.status(400).json({ error: 'Rôle invalide' });
     }
 
-    // Générer le token
-    const token = jwt.sign(
-      {
-        id: user.id,
-        username: user.username,
-        role: role,
-        name: user.name
-      },
-      process.env.JWT_SECRET || 'lotato-secret-key',
-      { expiresIn: '24h' }
-    );
-
-    res.json({
-      success: true,
-      token,
-      name: user.name,
-      role: role,
-      agentId: role === 'agent' ? user.id : null,
-      supervisorId: role === 'supervisor' ? user.id : null,
-      ownerId: role === 'owner' ? user.id : null
-    });
-
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
+    console.error('❌ Erreur login:', error);
+    res.status(500).json({ error: 'Erreur serveur lors de la connexion' });
   }
 });
 
@@ -429,6 +518,247 @@ app.get('/api/auth/verify', authenticateToken, (req, res) => {
 
 // Appliquer l'authentification aux routes API
 app.use('/api', authenticateToken);
+
+// ============= ROUTES POUR RESPONSABLE.HTML =============
+
+// Route pour récupérer les superviseurs
+app.get('/api/supervisors', async (req, res) => {
+  try {
+    const { supervisorId } = req.query;
+    
+    let query = 'SELECT * FROM supervisors';
+    const params = [];
+    
+    if (supervisorId) {
+      params.push(supervisorId.replace('supervisor-', ''));
+      query += ' WHERE id = $1';
+    }
+    
+    const result = await pool.query(query, params);
+    
+    const supervisors = result.rows.map(row => ({
+      id: `supervisor-${row.id}`,
+      name: row.name,
+      email: row.email,
+      phone: row.phone,
+      active: row.active
+    }));
+    
+    res.json({ supervisors });
+  } catch (error) {
+    console.error('Erreur récupération superviseurs:', error);
+    res.json({ supervisors: [] });
+  }
+});
+
+// Route pour récupérer les agents d'un superviseur
+app.get('/api/agents', async (req, res) => {
+  try {
+    const { supervisorId } = req.query;
+    
+    let query = `
+      SELECT a.*, 
+             COUNT(t.id) as ticket_count,
+             COALESCE(SUM(t.total_amount), 0) as total_sales,
+             COALESCE(SUM(t.win_amount), 0) as total_wins
+      FROM agents a
+      LEFT JOIN tickets t ON a.id::text = t.agent_id AND DATE(t.date) = CURRENT_DATE
+      WHERE a.active = true
+    `;
+    const params = [];
+    
+    if (supervisorId) {
+      params.push(supervisorId.replace('supervisor-', ''));
+      query += ' AND a.supervisor_id = $1';
+    }
+    
+    query += ' GROUP BY a.id ORDER BY a.name';
+    
+    const result = await pool.query(query, params);
+    
+    const agents = result.rows.map(agent => ({
+      id: agent.id.toString(),
+      name: agent.name,
+      email: agent.email,
+      phone: agent.phone,
+      location: agent.location,
+      commission: parseFloat(agent.commission),
+      supervisor_id: agent.supervisor_id,
+      active: agent.active,
+      online: Math.random() > 0.3, // Simulation
+      lastActivity: new Date().toISOString(),
+      ticketCount: parseInt(agent.ticket_count) || 0,
+      todaySales: parseFloat(agent.total_sales) || 0,
+      totalWins: parseFloat(agent.total_wins) || 0
+    }));
+    
+    res.json({ agents });
+  } catch (error) {
+    console.error('Erreur récupération agents:', error);
+    res.json({ agents: [] });
+  }
+});
+
+// Route pour les rapports par agent
+app.get('/api/reports', async (req, res) => {
+  try {
+    const { agentId } = req.query;
+    const today = new Date().toISOString().split('T')[0];
+    
+    let query = `
+      SELECT 
+        COUNT(*) as total_tickets,
+        COALESCE(SUM(total_amount), 0) as total_bets,
+        COALESCE(SUM(win_amount), 0) as total_wins
+      FROM tickets 
+      WHERE DATE(date) = $1
+    `;
+    
+    const params = [today];
+    if (agentId) {
+      params.push(agentId);
+      query += ` AND agent_id = $${params.length}`;
+    }
+    
+    const result = await pool.query(query, params);
+    const stats = result.rows[0] || { total_tickets: 0, total_bets: 0, total_wins: 0 };
+    
+    res.json({
+      totalBets: parseFloat(stats.total_bets) || 0,
+      totalTickets: parseInt(stats.total_tickets) || 0,
+      totalWins: parseFloat(stats.total_wins) || 0
+    });
+  } catch (error) {
+    console.error('Erreur rapports agent:', error);
+    res.json({
+      totalBets: 0,
+      totalTickets: 0,
+      totalWins: 0
+    });
+  }
+});
+
+// Route pour le tableau de bord
+app.get('/api/reports/dashboard', async (req, res) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Statistiques globales
+    const statsResult = await pool.query(`
+      SELECT 
+        COUNT(*) as total_tickets,
+        COALESCE(SUM(total_amount), 0) as total_sales,
+        COALESCE(SUM(win_amount), 0) as total_wins
+      FROM tickets 
+      WHERE DATE(date) = $1
+    `, [today]);
+    
+    const stats = statsResult.rows[0] || { total_tickets: 0, total_sales: 0, total_wins: 0 };
+    
+    // Agents actifs
+    const agentsResult = await pool.query('SELECT COUNT(*) FROM agents WHERE active = true');
+    const activeAgents = parseInt(agentsResult.rows[0].count) || 0;
+    
+    // Tirages actifs
+    const drawsResult = await pool.query('SELECT COUNT(*) FROM draws WHERE active = true');
+    const activeDraws = parseInt(drawsResult.rows[0].count) || 10; // Valeur par défaut
+    
+    res.json({
+      totalSales: parseFloat(stats.total_sales) || 0,
+      totalTickets: parseInt(stats.total_tickets) || 0,
+      totalWins: parseFloat(stats.total_wins) || 0,
+      activeAgents: activeAgents,
+      activeDraws: activeDraws,
+      totalUsers: activeAgents + 1 // Agents + superviseurs
+    });
+  } catch (error) {
+    console.error('Erreur tableau de bord:', error);
+    res.json({
+      totalSales: 0,
+      totalTickets: 0,
+      totalWins: 0,
+      activeAgents: 0,
+      activeDraws: 0,
+      totalUsers: 0
+    });
+  }
+});
+
+// Route pour bloquer/débloquer un agent
+app.patch('/api/users/:agentId/block', async (req, res) => {
+  try {
+    const { agentId } = req.params;
+    const { blocked } = req.body;
+    
+    const result = await pool.query(
+      'UPDATE agents SET active = $1 WHERE id = $2 RETURNING *',
+      [!blocked, agentId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Agent non trouvé' });
+    }
+    
+    res.json({ success: true, message: `Agent ${blocked ? 'bloqué' : 'débloqué'}` });
+  } catch (error) {
+    console.error('Erreur blocage agent:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Route pour les tickets d'un agent
+app.get('/api/tickets/agent/:agentId', async (req, res) => {
+  try {
+    const { agentId } = req.params;
+    
+    const result = await pool.query(
+      `SELECT * FROM tickets 
+       WHERE agent_id = $1 
+       ORDER BY date DESC 
+       LIMIT 50`,
+      [agentId]
+    );
+    
+    const tickets = result.rows.map(ticket => ({
+      ...ticket,
+      bets: typeof ticket.bets === 'string' ? JSON.parse(ticket.bets) : ticket.bets || []
+    }));
+    
+    res.json({ tickets });
+  } catch (error) {
+    console.error('Erreur tickets agent:', error);
+    res.json({ tickets: [] });
+  }
+});
+
+// Route pour les gains d'un agent
+app.get('/api/winners/agent/:agentId', async (req, res) => {
+  try {
+    const { agentId } = req.params;
+    const today = new Date().toISOString().split('T')[0];
+    
+    const result = await pool.query(
+      `SELECT * FROM tickets 
+       WHERE agent_id = $1 AND win_amount > 0 AND DATE(date) = $2
+       ORDER BY date DESC`,
+      [agentId, today]
+    );
+    
+    const winners = result.rows.map(ticket => ({
+      id: ticket.id,
+      ticket_id: ticket.ticket_id,
+      win_amount: ticket.win_amount,
+      date: ticket.date,
+      paid: ticket.paid,
+      draw_name: ticket.draw_name
+    }));
+    
+    res.json({ winners });
+  } catch (error) {
+    console.error('Erreur gains agent:', error);
+    res.json({ winners: [] });
+  }
+});
 
 // ============= ROUTES TICKETS =============
 app.post('/api/tickets/save', async (req, res) => {
@@ -741,51 +1071,6 @@ app.get('/api/draws', async (req, res) => {
 });
 
 // ============= ROUTES RAPPORTS =============
-app.get('/api/reports', async (req, res) => {
-  try {
-    const { agentId } = req.query;
-    const today = new Date().toISOString().split('T')[0];
-    
-    let query = `
-      SELECT 
-        COUNT(*) as total_tickets,
-        COALESCE(SUM(total_amount), 0) as total_bets,
-        COALESCE(SUM(win_amount), 0) as total_wins
-      FROM tickets 
-      WHERE DATE(date) = $1
-    `;
-    
-    const params = [today];
-    if (agentId) {
-      params.push(agentId);
-      query += ` AND agent_id = $${params.length}`;
-    }
-    
-    const result = await pool.query(query, params);
-    const stats = result.rows[0] || { total_tickets: 0, total_bets: 0, total_wins: 0 };
-    
-    const totalLoss = stats.total_bets - stats.total_wins;
-    
-    res.json({
-      totalTickets: parseInt(stats.total_tickets),
-      totalBets: parseFloat(stats.total_bets),
-      totalWins: parseFloat(stats.total_wins),
-      totalLoss: parseFloat(totalLoss),
-      balance: parseFloat(totalLoss)
-    });
-  } catch (error) {
-    console.error('Erreur rapports:', error);
-    res.json({
-      totalTickets: 0,
-      totalBets: 0,
-      totalWins: 0,
-      totalLoss: 0,
-      balance: 0
-    });
-  }
-});
-
-// Rapport par tirage spécifique
 app.get('/api/reports/draw', async (req, res) => {
   try {
     const { agentId, drawId } = req.query;
@@ -980,6 +1265,7 @@ app.post('/api/lottery-config', async (req, res) => {
     res.status(500).json({ error: 'Erreur sauvegarde' });
   }
 });
+
 // ============= ROUTES SUPERVISEURS SPÉCIFIQUES =============
 
 // Route de vérification pour superviseur
@@ -1053,7 +1339,7 @@ app.get('/api/supervisor/data', authenticateToken, async (req, res) => {
             location: agent.location,
             commission: parseFloat(agent.commission),
             active: agent.active,
-            online: Math.random() > 0.3, // Simulation
+            online: Math.random() > 0.3,
             lastActivity: new Date().toISOString(),
             ticketCount: parseInt(agent.ticket_count) || 0,
             todaySales: parseFloat(agent.total_sales) || 0,
@@ -1201,7 +1487,7 @@ app.get('/api/supervisor/agent/:id/tickets', authenticateToken, async (req, res)
 // ============= ROUTES PROPRIÉTAIRE =============
 
 // Route tableau de bord principal
-app.get('/api/reports/dashboard', async (req, res) => {
+app.get('/api/owner/dashboard', async (req, res) => {
   try {
     // Statistiques agents
     const agentsCount = await pool.query('SELECT COUNT(*) FROM agents WHERE active = true');
@@ -1729,7 +2015,7 @@ app.patch('/api/draws/:id/block', async (req, res) => {
 });
 
 // ============= ROUTES AGENTS =============
-app.get('/api/agents', async (req, res) => {
+app.get('/api/agents/all', async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT a.*, s.name as supervisor_name
@@ -1747,7 +2033,7 @@ app.get('/api/agents', async (req, res) => {
 });
 
 // ============= ROUTES SUPERVISEURS =============
-app.get('/api/supervisors', async (req, res) => {
+app.get('/api/supervisors/all', async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT s.*, COUNT(a.id) as agents_count
@@ -1823,9 +2109,14 @@ initializeDatabase().then(async () => {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Serveur LOTATO démarré sur http://0.0.0.0:${PORT}`);
     console.log(`📊 Health: http://0.0.0.0:${PORT}/api/health`);
-    console.log(`🔐 Login test: curl -X POST http://0.0.0.0:${PORT}/api/auth/login -H "Content-Type: application/json" -d '{"username":"admin","password":"admin123","role":"owner"}'`);
     console.log(`👑 Panneau propriétaire: http://0.0.0.0:${PORT}/owner.html`);
+    console.log(`👥 Panneau superviseur: http://0.0.0.0:${PORT}/responsable.html`);
     console.log(`👤 Interface agent: http://0.0.0.0:${PORT}/agent1.html`);
+    console.log('');
+    console.log('🔐 Informations de connexion:');
+    console.log('   Superviseur: username=supervisor1@lotato.com, password=super123');
+    console.log('   Agent: username=agent01@lotato.com, password=agent123');
+    console.log('   Propriétaire: username=admin, password=admin123');
   });
 });
 
