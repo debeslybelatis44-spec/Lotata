@@ -125,15 +125,70 @@ async function deleteTicket(ticketId) {
 
 async function loadReports() {
     try {
+        // Charger les tickets et rapports depuis l'API
+        await APIService.getTickets();
         const reports = await APIService.getReports();
         
-        document.getElementById('total-tickets').textContent = reports.totalTickets || 0;
-        document.getElementById('total-bets').textContent = (reports.totalBets || 0).toLocaleString() + ' Gdes';
-        document.getElementById('total-wins').textContent = (reports.totalWins || 0).toLocaleString() + ' Gdes';
-        document.getElementById('total-loss').textContent = (reports.totalLoss || 0).toLocaleString() + ' Gdes';
-        document.getElementById('balance').textContent = (reports.balance || 0).toLocaleString() + ' Gdes';
-        document.getElementById('balance').style.color = (reports.balance >= 0) ? 'var(--success)' : 'var(--danger)';
+        console.log('Données rapport API:', reports);
         
+        // CALCULS CORRIGÉS SELON LA LOGIQUE MÉTIER
+        let totalTickets = APP_STATE.ticketsHistory.length;
+        let totalBets = 0;
+        let totalWins = 0;
+        let totalLoss = 0;
+        let totalProfit = 0;
+        
+        // Analyser chaque ticket
+        APP_STATE.ticketsHistory.forEach(ticket => {
+            const ticketAmount = ticket.total_amount || 0;
+            totalBets += ticketAmount;
+            
+            // Si le ticket a été vérifié (tirage effectué)
+            if (ticket.checked) {
+                if (ticket.win_amount && ticket.win_amount > 0) {
+                    // Ticket gagnant
+                    totalWins += ticket.win_amount;
+                    
+                    // IMPORTANT: Le gain total inclut la mise + le profit
+                    // Ex: Mise 10G, Gain 50G → Profit net = 40G pour le joueur
+                    // Pour l'agent: Il a reçu 10G et doit payer 50G → Perte de 40G
+                    // Mais on affiche le montant total à payer (50G)
+                } else {
+                    // Ticket perdant
+                    // L'agent garde toute la mise
+                    totalLoss += ticketAmount;
+                }
+            }
+        });
+        
+        // CORRECTION: Calculer le profit/perte net pour l'agent
+        // Profit = Argent reçu (totalBets) - Argent à payer (totalWins)
+        // Si positif: l'agent a fait du profit
+        // Si négatif: l'agent a fait une perte
+        totalProfit = totalBets - totalWins;
+        
+        console.log('Calculs corrigés:');
+        console.log('- Total Tickets:', totalTickets);
+        console.log('- Total Paris (argent reçu):', totalBets);
+        console.log('- Total à payer aux gagnants:', totalWins);
+        console.log('- Total gardé (tickets perdants):', totalLoss);
+        console.log('- Profit/Perte net:', totalProfit);
+        
+        // Mettre à jour les statistiques générales
+        document.getElementById('total-tickets').textContent = totalTickets;
+        document.getElementById('total-bets').textContent = totalBets.toLocaleString() + ' Gdes';
+        document.getElementById('total-wins').textContent = totalWins.toLocaleString() + ' Gdes';
+        document.getElementById('total-loss').textContent = totalLoss.toLocaleString() + ' Gdes';
+        document.getElementById('balance').textContent = totalProfit.toLocaleString() + ' Gdes';
+        document.getElementById('balance').style.color = (totalProfit >= 0) ? 'var(--success)' : 'var(--danger)';
+        
+        // Ajouter un message d'information
+        const pendingTickets = APP_STATE.ticketsHistory.filter(t => !t.checked).length;
+        if (pendingTickets > 0) {
+            console.log(`${pendingTickets} tickets en attente de tirage`);
+        }
+        
+        // Remplir le sélecteur de tirage
         const drawSelector = document.getElementById('draw-report-selector');
         drawSelector.innerHTML = '<option value="all">Tout Tiraj</option>';
         
@@ -144,10 +199,18 @@ async function loadReports() {
             drawSelector.appendChild(option);
         });
         
+        // Charger le rapport pour "Tout Tiraj" par défaut
         await loadDrawReport('all');
         
     } catch (error) {
         console.error('Erreur chargement rapports:', error);
+        // Afficher des valeurs par défaut en cas d'erreur
+        document.getElementById('total-tickets').textContent = '0';
+        document.getElementById('total-bets').textContent = '0 Gdes';
+        document.getElementById('total-wins').textContent = '0 Gdes';
+        document.getElementById('total-loss').textContent = '0 Gdes';
+        document.getElementById('balance').textContent = '0 Gdes';
+        document.getElementById('balance').style.color = 'var(--success)';
     }
 }
 
@@ -156,8 +219,10 @@ async function loadDrawReport(drawId = null) {
         const selectedDrawId = drawId || document.getElementById('draw-report-selector').value;
         
         if (selectedDrawId === 'all') {
+            // Afficher les statistiques générales
             document.getElementById('draw-report-card').style.display = 'block';
             
+            // Copier les valeurs générales
             document.getElementById('draw-total-tickets').textContent = document.getElementById('total-tickets').textContent;
             document.getElementById('draw-total-bets').textContent = document.getElementById('total-bets').textContent;
             document.getElementById('draw-total-wins').textContent = document.getElementById('total-wins').textContent;
@@ -165,20 +230,50 @@ async function loadDrawReport(drawId = null) {
             document.getElementById('draw-balance').textContent = document.getElementById('balance').textContent;
             document.getElementById('draw-balance').style.color = document.getElementById('balance').style.color;
         } else {
-            const drawReport = await APIService.getDrawReport(selectedDrawId);
+            // Calculer les statistiques pour ce tirage spécifique
+            const drawTickets = APP_STATE.ticketsHistory.filter(t => t.draw_id === selectedDrawId);
             const draw = CONFIG.DRAWS.find(d => d.id === selectedDrawId);
             
+            let drawTotalTickets = drawTickets.length;
+            let drawTotalBets = 0;
+            let drawTotalWins = 0;
+            let drawTotalLoss = 0;
+            
+            // Calculer les statistiques pour ce tirage
+            drawTickets.forEach(ticket => {
+                const ticketAmount = ticket.total_amount || 0;
+                drawTotalBets += ticketAmount;
+                
+                if (ticket.checked) {
+                    if (ticket.win_amount && ticket.win_amount > 0) {
+                        drawTotalWins += ticket.win_amount;
+                    } else {
+                        drawTotalLoss += ticketAmount;
+                    }
+                }
+            });
+            
+            const drawProfit = drawTotalBets - drawTotalWins;
+            
             document.getElementById('draw-report-card').style.display = 'block';
-            document.getElementById('draw-total-tickets').textContent = drawReport.totalTickets || 0;
-            document.getElementById('draw-total-bets').textContent = (drawReport.totalBets || 0).toLocaleString() + ' Gdes';
-            document.getElementById('draw-total-wins').textContent = (drawReport.totalWins || 0).toLocaleString() + ' Gdes';
-            document.getElementById('draw-total-loss').textContent = (drawReport.totalLoss || 0).toLocaleString() + ' Gdes';
-            document.getElementById('draw-balance').textContent = (drawReport.balance || 0).toLocaleString() + ' Gdes';
-            document.getElementById('draw-balance').style.color = (drawReport.balance >= 0) ? 'var(--success)' : 'var(--danger)';
+            document.getElementById('draw-total-tickets').textContent = drawTotalTickets;
+            document.getElementById('draw-total-bets').textContent = drawTotalBets.toLocaleString() + ' Gdes';
+            document.getElementById('draw-total-wins').textContent = drawTotalWins.toLocaleString() + ' Gdes';
+            document.getElementById('draw-total-loss').textContent = drawTotalLoss.toLocaleString() + ' Gdes';
+            document.getElementById('draw-balance').textContent = drawProfit.toLocaleString() + ' Gdes';
+            document.getElementById('draw-balance').style.color = (drawProfit >= 0) ? 'var(--success)' : 'var(--danger)';
         }
         
     } catch (error) {
         console.error('Erreur chargement rapport tirage:', error);
+        // En cas d'erreur, afficher des zéros
+        document.getElementById('draw-report-card').style.display = 'block';
+        document.getElementById('draw-total-tickets').textContent = '0';
+        document.getElementById('draw-total-bets').textContent = '0 Gdes';
+        document.getElementById('draw-total-wins').textContent = '0 Gdes';
+        document.getElementById('draw-total-loss').textContent = '0 Gdes';
+        document.getElementById('draw-balance').textContent = '0 Gdes';
+        document.getElementById('draw-balance').style.color = 'var(--success)';
     }
 }
 
@@ -190,6 +285,34 @@ function printReport() {
     const selectedDrawId = drawSelector.value;
     
     let reportData = '';
+    let totalPending = 0;
+    let totalVerified = 0;
+    
+    // Calculer les statistiques détaillées
+    let ticketsToAnalyze = selectedDrawId === 'all' 
+        ? APP_STATE.ticketsHistory 
+        : APP_STATE.ticketsHistory.filter(t => t.draw_id === selectedDrawId);
+    
+    totalPending = ticketsToAnalyze.filter(t => !t.checked).length;
+    totalVerified = ticketsToAnalyze.filter(t => t.checked).length;
+    
+    let analyzedTotalBets = 0;
+    let analyzedTotalWins = 0;
+    let analyzedTotalLoss = 0;
+    
+    ticketsToAnalyze.forEach(ticket => {
+        analyzedTotalBets += ticket.total_amount || 0;
+        
+        if (ticket.checked) {
+            if (ticket.win_amount && ticket.win_amount > 0) {
+                analyzedTotalWins += ticket.win_amount;
+            } else {
+                analyzedTotalLoss += ticket.total_amount || 0;
+            }
+        }
+    });
+    
+    const analyzedProfit = analyzedTotalBets - analyzedTotalWins;
     
     if (selectedDrawId === 'all') {
         reportData = `
@@ -197,11 +320,16 @@ function printReport() {
             <p><strong>Dat:</strong> ${new Date().toLocaleDateString('fr-FR')}</p>
             <p><strong>Ajant:</strong> ${APP_STATE.agentName}</p>
             <hr>
-            <p>Total Tikè: ${document.getElementById('total-tickets').textContent}</p>
-            <p>Total Pari: ${document.getElementById('total-bets').textContent}</p>
-            <p>Total Ganyen: ${document.getElementById('total-wins').textContent}</p>
-            <p>Pèdi: ${document.getElementById('total-loss').textContent}</p>
-            <p><strong>Balans Total: ${document.getElementById('balance').textContent}</strong></p>
+            <p><strong>Statistik Tikè:</strong></p>
+            <p>• Total Tikè: ${ticketsToAnalyze.length}</p>
+            <p>• Tikè Verifye: ${totalVerified}</p>
+            <p>• Tikè an Atant: ${totalPending}</p>
+            <hr>
+            <p><strong>Statistik Finansye:</strong></p>
+            <p>Total Paris (Antre Lajan): ${analyzedTotalBets.toLocaleString()} Gdes</p>
+            <p>Total pou peye (Ganyen): ${analyzedTotalWins.toLocaleString()} Gdes</p>
+            <p>Total Retni (Pèdi): ${analyzedTotalLoss.toLocaleString()} Gdes</p>
+            <p><strong>Balans Net: ${analyzedProfit.toLocaleString()} Gdes</strong></p>
         `;
     } else {
         reportData = `
@@ -209,11 +337,16 @@ function printReport() {
             <p><strong>Dat:</strong> ${new Date().toLocaleDateString('fr-FR')}</p>
             <p><strong>Ajant:</strong> ${APP_STATE.agentName}</p>
             <hr>
-            <p>Total Tikè: ${document.getElementById('draw-total-tickets').textContent}</p>
-            <p>Total Pari: ${document.getElementById('draw-total-bets').textContent}</p>
-            <p>Total Ganyen: ${document.getElementById('draw-total-wins').textContent}</p>
-            <p>Pèdi: ${document.getElementById('draw-total-loss').textContent}</p>
-            <p><strong>Balans: ${document.getElementById('draw-balance').textContent}</strong></p>
+            <p><strong>Statistik Tikè:</strong></p>
+            <p>• Total Tikè: ${ticketsToAnalyze.length}</p>
+            <p>• Tikè Verifye: ${totalVerified}</p>
+            <p>• Tikè an Atant: ${totalPending}</p>
+            <hr>
+            <p><strong>Statistik Finansye:</strong></p>
+            <p>Total Paris (Antre Lajan): ${analyzedTotalBets.toLocaleString()} Gdes</p>
+            <p>Total pou peye (Ganyen): ${analyzedTotalWins.toLocaleString()} Gdes</p>
+            <p>Total Retni (Pèdi): ${analyzedTotalLoss.toLocaleString()} Gdes</p>
+            <p><strong>Balans Net: ${analyzedProfit.toLocaleString()} Gdes</strong></p>
         `;
     }
     
@@ -231,8 +364,11 @@ function printReport() {
             <style>
                 body { font-family: Arial, sans-serif; padding: 20px; }
                 h2 { color: #333; }
-                hr { border: 1px solid #ccc; margin: 20px 0; }
-                p { margin: 10px 0; }
+                hr { border: 1px solid #ccc; margin: 10px 0; }
+                p { margin: 8px 0; }
+                .note { font-style: italic; color: #666; font-size: 11px; margin-top: 5px; }
+                .section { margin: 15px 0; }
+                .important { font-weight: bold; font-size: 14px; }
             </style>
         </head>
         <body style="text-align:center;">
@@ -241,7 +377,13 @@ function printReport() {
             ${addressHtml}
             ${phoneHtml}
             <hr>
-            ${reportData}
+            <div class="section">
+                ${reportData}
+            </div>
+            <hr>
+            <p class="note">Balans = Total Paris - Total Ganyen</p>
+            <p class="note">Balans pozitif = Pwofi pou ajant</p>
+            <p class="note">Balans negatif = Pèt pou ajant</p>
             <hr>
             <p style="font-size:12px;">Jenere nan: ${new Date().toLocaleString('fr-FR')}</p>
         </body>
@@ -292,6 +434,11 @@ function updateWinnersDisplay() {
         const winningResults = APP_STATE.winningResults.find(r => r.drawId === ticket.draw_id);
         const resultStr = winningResults ? winningResults.numbers.join(', ') : 'N/A';
         
+        // Calculer le profit net pour le joueur
+        const betAmount = ticket.bet_amount || 0;
+        const winAmount = ticket.win_amount || 0;
+        const netProfit = winAmount - betAmount;
+        
         return `
             <div class="winner-ticket">
                 <div class="winner-header">
@@ -301,15 +448,19 @@ function updateWinnersDisplay() {
                             ${ticket.draw_name} - ${new Date(ticket.date).toLocaleDateString('fr-FR')}
                         </div>
                     </div>
-                    <div style="font-weight: bold; color: var(--success);">
-                        ${(ticket.win_amount || 0).toLocaleString()} Gdes
+                    <div style="text-align: right;">
+                        <div style="font-weight: bold; color: var(--success); font-size: 1.1rem;">
+                            ${winAmount.toLocaleString()} Gdes
+                        </div>
+                        <div style="font-size: 0.8rem; color: var(--text-dim);">
+                            (Mise: ${betAmount.toLocaleString()}G | Net: ${netProfit.toLocaleString()}G)
+                        </div>
                     </div>
                 </div>
                 <div>
                     <p><strong>Rezilta Tiraj:</strong> ${resultStr}</p>
                     <p><strong>Jwèt:</strong> ${ticket.game_type || 'Borlette'}</p>
                     <p><strong>Nimewo Ganyen:</strong> ${ticket.winning_number || 'N/A'}</p>
-                    <p><strong>Montan Pari:</strong> ${(ticket.bet_amount || 0).toLocaleString()} Gdes</p>
                 </div>
                 <div class="winner-actions">
                     ${isPaid ? 
@@ -355,9 +506,12 @@ function viewTicketDetails(ticketId) {
         <h3>Detay Tikè #${ticket.ticket_id || ticket.id}</h3>
         <p><strong>Tiraj:</strong> ${ticket.draw_name}</p>
         <p><strong>Dat:</strong> ${new Date(ticket.date).toLocaleString('fr-FR')}</p>
-        <p><strong>Total:</strong> ${ticket.total_amount} Gdes</p>
+        <p><strong>Total Mis:</strong> ${ticket.total_amount} Gdes</p>
         <p><strong>Statis:</strong> ${ticket.checked ? (ticket.win_amount > 0 ? 'GANYEN' : 'PÈDI') : 'AP TANN'}</p>
-        ${ticket.win_amount > 0 ? `<p><strong>Ganyen:</strong> ${ticket.win_amount} Gdes</p>` : ''}
+        ${ticket.win_amount > 0 ? `
+            <p><strong>Ganyen Total:</strong> ${ticket.win_amount} Gdes</p>
+            <p><strong>Pwofi Net:</strong> ${ticket.win_amount - ticket.total_amount} Gdes</p>
+        ` : ''}
         <hr>
         <h4>Paray yo:</h4>
     `;
@@ -371,7 +525,13 @@ function viewTicketDetails(ticketId) {
             let gameName = (bet.game || '').toUpperCase();
             if (bet.specialType) gameName = bet.specialType;
             if (bet.option) gameName += ` (Opsyon ${bet.option})`;
-            details += `<p>${gameName} ${bet.number || ''} - ${bet.amount || 0} Gdes ${bet.gain ? `(Ganyen: ${bet.gain} Gdes)` : ''}</p>`;
+            
+            let betDetails = `${gameName} ${bet.number || ''} - ${bet.amount || 0} Gdes`;
+            if (bet.gain) {
+                const netGain = bet.gain - (bet.amount || 0);
+                betDetails += ` (Ganyen: ${bet.gain}G | Net: ${netGain}G)`;
+            }
+            details += `<p>${betDetails}</p>`;
         });
     }
     
