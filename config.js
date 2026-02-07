@@ -1,62 +1,70 @@
-// Configuration globale pour toutes les interfaces
 const API_CONFIG = {
-    BASE_URL: window.location.origin + '/api',
+    BASE_URL: 'https://lotata-islp.onrender.com/api',
     ENDPOINTS: {
-        LOGIN: '/login',
+        LOGIN: '/auth/login',
         SAVE_TICKET: '/tickets/save',
         GET_TICKETS: '/tickets',
         GET_REPORTS: '/reports',
         GET_DRAWS: '/draws',
         GET_WINNERS: '/winners',
+        GET_WINNING_RESULTS: '/winners/results',
         PAY_WINNER: '/winners/pay',
         GET_AGENTS: '/agents',
-        CREATE_AGENT: '/agents/create',
-        BLOCK_AGENT: '/agents/:id/block',
-        GET_SUPERVISORS: '/supervisors',
-        UPDATE_FUNDS: '/agents/:id/funds',
-        PUBLISH_DRAW: '/draws/publish',
-        GET_BLOCKED_NUMBERS: '/blocked-numbers',
-        UPDATE_BLOCKED_NUMBERS: '/blocked-numbers',
+        DELETE_TICKET: '/tickets/delete',
+        GET_DRAW_REPORT: '/reports/draw',
         GET_LOTTERY_CONFIG: '/lottery-config',
-        UPDATE_LOTTERY_CONFIG: '/lottery-config',
-        GET_ACTIVITY: '/activity',
-        HEALTH: '/health'
+        CHECK_WINNING_TICKETS: '/tickets/check-winners'
     }
 };
 
-// Fonction utilitaire pour appeler l'API
-async function apiCall(endpoint, method = 'GET', data = null) {
-    const url = `${API_CONFIG.BASE_URL}${endpoint}`;
-    const options = {
-        method: method,
-        headers: {
-            'Content-Type': 'application/json',
-        }
-    };
-    
-    if (data) {
-        options.body = JSON.stringify(data);
-    }
-    
-    try {
-        const response = await fetch(url, options);
-        return await response.json();
-    } catch (error) {
-        console.error('API Error:', error);
-        return { error: 'Erreur de connexion' };
-    }
-}
+const CONFIG = {
+    CURRENCY: 'Gdes',
+    GAMING_RULES: {
+        BORLETTE: { lot1: 60, lot2: 20, lot3: 10 },
+        LOTTO3: 500,
+        LOTTO4: 1000,
+        LOTTO5: 5000,
+        MARIAGE: 1000,
+        AUTO_MARRIAGE: 1000,
+        AUTO_LOTTO4: 1000,
+        AUTO_LOTTO5: 5000
+    },
+    // Tunisie en premier, Florida (anciennement Miami) et autres tirages
+    DRAWS: [
+        { id: 'tn_matin', name: 'Tunisia Matin', time: '10:00', color: 'var(--tunisia)' },
+        { id: 'tn_soir', name: 'Tunisia Soir', time: '17:00', color: 'var(--tunisia)' },
+        { id: 'fl_matin', name: 'Florida Matin', time: '13:30', color: 'var(--florida)' },
+        { id: 'fl_soir', name: 'Florida Soir', time: '21:50', color: 'var(--florida)' },
+        { id: 'ny_matin', name: 'New York Matin', time: '14:30', color: 'var(--newyork)' },
+        { id: 'ny_soir', name: 'New York Soir', time: '20:00', color: 'var(--newyork)' },
+        { id: 'ga_matin', name: 'Georgia Matin', time: '12:30', color: 'var(--georgia)' },
+        { id: 'ga_soir', name: 'Georgia Soir', time: '19:00', color: 'var(--georgia)' },
+        { id: 'tx_matin', name: 'Texas Matin', time: '11:30', color: 'var(--texas)' },
+        { id: 'tx_soir', name: 'Texas Soir', time: '18:30', color: 'var(--texas)' }
+    ],
+    LOTTERY_NAME: 'LOTATO PRO',
+    LOTTERY_LOGO: 'https://raw.githubusercontent.com/your-username/your-repo/main/logo.png',
+    LOTTERY_ADDRESS: '',
+    LOTTERY_PHONE: ''
+};
 
-// Fonction pour mettre à jour la configuration API dans les fichiers HTML existants
-function updateApiConfig() {
-    if (typeof window.API_CONFIG !== 'undefined') {
-        window.API_CONFIG.BASE_URL = API_CONFIG.BASE_URL;
-    }
-}
-
-// Exécuter au chargement
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', updateApiConfig);
-} else {
-    updateApiConfig();
-}
+let APP_STATE = {
+    selectedDraw: 'tn_matin',
+    selectedDraws: ['tn_matin'],
+    multiDrawMode: false,
+    selectedGame: 'borlette',
+    currentCart: [],
+    ticketsHistory: [],
+    winningTickets: [],
+    winningResults: [],
+    lotto4Options: [true, true, true],
+    lotto5Options: [true, true, true],
+    showNumericChips: false,
+    showLottoGames: false,
+    showSpecialGames: false,
+    currentTab: 'home',
+    isDrawBlocked: false,
+    agentId: 'agent-01',
+    agentName: 'Agent-01',
+    lotteryConfig: null
+};
