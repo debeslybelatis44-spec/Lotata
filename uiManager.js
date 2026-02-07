@@ -148,12 +148,12 @@ async function loadReports() {
             totalTickets = APP_STATE.ticketsHistory.length;
             
             APP_STATE.ticketsHistory.forEach(ticket => {
-                const ticketAmount = ticket.total_amount || 0;
+                const ticketAmount = parseFloat(ticket.total_amount) || 0;
                 totalBets += ticketAmount;
                 
                 if (ticket.checked) {
                     if (ticket.win_amount && ticket.win_amount > 0) {
-                        totalWins += ticket.win_amount;
+                        totalWins += parseFloat(ticket.win_amount) || 0;
                     } else {
                         totalLoss += ticketAmount;
                     }
@@ -170,12 +170,12 @@ async function loadReports() {
         console.log('- Total Pertes:', totalLoss);
         console.log('- Bénéfice Net:', totalProfit);
         
-        // CORRECTION: Afficher les vrais totaux
+        // CORRECTION: Afficher les vrais totaux avec formatage correct
         document.getElementById('total-tickets').textContent = totalTickets;
-        document.getElementById('total-bets').textContent = totalBets.toLocaleString() + ' Gdes';
-        document.getElementById('total-wins').textContent = totalWins.toLocaleString() + ' Gdes';
-        document.getElementById('total-loss').textContent = totalLoss.toLocaleString() + ' Gdes';
-        document.getElementById('balance').textContent = totalProfit.toLocaleString() + ' Gdes';
+        document.getElementById('total-bets').textContent = totalBets.toLocaleString('fr-FR') + ' Gdes';
+        document.getElementById('total-wins').textContent = totalWins.toLocaleString('fr-FR') + ' Gdes';
+        document.getElementById('total-loss').textContent = totalLoss.toLocaleString('fr-FR') + ' Gdes';
+        document.getElementById('balance').textContent = totalProfit.toLocaleString('fr-FR') + ' Gdes';
         document.getElementById('balance').style.color = (totalProfit >= 0) ? 'var(--success)' : 'var(--danger)';
         
         // Remplir le sélecteur de tirage
@@ -208,21 +208,25 @@ async function loadDrawReport(drawId = null) {
         const selectedDrawId = drawId || document.getElementById('draw-report-selector').value;
         
         if (selectedDrawId === 'all') {
-            // Copier les valeurs générales
-            const totalTickets = document.getElementById('total-tickets').textContent;
-            const totalBets = document.getElementById('total-bets').textContent;
-            const totalWins = document.getElementById('total-wins').textContent;
-            const totalLoss = document.getElementById('total-loss').textContent;
-            const balance = document.getElementById('balance').textContent;
-            const balanceColor = document.getElementById('balance').style.color;
+            // Copier les valeurs générales - CORRECTION: utiliser directement les valeurs calculées
+            const totalTickets = parseInt(document.getElementById('total-tickets').textContent) || 0;
+            const totalBetsText = document.getElementById('total-bets').textContent;
+            const totalWinsText = document.getElementById('total-wins').textContent;
+            const totalLossText = document.getElementById('total-loss').textContent;
+            
+            // Extraire les valeurs numériques du texte
+            const totalBets = parseFloat(totalBetsText.replace(/[^0-9.]/g, '')) || 0;
+            const totalWins = parseFloat(totalWinsText.replace(/[^0-9.]/g, '')) || 0;
+            const totalLoss = parseFloat(totalLossText.replace(/[^0-9.]/g, '')) || 0;
+            const balance = totalBets - totalWins;
             
             document.getElementById('draw-report-card').style.display = 'block';
             document.getElementById('draw-total-tickets').textContent = totalTickets;
-            document.getElementById('draw-total-bets').textContent = totalBets;
-            document.getElementById('draw-total-wins').textContent = totalWins;
-            document.getElementById('draw-total-loss').textContent = totalLoss;
-            document.getElementById('draw-balance').textContent = balance;
-            document.getElementById('draw-balance').style.color = balanceColor;
+            document.getElementById('draw-total-bets').textContent = totalBets.toLocaleString('fr-FR') + ' Gdes';
+            document.getElementById('draw-total-wins').textContent = totalWins.toLocaleString('fr-FR') + ' Gdes';
+            document.getElementById('draw-total-loss').textContent = totalLoss.toLocaleString('fr-FR') + ' Gdes';
+            document.getElementById('draw-balance').textContent = balance.toLocaleString('fr-FR') + ' Gdes';
+            document.getElementById('draw-balance').style.color = (balance >= 0) ? 'var(--success)' : 'var(--danger)';
         } else {
             // Calculer pour un tirage spécifique
             const drawTickets = APP_STATE.ticketsHistory.filter(t => t.draw_id === selectedDrawId);
@@ -233,12 +237,12 @@ async function loadDrawReport(drawId = null) {
             let drawTotalLoss = 0;
             
             drawTickets.forEach(ticket => {
-                const ticketAmount = ticket.total_amount || 0;
+                const ticketAmount = parseFloat(ticket.total_amount) || 0;
                 drawTotalBets += ticketAmount;
                 
                 if (ticket.checked) {
                     if (ticket.win_amount && ticket.win_amount > 0) {
-                        drawTotalWins += ticket.win_amount;
+                        drawTotalWins += parseFloat(ticket.win_amount) || 0;
                     } else {
                         drawTotalLoss += ticketAmount;
                     }
@@ -249,10 +253,10 @@ async function loadDrawReport(drawId = null) {
             
             document.getElementById('draw-report-card').style.display = 'block';
             document.getElementById('draw-total-tickets').textContent = drawTotalTickets;
-            document.getElementById('draw-total-bets').textContent = drawTotalBets.toLocaleString() + ' Gdes';
-            document.getElementById('draw-total-wins').textContent = drawTotalWins.toLocaleString() + ' Gdes';
-            document.getElementById('draw-total-loss').textContent = drawTotalLoss.toLocaleString() + ' Gdes';
-            document.getElementById('draw-balance').textContent = drawProfit.toLocaleString() + ' Gdes';
+            document.getElementById('draw-total-bets').textContent = drawTotalBets.toLocaleString('fr-FR') + ' Gdes';
+            document.getElementById('draw-total-wins').textContent = drawTotalWins.toLocaleString('fr-FR') + ' Gdes';
+            document.getElementById('draw-total-loss').textContent = drawTotalLoss.toLocaleString('fr-FR') + ' Gdes';
+            document.getElementById('draw-balance').textContent = drawProfit.toLocaleString('fr-FR') + ' Gdes';
             document.getElementById('draw-balance').style.color = (drawProfit >= 0) ? 'var(--success)' : 'var(--danger)';
         }
         
@@ -291,13 +295,13 @@ function printReport() {
     let analyzedTotalLoss = 0;
     
     ticketsToAnalyze.forEach(ticket => {
-        analyzedTotalBets += ticket.total_amount || 0;
+        analyzedTotalBets += parseFloat(ticket.total_amount) || 0;
         
         if (ticket.checked) {
             if (ticket.win_amount && ticket.win_amount > 0) {
-                analyzedTotalWins += ticket.win_amount;
+                analyzedTotalWins += parseFloat(ticket.win_amount) || 0;
             } else {
-                analyzedTotalLoss += ticket.total_amount || 0;
+                analyzedTotalLoss += parseFloat(ticket.total_amount) || 0;
             }
         }
     });
@@ -316,10 +320,10 @@ function printReport() {
             <p>• Tikè an Atant: ${totalPending}</p>
             <hr>
             <p><strong>Statistik Finansye:</strong></p>
-            <p>Total Paris (Antre Lajan): ${analyzedTotalBets.toLocaleString()} Gdes</p>
-            <p>Total pou peye (Ganyen): ${analyzedTotalWins.toLocaleString()} Gdes</p>
-            <p>Total Retni (Pèdi): ${analyzedTotalLoss.toLocaleString()} Gdes</p>
-            <p><strong>Balans Net: ${analyzedProfit.toLocaleString()} Gdes</strong></p>
+            <p>Total Paris (Antre Lajan): ${analyzedTotalBets.toLocaleString('fr-FR')} Gdes</p>
+            <p>Total pou peye (Ganyen): ${analyzedTotalWins.toLocaleString('fr-FR')} Gdes</p>
+            <p>Total Retni (Pèdi): ${analyzedTotalLoss.toLocaleString('fr-FR')} Gdes</p>
+            <p><strong>Balans Net: ${analyzedProfit.toLocaleString('fr-FR')} Gdes</strong></p>
         `;
     } else {
         reportData = `
@@ -333,10 +337,10 @@ function printReport() {
             <p>• Tikè an Atant: ${totalPending}</p>
             <hr>
             <p><strong>Statistik Finansye:</strong></p>
-            <p>Total Paris (Antre Lajan): ${analyzedTotalBets.toLocaleString()} Gdes</p>
-            <p>Total pou peye (Ganyen): ${analyzedTotalWins.toLocaleString()} Gdes</p>
-            <p>Total Retni (Pèdi): ${analyzedTotalLoss.toLocaleString()} Gdes</p>
-            <p><strong>Balans Net: ${analyzedProfit.toLocaleString()} Gdes</strong></p>
+            <p>Total Paris (Antre Lajan): ${analyzedTotalBets.toLocaleString('fr-FR')} Gdes</p>
+            <p>Total pou peye (Ganyen): ${analyzedTotalWins.toLocaleString('fr-FR')} Gdes</p>
+            <p>Total Retni (Pèdi): ${analyzedTotalLoss.toLocaleString('fr-FR')} Gdes</p>
+            <p><strong>Balans Net: ${analyzedProfit.toLocaleString('fr-FR')} Gdes</strong></p>
         `;
     }
     
@@ -412,20 +416,20 @@ function updateWinnersDisplay() {
     }
     
     const totalWins = APP_STATE.winningTickets.length;
-    const totalAmount = APP_STATE.winningTickets.reduce((sum, ticket) => sum + (ticket.win_amount || 0), 0);
+    const totalAmount = APP_STATE.winningTickets.reduce((sum, ticket) => sum + (parseFloat(ticket.win_amount) || 0), 0);
     const averageWin = totalAmount / totalWins;
     
     document.getElementById('total-winners-today').textContent = totalWins;
-    document.getElementById('total-winning-amount').textContent = totalAmount.toLocaleString() + ' Gdes';
-    document.getElementById('average-winning').textContent = averageWin.toFixed(2).toLocaleString() + ' Gdes';
+    document.getElementById('total-winning-amount').textContent = totalAmount.toLocaleString('fr-FR') + ' Gdes';
+    document.getElementById('average-winning').textContent = averageWin.toFixed(2).toLocaleString('fr-FR') + ' Gdes';
     
     container.innerHTML = APP_STATE.winningTickets.map(ticket => {
         const isPaid = ticket.paid || false;
         const winningResults = APP_STATE.winningResults.find(r => r.drawId === ticket.draw_id);
         const resultStr = winningResults ? winningResults.numbers.join(', ') : 'N/A';
         
-        const betAmount = ticket.bet_amount || 0;
-        const winAmount = ticket.win_amount || 0;
+        const betAmount = parseFloat(ticket.bet_amount) || 0;
+        const winAmount = parseFloat(ticket.win_amount) || 0;
         const netProfit = winAmount - betAmount;
         
         return `
@@ -439,10 +443,10 @@ function updateWinnersDisplay() {
                     </div>
                     <div style="text-align: right;">
                         <div style="font-weight: bold; color: var(--success); font-size: 1.1rem;">
-                            ${winAmount.toLocaleString()} Gdes
+                            ${winAmount.toLocaleString('fr-FR')} Gdes
                         </div>
                         <div style="font-size: 0.8rem; color: var(--text-dim);">
-                            (Mise: ${betAmount.toLocaleString()}G | Net: ${netProfit.toLocaleString()}G)
+                            (Mise: ${betAmount.toLocaleString('fr-FR')}G | Net: ${netProfit.toLocaleString('fr-FR')}G)
                         </div>
                     </div>
                 </div>
