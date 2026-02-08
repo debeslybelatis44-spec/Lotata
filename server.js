@@ -9,7 +9,6 @@ const morgan = require('morgan');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
-const fs = require('fs');
 
 // Configuration de l'application
 const app = express();
@@ -21,7 +20,8 @@ const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'lotato_pro_refresh
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
-    rejectUnauthorized: false
+    rejectUnauthorized: false,
+    sslmode: 'require'
   }
 });
 
@@ -40,8 +40,8 @@ app.use(morgan('combined'));
 
 // Limiter les requêtes
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limite chaque IP à 100 requêtes par fenêtre
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   message: 'Trop de requêtes depuis cette IP, veuillez réessayer plus tard.'
 });
 app.use('/api/auth', limiter);
@@ -215,7 +215,7 @@ app.post('/api/auth/refresh', authenticateRefreshToken, (req, res) => {
   });
 });
 
-// Routes des utilisateurs (Propriétaire seulement)
+// Routes des utilisateurs
 app.get('/api/users', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'owner') {
@@ -326,7 +326,6 @@ app.get('/api/users/:id', authenticateToken, async (req, res) => {
 
     const { id } = req.params;
     
-    // Chercher dans toutes les tables
     const queries = [
       pool.query('SELECT * FROM owner WHERE id = $1', [id]),
       pool.query('SELECT * FROM supervisors WHERE id = $1', [id]),
@@ -364,7 +363,6 @@ app.put('/api/users/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { name, email, phone, newPassword, commission, location, dailyLimit } = req.body;
 
-    // Trouver le type d'utilisateur
     const userResult = await pool.query(
       `SELECT 'owner' as role FROM owner WHERE id = $1
        UNION
@@ -513,7 +511,6 @@ app.get('/api/draws', authenticateToken, async (req, res) => {
     query += ' ORDER BY time';
     const result = await pool.query(query, values);
 
-    // Ajouter des statistiques simulées pour chaque tirage
     const drawsWithStats = result.rows.map(draw => ({
       ...draw,
       tickets: Math.floor(Math.random() * 1000),
@@ -541,7 +538,6 @@ app.get('/api/draws/:id', authenticateToken, async (req, res) => {
 
     const draw = result.rows[0];
     
-    // Ajouter des statistiques détaillées
     const statsResult = await pool.query(
       `SELECT 
         COUNT(*) as tickets_today,
@@ -581,7 +577,6 @@ app.post('/api/draws/publish', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Données de tirage invalides' });
     }
 
-    // Créer un ID unique pour le tirage
     const drawId = `${name.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`;
     const resultsJson = JSON.stringify(results);
 
@@ -778,7 +773,6 @@ app.get('/api/numbers/stats', authenticateToken, async (req, res) => {
   try {
     const { number } = req.query;
     
-    // Statistiques simulées pour l'exemple
     const stats = {};
     
     if (number) {
@@ -813,7 +807,6 @@ app.get('/api/reports/dashboard', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 
-    // Récupérer les statistiques
     const totalUsersResult = await pool.query(
       'SELECT COUNT(*) as count FROM agents WHERE NOT blocked'
     );
@@ -1180,7 +1173,6 @@ app.get('/api/users/export', authenticateToken, async (req, res) => {
   }
 });
 
-// Fonction utilitaire pour convertir en CSV
 function convertToCSV(data) {
   const headers = ['Type', 'ID', 'Nom', 'Email', 'Téléphone', 'Créé le', 'Statut'];
   const rows = [];
@@ -1212,57 +1204,7 @@ function convertToCSV(data) {
   return [headers, ...rows].map(row => row.join(',')).join('\n');
 }
 
-// Route pour les fichiers de démonstration (tirages externes)
-app.post('/api/draws/fetch', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.role !== 'owner') {
-      return res.status(403).json({ error: 'Accès refusé' });
-    }
-
-    const { source } = req.body;
-    
-    const mockResults = [
-      { name: 'Miami Matin', results: [12, 34, 56, 78, 90], luckyNumber: 5 },
-      { name: 'New York Soir', results: [11, 22, 33, 44, 55], luckyNumber: 10 }
-    ];
-
-    for (const result of mockResults) {
-      const drawId = `${result.name.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`;
-      
-      await pool.query(
-        `INSERT INTO draws (id, name, time, status, results, lucky_number, published_at, published_by, comment)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [
-          drawId,
-          result.name,
-          new Date().toTimeString().split(' ')[0],
-          'completed',
-          JSON.stringify(result.results),
-          result.luckyNumber,
-          new Date(),
-          req.user.name,
-          'Importé automatiquement'
-        ]
-      );
-    }
-
-    await logActivity('owner', req.user.id, 'IMPORT_TIRAGES', 
-      `${mockResults.length} tirages importés depuis ${source}`);
-
-    res.json({
-      success: true,
-      count: mockResults.length,
-      message: `${mockResults.length} tirages récupérés avec succès`,
-      results: mockResults
-    });
-
-  } catch (error) {
-    console.error('Erreur récupération tirages:', error);
-    res.status(500).json({ error: 'Erreur interne du serveur' });
-  }
-});
-
-// Routes supplémentaires de l'API
+// Routes supplémentaires
 app.get('/api/users/stats', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'owner') {
@@ -1416,14 +1358,12 @@ app.get('/api/draws/stats', authenticateToken, async (req, res) => {
   }
 });
 
-// Route pour les numéros limites
 app.get('/api/numbers/limits', authenticateToken, async (req, res) => {
   try {
-    // Pour l'instant, retourner des limites par défaut
     const limits = {};
     for (let i = 0; i < 100; i++) {
       const num = i.toString().padStart(2, '0');
-      limits[num] = 1000; // Limite par défaut de 1000 Gdes
+      limits[num] = 1000;
     }
 
     res.json(limits);
@@ -1441,9 +1381,6 @@ app.post('/api/numbers/limits', authenticateToken, async (req, res) => {
     }
 
     const { number, limit } = req.body;
-
-    // Ici, vous pourriez sauvegarder dans une table dédiée
-    // Pour l'instant, on retourne simplement un succès
 
     await logActivity('owner', req.user.id, 'MODIFICATION_LIMITE_NUMÉRO', 
       `Limite pour boule ${number}: ${limit} Gdes`);
@@ -1481,12 +1418,10 @@ app.put('/api/numbers/limits', authenticateToken, async (req, res) => {
   }
 });
 
-// Route de validation des règles
 app.post('/api/rules/validate', authenticateToken, async (req, res) => {
   try {
     const rules = req.body;
 
-    // Validation simple
     const errors = [];
     
     if (rules.maxBetPerNumber && rules.maxBetPerNumber < 0) {
@@ -1515,7 +1450,6 @@ app.post('/api/rules/validate', authenticateToken, async (req, res) => {
   }
 });
 
-// Route pour obtenir l'historique des numéros
 app.get('/api/numbers/history', authenticateToken, async (req, res) => {
   try {
     const { number, days = 30 } = req.query;
@@ -1524,7 +1458,6 @@ app.get('/api/numbers/history', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Numéro requis' });
     }
 
-    // Simuler des données d'historique
     const history = [];
     const now = new Date();
     
@@ -1545,7 +1478,6 @@ app.get('/api/numbers/history', authenticateToken, async (req, res) => {
   }
 });
 
-// Route pour exporter le journal d'activité
 app.get('/api/reports/export/activity', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'owner') {
@@ -1593,7 +1525,6 @@ function convertActivitiesToCSV(activities) {
   return [headers, ...rows].map(row => row.join(',')).join('\n');
 }
 
-// Route pour les paramètres de sauvegarde
 app.post('/api/settings/backup', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'owner') {
@@ -1638,7 +1569,6 @@ app.post('/api/settings/restore', authenticateToken, async (req, res) => {
   }
 });
 
-// Route pour les résultats des tirages
 app.get('/api/draws/results/:drawId', authenticateToken, async (req, res) => {
   try {
     const { drawId } = req.params;
@@ -1654,7 +1584,6 @@ app.get('/api/draws/results/:drawId', authenticateToken, async (req, res) => {
 
     const draw = result.rows[0];
 
-    // Récupérer les tickets pour ce tirage
     const ticketsResult = await pool.query(
       `SELECT t.*, a.name as agent_name
        FROM tickets t
@@ -1663,7 +1592,6 @@ app.get('/api/draws/results/:drawId', authenticateToken, async (req, res) => {
       [drawId]
     );
 
-    // Récupérer les gagnants
     const winnersResult = await pool.query(
       `SELECT w.*, t.ticket_number, a.name as agent_name
        FROM winners w
@@ -1688,7 +1616,6 @@ app.get('/api/draws/results/:drawId', authenticateToken, async (req, res) => {
   }
 });
 
-// Route pour programmer un tirage
 app.post('/api/draws/schedule', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'owner') {
@@ -1719,7 +1646,6 @@ app.post('/api/draws/schedule', authenticateToken, async (req, res) => {
   }
 });
 
-// Route pour créer une alerte
 app.post('/api/alerts', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'owner') {
@@ -1788,7 +1714,6 @@ app.delete('/api/alerts/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Routes pour le dashboard en temps réel
 app.get('/api/reports/dashboard/realtime', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'owner') {
@@ -1820,19 +1745,68 @@ app.get('/api/reports/dashboard/realtime', authenticateToken, async (req, res) =
   }
 });
 
-// Gestion des erreurs 404 pour API
-app.use('/api/*', (req, res) => {
-  res.status(404).json({ error: 'Route API non trouvée' });
+// Route pour les fichiers de démonstration
+app.post('/api/draws/fetch', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'owner') {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+
+    const { source } = req.body;
+    
+    const mockResults = [
+      { name: 'Miami Matin', results: [12, 34, 56, 78, 90], luckyNumber: 5 },
+      { name: 'New York Soir', results: [11, 22, 33, 44, 55], luckyNumber: 10 }
+    ];
+
+    for (const result of mockResults) {
+      const drawId = `${result.name.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`;
+      
+      await pool.query(
+        `INSERT INTO draws (id, name, time, status, results, lucky_number, published_at, published_by, comment)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [
+          drawId,
+          result.name,
+          new Date().toTimeString().split(' ')[0],
+          'completed',
+          JSON.stringify(result.results),
+          result.luckyNumber,
+          new Date(),
+          req.user.name,
+          'Importé automatiquement'
+        ]
+      );
+    }
+
+    await logActivity('owner', req.user.id, 'IMPORT_TIRAGES', 
+      `${mockResults.length} tirages importés depuis ${source}`);
+
+    res.json({
+      success: true,
+      count: mockResults.length,
+      message: `${mockResults.length} tirages récupérés avec succès`,
+      results: mockResults
+    });
+
+  } catch (error) {
+    console.error('Erreur récupération tirages:', error);
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
 });
 
-// Route par défaut pour servir index.html
+// Routes de base
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Route pour owner.html
 app.get('/owner.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'owner.html'));
+});
+
+// Gestion des erreurs 404
+app.use('/api/*', (req, res) => {
+  res.status(404).json({ error: 'Route API non trouvée' });
 });
 
 // Initialiser la base de données
@@ -1840,11 +1814,10 @@ async function initializeDatabase() {
   try {
     console.log('Connexion à la base de données...');
     
-    // Tester la connexion
     await pool.query('SELECT 1');
     console.log('✅ Connecté à la base de données');
     
-    // Créer les tables si elles n'existent pas
+    // Créer les tables
     await pool.query(`
       CREATE TABLE IF NOT EXISTS owner (
         id SERIAL PRIMARY KEY,
@@ -1957,58 +1930,75 @@ async function initializeDatabase() {
 
     console.log('✅ Tables créées ou déjà existantes');
 
-    // Insérer les données initiales
+    // Insérer les données initiales sans spécifier les IDs (laissez SERIAL gérer)
     const adminPassword = await bcrypt.hash('admin123', 10);
     const supervisorPassword = await bcrypt.hash('sup123', 10);
     const agentPassword = await bcrypt.hash('agent123', 10);
 
+    // D'abord insérer les superviseurs
+    await pool.query(`
+      INSERT INTO supervisors (username, password, name, email, phone) 
+      VALUES 
+        ('supervisor1', $1, 'Jean Pierre', 'jean@lotato.com', '3411-2233'),
+        ('supervisor2', $1, 'Marie Claire', 'marie@lotato.com', '3411-4455')
+      ON CONFLICT (username) DO NOTHING
+    `, [supervisorPassword]);
+
+    console.log('✅ Superviseurs insérés');
+
+    // Ensuite insérer le propriétaire
     await pool.query(`
       INSERT INTO owner (username, password, name, email) 
       VALUES ('admin', $1, 'Administrateur Propriétaire', 'admin@lotato.com')
-      ON CONFLICT (username) DO NOTHING;
+      ON CONFLICT (username) DO NOTHING
     `, [adminPassword]);
 
-    await pool.query(`
-      INSERT INTO supervisors (username, password, name, email, phone) VALUES
-      ('supervisor1', $1, 'Jean Pierre', 'jean@lotato.com', '3411-2233'),
-      ('supervisor2', $1, 'Marie Claire', 'marie@lotato.com', '3411-4455')
-      ON CONFLICT (username) DO NOTHING;
-    `, [supervisorPassword]);
+    console.log('✅ Propriétaire inséré');
 
+    // Ensuite insérer les agents avec les bons IDs de superviseurs
     await pool.query(`
-      INSERT INTO agents (username, password, name, supervisor_id, location, commission) VALUES
-      ('agent001', $1, 'Marc Antoine', 1, 'Port-au-Prince', 5.00),
-      ('agent002', $1, 'Sophie Bernard', 1, 'Delmas', 5.00),
-      ('agent003', $1, 'Robert Pierre', 2, 'Pétion-Ville', 5.00)
-      ON CONFLICT (username) DO NOTHING;
+      INSERT INTO agents (username, password, name, supervisor_id, location, commission) 
+      VALUES 
+        ('agent001', $1, 'Marc Antoine', 1, 'Port-au-Prince', 5.00),
+        ('agent002', $1, 'Sophie Bernard', 1, 'Delmas', 5.00),
+        ('agent003', $1, 'Robert Pierre', 2, 'Pétion-Ville', 5.00)
+      ON CONFLICT (username) DO NOTHING
     `, [agentPassword]);
 
+    console.log('✅ Agents insérés');
+
+    // Insérer les tirages
     await pool.query(`
-      INSERT INTO draws (id, name, time, status) VALUES
-      ('mia_matin', 'Miami Matin', '13:30', 'scheduled'),
-      ('mia_soir', 'Miami Soir', '21:50', 'scheduled'),
-      ('ny_matin', 'New York Matin', '14:30', 'scheduled'),
-      ('ny_soir', 'New York Soir', '20:00', 'scheduled'),
-      ('ga_matin', 'Georgia Matin', '12:30', 'scheduled'),
-      ('ga_soir', 'Georgia Soir', '19:00', 'scheduled'),
-      ('tx_matin', 'Texas Matin', '11:30', 'scheduled'),
-      ('tx_soir', 'Texas Soir', '18:30', 'scheduled'),
-      ('tn_matin', 'Tunisia Matin', '10:00', 'scheduled'),
-      ('tn_soir', 'Tunisia Soir', '17:00', 'scheduled')
-      ON CONFLICT (id) DO NOTHING;
+      INSERT INTO draws (id, name, time, status) 
+      VALUES
+        ('mia_matin', 'Miami Matin', '13:30', 'scheduled'),
+        ('mia_soir', 'Miami Soir', '21:50', 'scheduled'),
+        ('ny_matin', 'New York Matin', '14:30', 'scheduled'),
+        ('ny_soir', 'New York Soir', '20:00', 'scheduled'),
+        ('ga_matin', 'Georgia Matin', '12:30', 'scheduled'),
+        ('ga_soir', 'Georgia Soir', '19:00', 'scheduled'),
+        ('tx_matin', 'Texas Matin', '11:30', 'scheduled'),
+        ('tx_soir', 'Texas Soir', '18:30', 'scheduled'),
+        ('tn_matin', 'Tunisia Matin', '10:00', 'scheduled'),
+        ('tn_soir', 'Tunisia Soir', '17:00', 'scheduled')
+      ON CONFLICT (id) DO NOTHING
     `);
 
+    console.log('✅ Tirages insérés');
+
+    // Configuration
     await pool.query(`
       INSERT INTO lottery_config (name, logo_url, address, phone, currency) 
       VALUES ('LOTATO PRO', '', '', '', 'Gdes')
-      ON CONFLICT (id) DO NOTHING;
+      ON CONFLICT (id) DO NOTHING
     `);
 
+    console.log('✅ Configuration insérée');
     console.log('✅ Données initiales insérées');
 
   } catch (error) {
     console.error('❌ Erreur d\'initialisation de la base de données:', error);
-    process.exit(1);
+    throw error;
   }
 }
 
