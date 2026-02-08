@@ -1,27 +1,830 @@
-{
-  "name": "lotato-pro",
-  "version": "1.0.0",
-  "description": "Système de gestion de loterie LOTATO PRO",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
-  },
-  "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5",
-    "bcryptjs": "^2.4.3",
-    "jsonwebtoken": "^9.0.2",
-    "pg": "^8.11.3",
-    "dotenv": "^16.3.1",
-    "morgan": "^1.10.0",
-    "helmet": "^7.0.0",
-    "express-rate-limit": "^7.1.5"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.1"
-  },
-  "engines": {
-    "node": ">=16.0.0"
+// server.js - Serveur Node.js pour LOTATO PRO
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const { Pool } = require('pg');
+const morgan = require('morgan');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const path = require('path');
+
+// Configuration de l'application
+const app = express();
+const PORT = process.env.PORT || 3000;
+const JWT_SECRET = process.env.JWT_SECRET || 'lotato_pro_secret_key_2024_change_in_production';
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'lotato_pro_refresh_secret_2024_change_in_production';
+
+// Configuration de la base de données Neon PostgreSQL
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false,
+    sslmode: 'require'
+  }
+});
+
+// Middleware
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false
+}));
+app.use(cors({
+  origin: process.env.CLIENT_URL || '*',
+  credentials: true
+}));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+app.use(morgan('combined'));
+
+// Limiter les requêtes
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: 'Trop de requêtes depuis cette IP, veuillez réessayer plus tard.'
+});
+app.use('/api/auth', limiter);
+
+// Servir les fichiers HTML/JS/CSS statiques depuis la racine
+app.use(express.static(__dirname));
+
+// Middleware d'authentification
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Token manquant' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: 'Token invalide' });
+    }
+    req.user = user;
+    next();
+  });
+};
+
+// Fonctions utilitaires
+const generateTokens = (user) => {
+  const accessToken = jwt.sign(
+    { 
+      id: user.id, 
+      username: user.username, 
+      role: user.role,
+      name: user.name 
+    }, 
+    JWT_SECRET, 
+    { expiresIn: '15m' }
+  );
+
+  const refreshToken = jwt.sign(
+    { 
+      id: user.id, 
+      username: user.username, 
+      role: user.role 
+    }, 
+    JWT_REFRESH_SECRET, 
+    { expiresIn: '7d' }
+  );
+
+  return { accessToken, refreshToken };
+};
+
+const logActivity = async (userType, userId, action, details = null) => {
+  try {
+    await pool.query(
+      'INSERT INTO activity_log (user_type, user_id, action, details) VALUES ($1, $2, $3, $4)',
+      [userType, userId, action, details]
+    );
+  } catch (error) {
+    console.error('Erreur lors de la journalisation:', error);
+  }
+};
+
+// Routes de santé
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// Routes d'authentification
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { username, password, role } = req.body;
+
+    let user;
+    let tableName;
+
+    switch (role) {
+      case 'owner':
+        tableName = 'owner';
+        break;
+      case 'supervisor':
+        tableName = 'supervisors';
+        break;
+      case 'agent':
+        tableName = 'agents';
+        break;
+      default:
+        return res.status(400).json({ error: 'Rôle invalide' });
+    }
+
+    const result = await pool.query(
+      `SELECT * FROM ${tableName} WHERE username = $1 OR email = $1`,
+      [username]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'Identifiants incorrects' });
+    }
+
+    user = result.rows[0];
+
+    const isValidPassword = await bcrypt.compare(password, user.password);
+    if (!isValidPassword) {
+      return res.status(401).json({ error: 'Identifiants incorrects' });
+    }
+
+    // Générer les tokens
+    const tokens = generateTokens({
+      id: user.id,
+      username: user.username,
+      role: role,
+      name: user.name
+    });
+
+    // Journaliser l'activité
+    await logActivity(role, user.id, 'CONNEXION', `Connexion ${role}`);
+
+    res.json({
+      success: true,
+      token: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      name: user.name,
+      role: role,
+      id: user.id
+    });
+
+  } catch (error) {
+    console.error('Erreur de connexion:', error);
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+// Route de vérification de token
+app.get('/api/auth/verify', authenticateToken, (req, res) => {
+  res.json({ 
+    valid: true, 
+    user: req.user,
+    message: 'Token valide' 
+  });
+});
+
+// Route de rafraîchissement de token
+app.post('/api/auth/refresh', async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    
+    if (!refreshToken) {
+      return res.status(401).json({ error: 'Refresh token manquant' });
+    }
+
+    const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET);
+    
+    // Regénérer les tokens
+    const tokens = generateTokens({
+      id: decoded.id,
+      username: decoded.username,
+      role: decoded.role
+    });
+
+    res.json({
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken
+    });
+  } catch (error) {
+    console.error('Erreur refresh token:', error);
+    res.status(403).json({ error: 'Refresh token invalide' });
+  }
+});
+
+// Route de déconnexion
+app.post('/api/auth/logout', authenticateToken, async (req, res) => {
+  try {
+    await logActivity(req.user.role, req.user.id, 'DÉCONNEXION');
+    res.json({ success: true, message: 'Déconnecté avec succès' });
+  } catch (error) {
+    console.error('Erreur de déconnexion:', error);
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+// Routes des utilisateurs (Propriétaire seulement)
+app.get('/api/users', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'owner') {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+
+    const supervisors = await pool.query(
+      'SELECT id, username, name, email, phone, created_at FROM supervisors ORDER BY name'
+    );
+
+    const agents = await pool.query(
+      `SELECT a.id, a.username, a.name, a.email, a.phone, a.location, a.commission, 
+              a.funds, a.online, a.blocked, a.last_activity, a.created_at,
+              s.name as supervisor_name, s.id as supervisor_id
+       FROM agents a
+       LEFT JOIN supervisors s ON a.supervisor_id = s.id
+       ORDER BY a.name`
+    );
+
+    res.json({
+      supervisors: supervisors.rows,
+      agents: agents.rows
+    });
+
+  } catch (error) {
+    console.error('Erreur récupération utilisateurs:', error);
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+// Route pour créer un utilisateur
+app.post('/api/users', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'owner') {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+
+    const { name, email, phone, password, role, supervisorId, location, commission } = req.body;
+
+    if (!name || !email || !phone || !password || !role) {
+      return res.status(400).json({ error: 'Données manquantes' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    let result;
+
+    if (role === 'supervisor') {
+      result = await pool.query(
+        `INSERT INTO supervisors (username, password, name, email, phone) 
+         VALUES ($1, $2, $3, $4, $5) 
+         RETURNING id, username, name, email, phone`,
+        [email.split('@')[0], hashedPassword, name, email, phone]
+      );
+    } else if (role === 'agent') {
+      if (!supervisorId) {
+        return res.status(400).json({ error: 'Superviseur requis pour un agent' });
+      }
+
+      result = await pool.query(
+        `INSERT INTO agents (username, password, name, email, phone, supervisor_id, location, commission) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+         RETURNING id, username, name, email, phone, location, commission`,
+        [
+          email.split('@')[0] || phone,
+          hashedPassword,
+          name,
+          email,
+          phone,
+          supervisorId,
+          location || 'Non spécifié',
+          commission || 5.00
+        ]
+      );
+    } else {
+      return res.status(400).json({ error: 'Rôle invalide' });
+    }
+
+    await logActivity('owner', req.user.id, 'CRÉATION_UTILISATEUR', `${role}: ${name}`);
+
+    res.json({
+      success: true,
+      message: `${role} créé avec succès`,
+      user: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Erreur création utilisateur:', error);
+    if (error.code === '23505') {
+      return res.status(400).json({ error: 'Cet email ou nom d\'utilisateur existe déjà' });
+    }
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+// Route pour obtenir un utilisateur par ID
+app.get('/api/users/:id', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'owner') {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+
+    const { id } = req.params;
+    
+    // Chercher dans toutes les tables
+    const ownerResult = await pool.query('SELECT * FROM owner WHERE id = $1', [id]);
+    if (ownerResult.rows.length > 0) {
+      const user = ownerResult.rows[0];
+      user.role = 'owner';
+      return res.json(user);
+    }
+
+    const supervisorResult = await pool.query('SELECT * FROM supervisors WHERE id = $1', [id]);
+    if (supervisorResult.rows.length > 0) {
+      const user = supervisorResult.rows[0];
+      user.role = 'supervisor';
+      return res.json(user);
+    }
+
+    const agentResult = await pool.query('SELECT * FROM agents WHERE id = $1', [id]);
+    if (agentResult.rows.length > 0) {
+      const user = agentResult.rows[0];
+      user.role = 'agent';
+      return res.json(user);
+    }
+
+    return res.status(404).json({ error: 'Utilisateur non trouvé' });
+
+  } catch (error) {
+    console.error('Erreur récupération utilisateur:', error);
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+// Route pour mettre à jour un utilisateur
+app.put('/api/users/:id', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'owner') {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+
+    const { id } = req.params;
+    const { name, email, phone, newPassword } = req.body;
+
+    // Détecter le type d'utilisateur
+    let userType = null;
+    let tableName = null;
+
+    const ownerCheck = await pool.query('SELECT id FROM owner WHERE id = $1', [id]);
+    if (ownerCheck.rows.length > 0) {
+      userType = 'owner';
+      tableName = 'owner';
+    } else {
+      const supervisorCheck = await pool.query('SELECT id FROM supervisors WHERE id = $1', [id]);
+      if (supervisorCheck.rows.length > 0) {
+        userType = 'supervisor';
+        tableName = 'supervisors';
+      } else {
+        const agentCheck = await pool.query('SELECT id FROM agents WHERE id = $1', [id]);
+        if (agentCheck.rows.length > 0) {
+          userType = 'agent';
+          tableName = 'agents';
+        } else {
+          return res.status(404).json({ error: 'Utilisateur non trouvé' });
+        }
+      }
+    }
+
+    // Construire la requête de mise à jour
+    let query = `UPDATE ${tableName} SET name = $1, email = $2, phone = $3`;
+    const values = [name, email, phone, id];
+    
+    if (newPassword) {
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      query += `, password = $4 WHERE id = $5 RETURNING *`;
+      values.splice(3, 0, hashedPassword);
+    } else {
+      query += ` WHERE id = $4 RETURNING *`;
+    }
+
+    const result = await pool.query(query, values);
+
+    await logActivity('owner', req.user.id, 'MODIFICATION_UTILISATEUR', `${userType}: ${name}`);
+
+    res.json({
+      success: true,
+      message: 'Utilisateur mis à jour',
+      user: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Erreur mise à jour utilisateur:', error);
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+// Route pour bloquer/débloquer un utilisateur
+app.patch('/api/users/:id/block', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'owner') {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+
+    const { id } = req.params;
+    const { blocked } = req.body;
+
+    const result = await pool.query(
+      'UPDATE agents SET blocked = $1 WHERE id = $2 RETURNING id, name, blocked',
+      [blocked, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Agent non trouvé' });
+    }
+
+    await logActivity('owner', req.user.id, 'BLOCAGE_UTILISATEUR', 
+      `${blocked ? 'Bloqué' : 'Débloqué'}: ${result.rows[0].name}`);
+
+    res.json({
+      success: true,
+      message: `Agent ${blocked ? 'bloqué' : 'débloqué'} avec succès`,
+      user: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Erreur blocage utilisateur:', error);
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+// Routes des tirages
+app.get('/api/draws', authenticateToken, async (req, res) => {
+  try {
+    const { status = 'all' } = req.query;
+    let query = 'SELECT * FROM draws';
+    let values = [];
+
+    if (status !== 'all') {
+      query += ' WHERE status = $1';
+      values.push(status);
+    }
+
+    query += ' ORDER BY time';
+    const result = await pool.query(query, values);
+
+    res.json(result.rows);
+
+  } catch (error) {
+    console.error('Erreur récupération tirages:', error);
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+// Route pour publier un tirage
+app.post('/api/draws/publish', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'owner') {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+
+    const { name, results, luckyNumber, comment } = req.body;
+
+    if (!name || !results || !Array.isArray(results) || results.length !== 5) {
+      return res.status(400).json({ error: 'Données de tirage invalides' });
+    }
+
+    const drawId = `${name.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`;
+    const resultsJson = JSON.stringify(results);
+
+    await pool.query(
+      `INSERT INTO draws (id, name, time, status, results, lucky_number, published_at, published_by, comment)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        drawId,
+        name,
+        new Date().toTimeString().split(' ')[0],
+        'completed',
+        resultsJson,
+        luckyNumber || null,
+        new Date(),
+        req.user.name,
+        comment || ''
+      ]
+    );
+
+    await logActivity('owner', req.user.id, 'PUBLICATION_TIRAGE', 
+      `${name}: ${results.join(', ')} ${luckyNumber ? `+ ${luckyNumber}` : ''}`);
+
+    res.json({
+      success: true,
+      message: 'Tirage publié avec succès',
+      drawId: drawId
+    });
+
+  } catch (error) {
+    console.error('Erreur publication tirage:', error);
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+// Routes des numéros
+app.get('/api/numbers', authenticateToken, async (req, res) => {
+  try {
+    const blockedResult = await pool.query(
+      'SELECT number FROM blocked_numbers ORDER BY number'
+    );
+
+    const blockedNumbers = blockedResult.rows.map(row => row.number);
+
+    res.json({
+      blocked: blockedNumbers,
+      limits: {},
+      stats: {}
+    });
+
+  } catch (error) {
+    console.error('Erreur récupération numéros:', error);
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+// Route pour bloquer un numéro
+app.post('/api/numbers/block', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'owner') {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+
+    const { number } = req.body;
+
+    if (!/^\d{2}$/.test(number)) {
+      return res.status(400).json({ error: 'Numéro invalide (doit être 2 chiffres)' });
+    }
+
+    await pool.query(
+      'INSERT INTO blocked_numbers (number) VALUES ($1) ON CONFLICT (number) DO NOTHING',
+      [number]
+    );
+
+    await logActivity('owner', req.user.id, 'BLOCAGE_NUMÉRO', `Boule ${number} bloqué`);
+
+    res.json({
+      success: true,
+      message: `Numéro ${number} bloqué avec succès`
+    });
+
+  } catch (error) {
+    console.error('Erreur blocage numéro:', error);
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+// Route pour débloquer des numéros
+app.post('/api/numbers/unblock', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'owner') {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+
+    const { numbers } = req.body;
+
+    if (!numbers || !Array.isArray(numbers) || numbers.length === 0) {
+      return res.status(400).json({ error: 'Aucun numéro spécifié' });
+    }
+
+    await pool.query(
+      'DELETE FROM blocked_numbers WHERE number = ANY($1)',
+      [numbers]
+    );
+
+    await logActivity('owner', req.user.id, 'DÉBLOCAGE_NUMÉRO', 
+      `${numbers.length} numéro(s) débloqué(s): ${numbers.join(', ')}`);
+
+    res.json({
+      success: true,
+      message: `${numbers.length} numéro(s) débloqué(s) avec succès`
+    });
+
+  } catch (error) {
+    console.error('Erreur déblocage numéro:', error);
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+// Routes des rapports
+app.get('/api/reports/dashboard', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'owner') {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+
+    // Récupérer les statistiques
+    const totalAgentsResult = await pool.query(
+      'SELECT COUNT(*) as count FROM agents'
+    );
+
+    const totalSupervisorsResult = await pool.query(
+      'SELECT COUNT(*) as count FROM supervisors'
+    );
+
+    const onlineUsersResult = await pool.query(
+      'SELECT COUNT(*) as count FROM agents WHERE online = true'
+    );
+
+    const totalBlocksResult = await pool.query(
+      'SELECT COUNT(*) as count FROM blocked_numbers'
+    );
+
+    const totalDrawsResult = await pool.query(
+      'SELECT COUNT(*) as count FROM draws WHERE status = $1',
+      ['completed']
+    );
+
+    res.json({
+      totalUsers: parseInt(totalAgentsResult.rows[0].count) + parseInt(totalSupervisorsResult.rows[0].count),
+      totalAgents: parseInt(totalAgentsResult.rows[0].count),
+      totalSupervisors: parseInt(totalSupervisorsResult.rows[0].count),
+      onlineUsers: parseInt(onlineUsersResult.rows[0].count),
+      totalSales: 0,
+      totalTickets: 0,
+      totalWins: 0,
+      totalBlocks: parseInt(totalBlocksResult.rows[0].count),
+      totalDraws: parseInt(totalDrawsResult.rows[0].count),
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Erreur dashboard:', error);
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+// Route pour l'activité
+app.get('/api/reports/activity', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'owner') {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+
+    const result = await pool.query(
+      'SELECT * FROM activity_log ORDER BY created_at DESC LIMIT 100'
+    );
+
+    const activities = result.rows.map(row => ({
+      id: row.id,
+      type: row.action.split('_')[0] || 'system',
+      message: row.action,
+      details: row.details,
+      timestamp: row.created_at,
+      user: 'Système'
+    }));
+
+    res.json(activities);
+
+  } catch (error) {
+    console.error('Erreur activité:', error);
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+// Route pour les paramètres
+app.get('/api/settings', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'owner') {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+
+    const result = await pool.query('SELECT * FROM lottery_config LIMIT 1');
+    
+    let settings = result.rows[0];
+    if (!settings) {
+      settings = {
+        name: 'LOTATO PRO',
+        logo_url: '',
+        address: '',
+        phone: '',
+        currency: 'Gdes'
+      };
+    }
+
+    res.json(settings);
+
+  } catch (error) {
+    console.error('Erreur paramètres:', error);
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+// Route pour mettre à jour les paramètres
+app.put('/api/settings', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'owner') {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+
+    const { name, logo_url, address, phone, currency } = req.body;
+
+    const result = await pool.query(
+      `INSERT INTO lottery_config (name, logo_url, address, phone, currency, updated_at)
+       VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+       ON CONFLICT (id) DO UPDATE 
+       SET name = $1, logo_url = $2, address = $3, phone = $4, currency = $5, updated_at = CURRENT_TIMESTAMP
+       RETURNING *`,
+      [name, logo_url, address, phone, currency]
+    );
+
+    await logActivity('owner', req.user.id, 'MODIFICATION_PARAMÈTRES', 
+      `Configuration mise à jour: ${name}`);
+
+    res.json({
+      success: true,
+      message: 'Paramètres mis à jour avec succès',
+      settings: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Erreur mise à jour paramètres:', error);
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+// Route pour les alertes
+app.get('/api/alerts', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'owner') {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+
+    // Alertes simulées
+    const alerts = [
+      {
+        id: 1,
+        type: 'info',
+        title: 'Bienvenue',
+        message: 'Système LOTATO PRO initialisé avec succès',
+        timestamp: new Date().toISOString(),
+        read: false
+      }
+    ];
+
+    res.json(alerts);
+
+  } catch (error) {
+    console.error('Erreur alertes:', error);
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+// Routes de base
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+app.get('/owner.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'owner.html'));
+});
+
+// Gestion des erreurs 404
+app.use('/api/*', (req, res) => {
+  res.status(404).json({ error: 'Route API non trouvée' });
+});
+
+// Gestionnaire d'erreurs global
+app.use((err, req, res, next) => {
+  console.error('Erreur serveur:', err.stack);
+  res.status(500).json({ 
+    error: 'Erreur interne du serveur',
+    message: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
+});
+
+// Initialiser la base de données
+async function initializeDatabase() {
+  try {
+    console.log('Connexion à la base de données...');
+    
+    await pool.query('SELECT 1');
+    console.log('✅ Connecté à la base de données');
+    
+    console.log('✅ Initialisation de la base de données terminée');
+
+  } catch (error) {
+    console.error('❌ Erreur de connexion à la base de données:', error.message);
+    // Ne pas quitter, essayer de continuer sans base de données
+    console.log('⚠️  Mode dégradé: certaines fonctionnalités peuvent ne pas être disponibles');
   }
 }
+
+// Démarrer le serveur
+async function startServer() {
+  try {
+    await initializeDatabase();
+    
+    app.listen(PORT, () => {
+      console.log(`✅ Serveur LOTATO PRO démarré sur le port ${PORT}`);
+      console.log(`🌐 URL: http://localhost:${PORT}`);
+      console.log(`📊 Interface propriétaire: http://localhost:${PORT}/owner.html`);
+      console.log(`🔐 Interface de connexion: http://localhost:${PORT}/`);
+      console.log(`🚀 API: http://localhost:${PORT}/api/health`);
+    });
+  } catch (error) {
+    console.error('❌ Impossible de démarrer le serveur:', error);
+    process.exit(1);
+  }
+}
+
+startServer();
