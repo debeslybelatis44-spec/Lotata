@@ -42,9 +42,21 @@ async function loadHistory() {
         const container = document.getElementById('history-container');
         container.innerHTML = '<div class="empty-msg">Chajman...</div>';
         
-        await APIService.getTickets();
+        // Récupérer et stocker les tickets
+        const tickets = await APIService.getTickets();
+        APP_STATE.ticketsHistory = tickets || [];
+        
+        console.log('Tickets chargés:', tickets);
+        console.log('Nombre de tickets:', tickets ? tickets.length : 0);
+        if (tickets && tickets.length > 0) {
+            console.log('Exemple de ticket:', tickets[0]);
+            console.log('ID du ticket:', tickets[0].id);
+            console.log('ticket_id du ticket:', tickets[0].ticket_id);
+        }
+        
         renderHistory();
     } catch (error) {
+        console.error('Erreur chargement historique:', error);
         document.getElementById('history-container').innerHTML = 
             '<div class="empty-msg">Erè chajman istorik</div>';
     }
@@ -53,12 +65,15 @@ async function loadHistory() {
 function renderHistory() {
     const container = document.getElementById('history-container');
     
-    if (APP_STATE.ticketsHistory.length === 0) {
+    if (!APP_STATE.ticketsHistory || APP_STATE.ticketsHistory.length === 0) {
         container.innerHTML = '<div class="empty-msg">Pa gen tikè nan istorik</div>';
         return;
     }
     
     container.innerHTML = APP_STATE.ticketsHistory.map(ticket => {
+        // S'assurer que l'ID du ticket est correct
+        const ticketId = ticket.id || ticket.ticket_id || 'unknown';
+        
         let status = '';
         let statusClass = '';
         
@@ -85,7 +100,7 @@ function renderHistory() {
         return `
             <div class="history-card">
                 <div class="card-header">
-                    <span>#${ticket.ticket_id || ticket.id}</span>
+                    <span>#${ticket.ticket_id || ticket.id || 'N/A'}</span>
                     <span>${new Date(ticket.date).toLocaleDateString('fr-FR')} ${new Date(ticket.date).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}</span>
                 </div>
                 <div>
@@ -96,10 +111,10 @@ function renderHistory() {
                 <div class="card-footer">
                     <span class="badge ${statusClass}">${status}</span>
                     <div style="display: flex; gap: 5px;">
-                        <button class="btn-small" onclick="viewTicketDetails('${ticket.id}')">
+                        <button class="btn-small" onclick="viewTicketDetails('${ticketId}')">
                             <i class="fas fa-eye"></i> Detay
                         </button>
-                        <button class="delete-history-btn" onclick="deleteTicket('${ticket.id}')" ${canDelete ? '' : 'disabled'}>
+                        <button class="delete-history-btn" onclick="deleteTicket('${ticketId}')" ${canDelete ? '' : 'disabled'}>
                             <i class="fas fa-trash"></i> Efase
                         </button>
                     </div>
@@ -114,7 +129,9 @@ async function deleteTicket(ticketId) {
     
     try {
         await APIService.deleteTicket(ticketId);
-        APP_STATE.ticketsHistory = APP_STATE.ticketsHistory.filter(t => t.id !== ticketId);
+        APP_STATE.ticketsHistory = APP_STATE.ticketsHistory.filter(t => 
+            (t.id !== ticketId && t.ticket_id !== ticketId)
+        );
         renderHistory();
         alert('Tikè efase ak siksè!');
     } catch (error) {
@@ -126,7 +143,9 @@ async function deleteTicket(ticketId) {
 async function loadReports() {
     try {
         // Charger les tickets et rapports depuis l'API
-        await APIService.getTickets();
+        const tickets = await APIService.getTickets();
+        APP_STATE.ticketsHistory = tickets || [];
+        
         const reports = await APIService.getReports();
         
         console.log('Données rapport API:', reports);
@@ -489,11 +508,20 @@ async function markAsPaid(ticketId) {
 }
 
 function viewTicketDetails(ticketId) {
-    const ticket = APP_STATE.ticketsHistory.find(t => t.id === ticketId);
+    console.log('Recherche ticket avec ID:', ticketId);
+    console.log('Tickets disponibles dans APP_STATE:', APP_STATE.ticketsHistory);
+    
+    // Recherche par id ou ticket_id
+    const ticket = APP_STATE.ticketsHistory.find(t => 
+        t.id === ticketId || t.ticket_id === ticketId
+    );
+    
     if (!ticket) {
-        alert("Tikè pa jwenn!");
+        alert(`Tikè pa jwenn! ID: ${ticketId}`);
         return;
     }
+    
+    console.log('Ticket trouvé:', ticket);
     
     let details = `
         <h3>Detay Tikè #${ticket.ticket_id || ticket.id}</h3>
