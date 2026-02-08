@@ -443,6 +443,215 @@ app.get('/api/supervisor/agents', authenticateToken, async (req, res) => {
   }
 });
 
+// ============= NOUVELLES ROUTES SUPERVISEURS =============
+
+// Statistiques d'un agent spécifique
+app.get('/api/reports/agent/:agentId', authenticateToken, async (req, res) => {
+  try {
+    const { agentId } = req.params;
+    
+    // Récupérer les statistiques de l'agent
+    const statsResult = await pool.query(`
+      SELECT 
+        COUNT(*) as total_tickets,
+        COALESCE(SUM(total_amount), 0) as total_bets,
+        COALESCE(SUM(win_amount), 0) as total_wins
+      FROM tickets 
+      WHERE agent_id = $1 AND DATE(date) = CURRENT_DATE
+    `, [agentId]);
+    
+    const stats = statsResult.rows[0] || { total_tickets: 0, total_bets: 0, total_wins: 0 };
+    
+    res.json({
+      stats: {
+        totalBets: parseFloat(stats.total_bets),
+        totalTickets: parseInt(stats.total_tickets),
+        totalWins: parseFloat(stats.total_wins)
+      }
+    });
+    
+  } catch (error) {
+    console.error('Erreur récupération statistiques agent:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Rapports du superviseur
+app.get('/api/reports/supervisor', authenticateToken, async (req, res) => {
+  try {
+    const { period } = req.query;
+    
+    // Vérifier le rôle
+    if (req.user.role !== 'supervisor' && req.user.role !== 'owner') {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+    
+    let dateCondition = 'DATE(date) = CURRENT_DATE';
+    if (period === 'yesterday') {
+      dateCondition = 'DATE(date) = CURRENT_DATE - INTERVAL \'1 day\'';
+    } else if (period === 'week') {
+      dateCondition = 'date >= CURRENT_DATE - INTERVAL \'7 days\'';
+    } else if (period === 'month') {
+      dateCondition = 'date >= CURRENT_DATE - INTERVAL \'30 days\'';
+    }
+    
+    // Pour un superviseur, récupérer les statistiques de tous ses agents
+    const supervisorId = req.user.id.replace('supervisor-', '');
+    
+    // Récupérer les IDs des agents de ce superviseur
+    const agentsResult = await pool.query(
+      'SELECT id FROM agents WHERE supervisor_id = $1 AND active = true',
+      [parseInt(supervisorId)]
+    );
+    
+    const agentIds = agentsResult.rows.map(row => row.id.toString());
+    
+    let report = {
+      totalSales: 0,
+      totalTickets: 0,
+      totalWins: 0,
+      activeAgents: agentIds.length
+    };
+    
+    if (agentIds.length > 0) {
+      const statsResult = await pool.query(`
+        SELECT 
+          COUNT(*) as total_tickets,
+          COALESCE(SUM(total_amount), 0) as total_bets,
+          COALESCE(SUM(win_amount), 0) as total_wins
+        FROM tickets 
+        WHERE agent_id = ANY($1::text[]) AND ${dateCondition}
+      `, [agentIds]);
+      
+      const stats = statsResult.rows[0] || { total_tickets: 0, total_bets: 0, total_wins: 0 };
+      
+      report.totalSales = parseFloat(stats.total_bets);
+      report.totalTickets = parseInt(stats.total_tickets);
+      report.totalWins = parseFloat(stats.total_wins);
+    }
+    
+    res.json({ report });
+    
+  } catch (error) {
+    console.error('Erreur récupération rapports superviseur:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Gagnants du superviseur
+app.get('/api/winners/supervisor', authenticateToken, async (req, res) => {
+  try {
+    // Vérifier le rôle
+    if (req.user.role !== 'supervisor' && req.user.role !== 'owner') {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+    
+    const supervisorId = req.user.id.replace('supervisor-', '');
+    
+    // Récupérer les IDs des agents de ce superviseur
+    const agentsResult = await pool.query(
+      'SELECT id FROM agents WHERE supervisor_id = $1 AND active = true',
+      [parseInt(supervisorId)]
+    );
+    
+    const agentIds = agentsResult.rows.map(row => row.id.toString());
+    
+    let winners = [];
+    
+    if (agentIds.length > 0) {
+      const winnersResult = await pool.query(`
+        SELECT t.*, a.name as agent_name
+        FROM tickets t
+        LEFT JOIN agents a ON t.agent_id = a.id::text
+        WHERE t.win_amount > 0 AND t.agent_id = ANY($1::text[])
+        ORDER BY t.date DESC
+        LIMIT 20
+      `, [agentIds]);
+      
+      winners = winnersResult.rows.map(row => ({
+        ...row,
+        ticket_id: row.ticket_id || row.id,
+        win_amount: row.win_amount || 0,
+        agent_name: row.agent_name || 'Agent Inconnu',
+        draw_name: row.draw_name || 'Tirage'
+      }));
+    }
+    
+    res.json({ winners });
+    
+  } catch (error) {
+    console.error('Erreur récupération gagnants superviseur:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Paramètres du superviseur
+app.get('/api/supervisor/settings', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'supervisor' && req.user.role !== 'owner') {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+    
+    const supervisorId = req.user.id.replace('supervisor-', '');
+    
+    // Récupérer les informations du superviseur
+    const result = await pool.query(
+      'SELECT name, email, phone FROM supervisors WHERE id = $1',
+      [parseInt(supervisorId)]
+    );
+    
+    let supervisorData = {};
+    
+    if (result.rows.length === 0) {
+      // Données par défaut pour le développement
+      supervisorData = {
+        name: req.user.name || 'Superviseur Test',
+        email: 'supervisor@test.com',
+        phone: '+509XXXXXXXX',
+        email_notifications: 'all'
+      };
+    } else {
+      const supervisor = result.rows[0];
+      supervisorData = {
+        name: supervisor.name,
+        email: supervisor.email,
+        phone: supervisor.phone,
+        email_notifications: 'all'
+      };
+    }
+    
+    res.json(supervisorData);
+    
+  } catch (error) {
+    console.error('Erreur récupération paramètres superviseur:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Mettre à jour les paramètres du superviseur
+app.put('/api/supervisor/settings', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'supervisor' && req.user.role !== 'owner') {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+    
+    const supervisorId = req.user.id.replace('supervisor-', '');
+    const { email, phone, email_notifications } = req.body;
+    
+    // Mettre à jour les informations du superviseur
+    await pool.query(
+      'UPDATE supervisors SET email = $1, phone = $2, updated_at = NOW() WHERE id = $3',
+      [email, phone, parseInt(supervisorId)]
+    );
+    
+    res.json({ success: true, message: 'Paramètres mis à jour' });
+    
+  } catch (error) {
+    console.error('Erreur mise à jour paramètres superviseur:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 // Récupérer les tickets d'un agent spécifique
 app.get('/api/tickets/agent/:agentId', authenticateToken, async (req, res) => {
   try {
