@@ -438,8 +438,14 @@ app.get('/api/reports/dashboard', async (req, res) => {
     // Tirages actifs
     const activeDraws = await pool.query('SELECT COUNT(*) FROM draws WHERE active = true');
     
-    // En ligne simulation
-    const onlineUsers = Math.floor(Math.random() * 10) + 5;
+    // En ligne
+    const onlineUsers = await pool.query(`
+      SELECT COUNT(*) as online_count FROM (
+        SELECT id FROM supervisors WHERE active = true
+        UNION ALL
+        SELECT id FROM agents WHERE active = true
+      ) as users
+    `);
     
     res.json({
       totalUsers: parseInt(agentsCount.rows[0].count) + parseInt(supervisorsCount.rows[0].count),
@@ -448,7 +454,7 @@ app.get('/api/reports/dashboard', async (req, res) => {
       totalWins: parseFloat(ticketsToday.rows[0].total_wins) || 0,
       totalBlocks: parseInt(blockedNumbers.rows[0].count) || 0,
       totalDraws: parseInt(activeDraws.rows[0].count) || 0,
-      onlineUsers: onlineUsers
+      onlineUsers: parseInt(onlineUsers.rows[0].online_count) || 0
     });
   } catch (error) {
     console.error('Erreur dashboard:', error);
@@ -534,7 +540,7 @@ app.get('/api/users', async (req, res) => {
           email: s.email,
           phone: s.phone,
           blocked: !s.active,
-          online: Math.random() > 0.5,
+          online: true,
           role: 'supervisor',
           createdAt: s.created_at,
           agentsCount: parseInt(s.agents_count),
@@ -577,7 +583,7 @@ app.get('/api/users', async (req, res) => {
           supervisorName: a.supervisor_name || 'Non assigné',
           supervisorId: a.supervisor_id,
           blocked: !a.active,
-          online: Math.random() > 0.5,
+          online: true,
           role: 'agent',
           createdAt: a.created_at,
           sales: parseFloat(statsResult.rows[0]?.total_sales) || 0,
@@ -621,7 +627,7 @@ app.get('/api/users', async (req, res) => {
           supervisorName: a.supervisor_name || 'Non assigné',
           supervisorId: a.supervisor_id,
           blocked: !a.active,
-          online: Math.random() > 0.5,
+          online: true,
           role: 'agent',
           createdAt: a.created_at,
           sales: parseFloat(statsResult.rows[0]?.total_sales) || 0,
@@ -671,7 +677,7 @@ app.get('/api/users/:id', async (req, res) => {
         supervisorName: supervisorResult.rows[0]?.name || 'Non assigné',
         role: 'agent',
         blocked: !agent.active,
-        online: Math.random() > 0.5,
+        online: true,
         createdAt: agent.created_at,
         ticketsToday: parseInt(statsResult.rows[0]?.total_tickets) || 0,
         salesToday: parseFloat(statsResult.rows[0]?.total_sales) || 0,
@@ -703,7 +709,7 @@ app.get('/api/users/:id', async (req, res) => {
         phone: supervisor.phone,
         role: 'supervisor',
         blocked: !supervisor.active,
-        online: Math.random() > 0.5,
+        online: true,
         createdAt: supervisor.created_at,
         agentsCount: parseInt(agentsCount.rows[0].count),
         salesToday: parseFloat(salesResult.rows[0]?.total_sales) || 0
@@ -1072,8 +1078,14 @@ app.get('/api/users/stats', async (req, res) => {
       ) as new_users
     `);
     
-    // Utilisateurs en ligne (simulation)
-    const onlineUsers = Math.floor(Math.random() * 15) + 5;
+    // Utilisateurs en ligne
+    const onlineUsers = await pool.query(`
+      SELECT COUNT(*) as online_count FROM (
+        SELECT id FROM supervisors WHERE active = true
+        UNION ALL
+        SELECT id FROM agents WHERE active = true
+      ) as users
+    `);
     
     res.json({
       totalAgents: parseInt(totalAgents.rows[0].count),
@@ -1081,7 +1093,7 @@ app.get('/api/users/stats', async (req, res) => {
       blockedAgents: parseInt(blockedAgents.rows[0].count),
       blockedSupervisors: parseInt(blockedSupervisors.rows[0].count),
       newToday: parseInt(newToday.rows[0].new_today),
-      onlineUsers: onlineUsers,
+      onlineUsers: parseInt(onlineUsers.rows[0].online_count),
       totalUsers: parseInt(totalAgents.rows[0].count) + parseInt(totalSupervisors.rows[0].count)
     });
   } catch (error) {
@@ -2686,13 +2698,7 @@ app.get('/api/supervisor/auth/verify', authenticateToken, async (req, res) => {
     );
     
     if (result.rows.length === 0) {
-      // Retourner les informations de base pour le développement
-      return res.json({
-        id: 1,
-        name: req.user.name || 'Superviseur Test',
-        email: 'supervisor@test.com',
-        phone: '+509XXXXXXXX'
-      });
+      return res.status(404).json({ error: 'Superviseur non trouvé' });
     }
     
     const supervisor = result.rows[0];
@@ -2736,7 +2742,7 @@ app.get('/api/supervisor/agents', authenticateToken, async (req, res) => {
       location: agent.location,
       commission: parseFloat(agent.commission),
       active: agent.active,
-      online: Math.random() > 0.5,
+      online: true,
       ticketsToday: parseInt(agent.tickets_today) || 0,
       salesToday: parseFloat(agent.sales_today) || 0,
       supervisorId: agent.supervisor_id
