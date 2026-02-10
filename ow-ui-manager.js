@@ -31,13 +31,6 @@ class UIManager {
                 this.closeAllModals();
             }
         });
-        
-        // Écouteur pour les clics en dehors des modals
-        document.addEventListener('click', (e) => {
-            if (e.target.classList.contains('modal')) {
-                this.closeModal(e.target.id);
-            }
-        });
     }
 
     initResponsiveHandlers() {
@@ -77,7 +70,7 @@ class UIManager {
             item.classList.remove('active');
         });
         
-        const clickedItem = event.target.closest('.nav-item');
+        const clickedItem = event?.target?.closest('.nav-item');
         if (clickedItem) {
             clickedItem.classList.add('active');
         }
@@ -108,7 +101,7 @@ class UIManager {
             tab.classList.remove('active');
         });
         
-        if (event.target) {
+        if (event?.target) {
             event.target.classList.add('active');
         } else {
             // Si appelé programmatiquement, trouver le bon tab
@@ -129,7 +122,6 @@ class UIManager {
                 this.loadPublishHistory();
             } else if (tabName === 'auto') {
                 this.updateFetchStatus();
-                this.loadFetchLog();
             }
         }
     }
@@ -139,7 +131,7 @@ class UIManager {
             tab.classList.remove('active');
         });
         
-        if (event.target) {
+        if (event?.target) {
             event.target.classList.add('active');
         }
         
@@ -167,7 +159,7 @@ class UIManager {
             tab.classList.remove('active');
         });
         
-        if (event.target) {
+        if (event?.target) {
             event.target.classList.add('active');
         }
         
@@ -218,20 +210,12 @@ class UIManager {
 
     async loadDashboardData() {
         try {
-            const cachedData = this.stateManager.getCachedData('dashboard');
-            if (cachedData) {
-                this.stateManager.updateDashboardStats(cachedData);
-                this.renderRecentActivity();
-                return;
-            }
-            
             const data = await ApiService.getDashboardData();
-            this.stateManager.cacheData('dashboard', data);
             this.stateManager.updateDashboardStats(data);
             this.renderRecentActivity();
             
             // Charger les alertes
-            this.loadAlerts();
+            await this.loadAlerts();
             
         } catch (error) {
             console.error('Erreur chargement dashboard:', error);
@@ -264,7 +248,6 @@ class UIManager {
     loadPublishData() {
         this.updateResultPreview();
         this.updateFetchStatus();
-        this.loadFetchLog();
     }
 
     async loadNumbersData() {
@@ -307,13 +290,19 @@ class UIManager {
     }
 
     async loadLimitsData() {
-        // Implémentation spécifique pour les limites
-        this.renderLimitsView();
+        try {
+            const data = await ApiService.getSettings();
+            this.stateManager.setData('settings', data);
+            this.renderLimitsView();
+        } catch (error) {
+            console.error('Erreur chargement limites:', error);
+            this.showNotification('Erreur de chargement des limites', 'error');
+        }
     }
 
     async loadReportsData() {
         const tabName = this.stateManager.state.currentReportsTab;
-        this.loadReport(tabName);
+        await this.loadReport(tabName);
     }
 
     // Rendu des vues
@@ -330,10 +319,10 @@ class UIManager {
         container.innerHTML = recentActivities.map(activity => `
             <div class="activity-item">
                 <div class="activity-icon">
-                    <i class="fas fa-${this.getActivityIcon(activity.type)}"></i>
+                    <i class="fas fa-${this.getActivityIcon(activity.action)}"></i>
                 </div>
                 <div class="activity-content">
-                    <div class="activity-message">${activity.message}</div>
+                    <div class="activity-message">${activity.details || activity.action}</div>
                     <div class="activity-meta">
                         <span class="activity-time">${this.formatTime(new Date(activity.timestamp))}</span>
                         <span class="activity-user">• Par ${activity.user || 'Système'}</span>
@@ -350,7 +339,8 @@ class UIManager {
 
     renderSupervisors() {
         const container = document.getElementById('supervisors-container');
-        const supervisors = this.stateManager.getData('users').supervisors || [];
+        const usersData = this.stateManager.getData('users');
+        const supervisors = usersData?.supervisors || [];
         
         if (supervisors.length === 0) {
             container.innerHTML = '<p class="no-data">Aucun superviseur trouvé</p>';
@@ -362,7 +352,8 @@ class UIManager {
 
     renderAgents() {
         const container = document.getElementById('agents-container');
-        const agents = this.stateManager.getData('users').agents || [];
+        const usersData = this.stateManager.getData('users');
+        const agents = usersData?.agents || [];
         
         if (agents.length === 0) {
             container.innerHTML = '<p class="no-data">Aucun agent trouvé</p>';
@@ -373,8 +364,11 @@ class UIManager {
     }
 
     createUserCard(user, type) {
+        const isBlocked = user.blocked || !user.active;
+        const supervisorName = type === 'agent' ? (user.supervisorName || 'Non assigné') : null;
+        
         return `
-            <div class="user-card ${user.blocked ? 'blocked' : ''}">
+            <div class="user-card ${isBlocked ? 'blocked' : ''}">
                 <div class="user-header">
                     <div class="user-type type-${type}">${type === 'agent' ? 'AGENT' : 'SUPERVISEUR'}</div>
                     <div class="user-status">
@@ -389,7 +383,7 @@ class UIManager {
                         <p><strong>Email:</strong> ${user.email}</p>
                         <p><strong>Téléphone:</strong> ${user.phone}</p>
                         ${type === 'agent' ? 
-                            `<p><strong>Superviseur:</strong> ${user.supervisorName || 'Non assigné'}</p>
+                            `<p><strong>Superviseur:</strong> ${supervisorName}</p>
                              <p><strong>Commission:</strong> ${user.commission || 5}%</p>` :
                             `<p><strong>Agents:</strong> ${user.agentsCount || 0}</p>`
                         }
@@ -402,13 +396,13 @@ class UIManager {
                     </div>
                     <div class="user-stat">
                         <div class="stat-label">Depuis</div>
-                        <div class="stat-value">${new Date(user.createdAt).toLocaleDateString()}</div>
+                        <div class="stat-value">${user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</div>
                     </div>
                 </div>
                 <div class="user-actions">
-                    <button class="btn ${user.blocked ? 'btn-success' : 'btn-danger'} btn-small" 
-                            onclick="ownerManager.toggleUserBlock('${user.id}', ${!user.blocked})">
-                        ${user.blocked ? 'Débloquer' : 'Bloquer'}
+                    <button class="btn ${isBlocked ? 'btn-success' : 'btn-danger'} btn-small" 
+                            onclick="ownerManager.toggleUserBlock('${user.id}', ${!isBlocked})">
+                        ${isBlocked ? 'Débloquer' : 'Bloquer'}
                     </button>
                     <button class="btn btn-warning btn-small" onclick="ownerManager.editUser('${user.id}')">
                         Éditer
@@ -472,7 +466,6 @@ class UIManager {
 
     // Gestion des notifications
     showNotification(message, type = 'success', duration = 5000) {
-        // Ajouter à l'état
         const notification = this.stateManager.addNotification(message, type, duration);
         
         // Créer l'élément UI
@@ -677,19 +670,518 @@ class UIManager {
         }
     }
 
-    // Utilitaires
-    getActivityIcon(type) {
-        const icons = {
-            user: 'user',
-            draw: 'calendar-alt',
-            system: 'cog',
-            security: 'shield-alt',
-            financial: 'money-bill-wave',
-            warning: 'exclamation-triangle',
-            success: 'check-circle',
-            error: 'times-circle'
+    // Règles de jeu
+    async loadRulesView() {
+        try {
+            const rules = await ApiService.getRules();
+            this.renderRulesView(rules);
+        } catch (error) {
+            console.error('Erreur chargement règles:', error);
+            this.showNotification('Erreur de chargement des règles', 'error');
+        }
+    }
+
+    renderRulesView(rulesData) {
+        const financialContainer = document.getElementById('financial-rules');
+        const timeContainer = document.getElementById('time-rules');
+        const commissionContainer = document.getElementById('commission-rules');
+        
+        if (!financialContainer || !timeContainer || !commissionContainer) return;
+        
+        const rules = rulesData || {};
+        
+        // Règles financières
+        financialContainer.innerHTML = `
+            <div class="rule-item">
+                <label>Mise minimale:</label>
+                <input type="number" class="form-control rule-input" data-key="min_bet" 
+                       value="${rules.min_bet?.value || 1}" placeholder="1">
+                <div class="rule-description">${rules.min_bet?.description || 'Mise minimale par boule'}</div>
+            </div>
+            <div class="rule-item">
+                <label>Mise maximale:</label>
+                <input type="number" class="form-control rule-input" data-key="max_bet" 
+                       value="${rules.max_bet?.value || 1000}" placeholder="1000">
+                <div class="rule-description">${rules.max_bet?.description || 'Mise maximale par boule'}</div>
+            </div>
+            <div class="rule-item">
+                <label>Multiplicateur gain:</label>
+                <input type="number" class="form-control rule-input" data-key="win_multiplier" 
+                       value="${rules.win_multiplier?.value || 70}" placeholder="70">
+                <div class="rule-description">${rules.win_multiplier?.description || 'Multiplicateur pour les gains'}</div>
+            </div>
+        `;
+        
+        // Règles temporelles
+        timeContainer.innerHTML = `
+            <div class="rule-item">
+                <label>Heure ouverture:</label>
+                <input type="time" class="form-control rule-input" data-key="open_time" 
+                       value="${rules.open_time?.value || '06:00'}">
+                <div class="rule-description">${rules.open_time?.description || 'Heure d\'ouverture des paris'}</div>
+            </div>
+            <div class="rule-item">
+                <label>Heure fermeture:</label>
+                <input type="time" class="form-control rule-input" data-key="close_time" 
+                       value="${rules.close_time?.value || '22:00'}">
+                <div class="rule-description">${rules.close_time?.description || 'Heure de fermeture des paris'}</div>
+            </div>
+            <div class="rule-item">
+                <label>Délai annulation:</label>
+                <input type="number" class="form-control rule-input" data-key="cancel_timeout" 
+                       value="${rules.cancel_timeout?.value || 10}" placeholder="10">
+                <div class="rule-description">${rules.cancel_timeout?.description || 'Délai d\'annulation en minutes'}</div>
+            </div>
+        `;
+        
+        // Règles de commission
+        commissionContainer.innerHTML = `
+            <div class="rule-item">
+                <label>Commission agent:</label>
+                <input type="number" class="form-control rule-input" data-key="agent_commission" 
+                       value="${rules.agent_commission?.value || 5}" placeholder="5">
+                <div class="rule-description">${rules.agent_commission?.description || 'Commission des agents (%)'}</div>
+            </div>
+            <div class="rule-item">
+                <label>Commission superviseur:</label>
+                <input type="number" class="form-control rule-input" data-key="supervisor_commission" 
+                       value="${rules.supervisor_commission?.value || 2}" placeholder="2">
+                <div class="rule-description">${rules.supervisor_commission?.description || 'Commission des superviseurs (%)'}</div>
+            </div>
+            <div class="rule-item">
+                <label>Taxe jeu:</label>
+                <input type="number" class="form-control rule-input" data-key="game_tax" 
+                       value="${rules.game_tax?.value || 15}" placeholder="15">
+                <div class="rule-description">${rules.game_tax?.description || 'Taxe sur les jeux (%)'}</div>
+            </div>
+        `;
+        
+        // Ajouter les événements
+        document.querySelectorAll('.rule-input').forEach(input => {
+            input.addEventListener('change', () => this.updateRule(input));
+        });
+    }
+
+    async updateRule(input) {
+        const key = input.dataset.key;
+        const value = input.value;
+        
+        try {
+            const rules = this.stateManager.getData('rules') || {};
+            if (!rules[key]) {
+                rules[key] = { value: '', description: '' };
+            }
+            rules[key].value = value;
+            
+            await ApiService.updateRules(rules);
+            this.showNotification('Règle mise à jour', 'success');
+            
+        } catch (error) {
+            console.error('Erreur mise à jour règle:', error);
+            this.showNotification('Erreur lors de la mise à jour', 'error');
+        }
+    }
+
+    async saveRules() {
+        try {
+            const rules = {};
+            
+            // Récupérer toutes les règles
+            document.querySelectorAll('.rule-input').forEach(input => {
+                const key = input.dataset.key;
+                rules[key] = {
+                    value: input.value,
+                    description: input.parentElement.querySelector('.rule-description')?.textContent || ''
+                };
+            });
+            
+            await ApiService.updateRules({ rules: rules });
+            this.showNotification('Toutes les règles ont été sauvegardées', 'success');
+            
+        } catch (error) {
+            console.error('Erreur sauvegarde règles:', error);
+            this.showNotification('Erreur lors de la sauvegarde', 'error');
+        }
+    }
+
+    async resetRules() {
+        if (!confirm('Restaurer toutes les règles aux valeurs par défaut?')) {
+            return;
+        }
+        
+        try {
+            const defaultRules = {
+                min_bet: { value: '1', description: 'Mise minimale par boule' },
+                max_bet: { value: '1000', description: 'Mise maximale par boule' },
+                win_multiplier: { value: '70', description: 'Multiplicateur pour les gains' },
+                open_time: { value: '06:00', description: 'Heure d\'ouverture des paris' },
+                close_time: { value: '22:00', description: 'Heure de fermeture des paris' },
+                cancel_timeout: { value: '10', description: 'Délai d\'annulation en minutes' },
+                agent_commission: { value: '5', description: 'Commission des agents (%)' },
+                supervisor_commission: { value: '2', description: 'Commission des superviseurs (%)' },
+                game_tax: { value: '15', description: 'Taxe sur les jeux (%)' }
+            };
+            
+            await ApiService.updateRules({ rules: defaultRules });
+            this.showNotification('Règles restaurées avec succès', 'success');
+            this.loadRulesData();
+            
+        } catch (error) {
+            console.error('Erreur réinitialisation règles:', error);
+            this.showNotification('Erreur lors de la réinitialisation', 'error');
+        }
+    }
+
+    // Rapports
+    async loadReport(reportType) {
+        try {
+            let reportData;
+            let containerId;
+            
+            switch(reportType) {
+                case 'sales':
+                    reportData = await ApiService.getSalesReport();
+                    containerId = 'sales-report';
+                    this.renderSalesReport(reportData, containerId);
+                    break;
+                case 'users':
+                    reportData = await ApiService.getUserStats();
+                    containerId = 'users-report';
+                    this.renderUsersReport(reportData, containerId);
+                    break;
+                case 'draws':
+                    reportData = await ApiService.getDrawStats();
+                    containerId = 'draws-report';
+                    this.renderDrawsReport(reportData, containerId);
+                    break;
+                case 'financial':
+                    reportData = await ApiService.getFinancialReport();
+                    containerId = 'financial-report';
+                    this.renderFinancialReport(reportData, containerId);
+                    break;
+            }
+            
+        } catch (error) {
+            console.error(`Erreur chargement rapport ${reportType}:`, error);
+            this.showNotification(`Erreur de chargement du rapport ${reportType}`, 'error');
+        }
+    }
+
+    renderSalesReport(data, containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        
+        const summary = data?.summary || {};
+        const daily = data?.daily || [];
+        
+        container.innerHTML = `
+            <div class="report-container">
+                <h4>Résumé des Ventes</h4>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px;">
+                    <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 10px;">
+                        <div style="font-size: 12px; color: var(--text-dim);">Tickets Vendus</div>
+                        <div style="font-size: 24px; font-weight: bold; color: var(--primary);">
+                            ${summary.totalTickets || 0}
+                        </div>
+                    </div>
+                    <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 10px;">
+                        <div style="font-size: 12px; color: var(--text-dim);">Ventes Totales</div>
+                        <div style="font-size: 24px; font-weight: bold; color: var(--success);">
+                            ${(summary.totalSales || 0).toLocaleString()} Gdes
+                        </div>
+                    </div>
+                    <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 10px;">
+                        <div style="font-size: 12px; color: var(--text-dim);">Gains Distribués</div>
+                        <div style="font-size: 24px; font-weight: bold; color: var(--warning);">
+                            ${(summary.totalWins || 0).toLocaleString()} Gdes
+                        </div>
+                    </div>
+                    <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 10px;">
+                        <div style="font-size: 12px; color: var(--text-dim);">Bénéfice Net</div>
+                        <div style="font-size: 24px; font-weight: bold; color: ${(summary.totalLoss || 0) > 0 ? 'var(--success)' : 'var(--danger)'};">
+                            ${(summary.totalLoss || 0).toLocaleString()} Gdes
+                        </div>
+                    </div>
+                </div>
+                
+                <h4>Ventes Quotidiennes</h4>
+                <div style="max-height: 400px; overflow-y: auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: #f8f9fa;">
+                                <th style="padding: 10px; text-align: left;">Date</th>
+                                <th style="padding: 10px; text-align: right;">Tickets</th>
+                                <th style="padding: 10px; text-align: right;">Ventes</th>
+                                <th style="padding: 10px; text-align: right;">Gains</th>
+                                <th style="padding: 10px; text-align: right;">Bénéfice</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${daily.map(day => `
+                                <tr style="border-bottom: 1px solid var(--border);">
+                                    <td style="padding: 10px;">${new Date(day.day).toLocaleDateString()}</td>
+                                    <td style="padding: 10px; text-align: right;">${day.tickets || 0}</td>
+                                    <td style="padding: 10px; text-align: right;">${(day.sales || 0).toLocaleString()} Gdes</td>
+                                    <td style="padding: 10px; text-align: right;">${(day.wins || 0).toLocaleString()} Gdes</td>
+                                    <td style="padding: 10px; text-align: right; color: ${(day.loss || 0) > 0 ? 'var(--success)' : 'var(--danger)'};">
+                                        ${(day.loss || 0).toLocaleString()} Gdes
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div style="margin-top: 20px; text-align: right;">
+                    <button class="btn btn-primary" onclick="ApiService.exportReport('sales', 'csv')">
+                        <i class="fas fa-download"></i> Exporter en CSV
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    renderUsersReport(data, containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        
+        container.innerHTML = `
+            <div class="report-container">
+                <h4>Statistiques des Utilisateurs</h4>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 30px;">
+                    <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 10px;">
+                        <div style="font-size: 12px; color: var(--text-dim);">Agents Actifs</div>
+                        <div style="font-size: 24px; font-weight: bold; color: var(--primary);">
+                            ${data.totalAgents || 0}
+                        </div>
+                    </div>
+                    <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 10px;">
+                        <div style="font-size: 12px; color: var(--text-dim);">Superviseurs</div>
+                        <div style="font-size: 24px; font-weight: bold; color: var(--success);">
+                            ${data.totalSupervisors || 0}
+                        </div>
+                    </div>
+                    <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 10px;">
+                        <div style="font-size: 12px; color: var(--text-dim);">Nouveaux Aujourd'hui</div>
+                        <div style="font-size: 24px; font-weight: bold; color: var(--warning);">
+                            ${data.newToday || 0}
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 30px;">
+                    <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 10px;">
+                        <div style="font-size: 12px; color: var(--text-dim);">Utilisateurs Bloqués</div>
+                        <div style="font-size: 24px; font-weight: bold; color: var(--danger);">
+                            ${(data.blockedAgents || 0) + (data.blockedSupervisors || 0)}
+                        </div>
+                    </div>
+                    <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 10px;">
+                        <div style="font-size: 12px; color: var(--text-dim);">Utilisateurs En Ligne</div>
+                        <div style="font-size: 24px; font-weight: bold; color: var(--info);">
+                            ${data.onlineUsers || 0}
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="text-align: right;">
+                    <button class="btn btn-primary" onclick="ApiService.exportReport('users', 'csv')">
+                        <i class="fas fa-download"></i> Exporter en CSV
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    renderDrawsReport(data, containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        
+        const popularDraws = data?.popularDraws || [];
+        
+        container.innerHTML = `
+            <div class="report-container">
+                <h4>Statistiques des Tirages</h4>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 30px;">
+                    <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 10px;">
+                        <div style="font-size: 12px; color: var(--text-dim);">Total Tirages</div>
+                        <div style="font-size: 24px; font-weight: bold; color: var(--primary);">
+                            ${data.totalDraws || 0}
+                        </div>
+                    </div>
+                    <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 10px;">
+                        <div style="font-size: 12px; color: var(--text-dim);">Tirages Actifs</div>
+                        <div style="font-size: 24px; font-weight: bold; color: var(--success);">
+                            ${data.activeDraws || 0}
+                        </div>
+                    </div>
+                    <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 10px;">
+                        <div style="font-size: 12px; color: var(--text-dim);">Publiés Aujourd'hui</div>
+                        <div style="font-size: 24px; font-weight: bold; color: var(--warning);">
+                            ${data.publishedToday || 0}
+                        </div>
+                    </div>
+                </div>
+                
+                <h4>Tirages les Plus Populaires</h4>
+                <div style="max-height: 300px; overflow-y: auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: #f8f9fa;">
+                                <th style="padding: 10px; text-align: left;">Tirage</th>
+                                <th style="padding: 10px; text-align: right;">Tickets</th>
+                                <th style="padding: 10px; text-align: right;">Ventes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${popularDraws.map(draw => `
+                                <tr style="border-bottom: 1px solid var(--border);">
+                                    <td style="padding: 10px;">${draw.name}</td>
+                                    <td style="padding: 10px; text-align: right;">${draw.ticketCount || 0}</td>
+                                    <td style="padding: 10px; text-align: right;">${(draw.totalSales || 0).toLocaleString()} Gdes</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div style="margin-top: 20px; text-align: right;">
+                    <button class="btn btn-primary" onclick="ApiService.exportReport('draws', 'csv')">
+                        <i class="fas fa-download"></i> Exporter en CSV
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    renderFinancialReport(data, containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        
+        const summary = data?.summary || {};
+        const daily = data?.daily || [];
+        
+        container.innerHTML = `
+            <div class="report-container">
+                <h4>Rapport Financier - ${data.period || 'Mois'}</h4>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 30px;">
+                    <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 10px;">
+                        <div style="font-size: 12px; color: var(--text-dim);">Ventes Totales</div>
+                        <div style="font-size: 24px; font-weight: bold; color: var(--success);">
+                            ${(summary.totalSales || 0).toLocaleString()} Gdes
+                        </div>
+                    </div>
+                    <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 10px;">
+                        <div style="font-size: 12px; color: var(--text-dim);">Bénéfice Net</div>
+                        <div style="font-size: 24px; font-weight: bold; color: ${(summary.profit || 0) > 0 ? 'var(--success)' : 'var(--danger)'};">
+                            ${(summary.profit || 0).toLocaleString()} Gdes
+                        </div>
+                    </div>
+                    <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 10px;">
+                        <div style="font-size: 12px; color: var(--text-dim);">Taux de Gain</div>
+                        <div style="font-size: 24px; font-weight: bold; color: var(--warning);">
+                            ${(summary.winRate || 0).toFixed(1)}%
+                        </div>
+                    </div>
+                </div>
+                
+                <h4>Évolution Quotidienne</h4>
+                <div style="max-height: 400px; overflow-y: auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: #f8f9fa;">
+                                <th style="padding: 10px; text-align: left;">Date</th>
+                                <th style="padding: 10px; text-align: right;">Ventes</th>
+                                <th style="padding: 10px; text-align: right;">Gains</th>
+                                <th style="padding: 10px; text-align: right;">Bénéfice</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${daily.map(day => `
+                                <tr style="border-bottom: 1px solid var(--border);">
+                                    <td style="padding: 10px;">${new Date(day.day).toLocaleDateString()}</td>
+                                    <td style="padding: 10px; text-align: right;">${(day.sales || 0).toLocaleString()} Gdes</td>
+                                    <td style="padding: 10px; text-align: right;">${(day.wins || 0).toLocaleString()} Gdes</td>
+                                    <td style="padding: 10px; text-align: right; color: ${(day.profit || 0) > 0 ? 'var(--success)' : 'var(--danger)'};">
+                                        ${(day.profit || 0).toLocaleString()} Gdes
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div style="margin-top: 20px; text-align: right;">
+                    <button class="btn btn-primary" onclick="ApiService.exportReport('financial', 'csv')">
+                        <i class="fas fa-download"></i> Exporter en CSV
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    // Alertes
+    async loadAlerts() {
+        try {
+            const alerts = await ApiService.getAlerts();
+            this.renderAlerts(alerts);
+        } catch (error) {
+            console.error('Erreur chargement alertes:', error);
+        }
+    }
+
+    renderAlerts(alerts) {
+        const container = document.getElementById('alerts-container');
+        if (!container) return;
+        
+        const activeAlerts = alerts.filter(alert => alert.active).slice(0, 3);
+        
+        if (activeAlerts.length === 0) {
+            container.innerHTML = '<p style="color: var(--text-dim); text-align: center; padding: 20px;">Aucune alerte active</p>';
+            return;
+        }
+        
+        container.innerHTML = activeAlerts.map(alert => `
+            <div class="alert-item" style="background: ${this.getAlertColor(alert.type)}; color: white; 
+                 padding: 15px; border-radius: 10px; margin-bottom: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div>
+                        <strong>${alert.title}</strong>
+                        <div style="font-size: 13px; margin-top: 5px;">${alert.message}</div>
+                    </div>
+                    <span class="badge" style="background: rgba(255,255,255,0.2); padding: 3px 8px; border-radius: 12px; font-size: 11px;">
+                        ${alert.priority}
+                    </span>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    getAlertColor(type) {
+        const colors = {
+            'info': 'var(--primary)',
+            'warning': 'var(--warning)',
+            'danger': 'var(--danger)',
+            'success': 'var(--success)'
         };
-        return icons[type] || 'info-circle';
+        return colors[type] || 'var(--primary)';
+    }
+
+    // Utilitaires
+    getActivityIcon(action) {
+        const icons = {
+            'create_user': 'user-plus',
+            'update_user': 'user-edit',
+            'block_user': 'user-lock',
+            'create_draw': 'calendar-plus',
+            'publish_draw': 'calendar-check',
+            'block_draw': 'calendar-times',
+            'block_number': 'ban',
+            'update_settings': 'cog',
+            'login': 'sign-in-alt',
+            'logout': 'sign-out-alt'
+        };
+        return icons[action] || 'info-circle';
     }
 
     formatTime(date) {
@@ -717,15 +1209,112 @@ class UIManager {
     }
 
     // Méthodes à compléter par les autres gestionnaires
-    loadBlocksTab() {}
-    loadLimitsTab() {}
-    loadNumbersStats() {}
-    loadPublishHistory() {}
-    loadFetchLog() {}
-    loadReport(reportType) {}
-    renderDrawsView() {}
-    renderActivityView() {}
-    renderRulesView() {}
-    renderLimitsView() {}
-    loadAlerts() {}
+    loadBlocksTab() {
+        if (typeof ownerManager !== 'undefined') {
+            ownerManager.loadBlocksTab();
+        }
+    }
+
+    loadLimitsTab() {
+        if (typeof ownerManager !== 'undefined') {
+            ownerManager.loadLimitsTab();
+        }
+    }
+
+    loadNumbersStats() {
+        if (typeof ownerManager !== 'undefined') {
+            ownerManager.loadNumbersStats();
+        }
+    }
+
+    loadPublishHistory() {
+        if (typeof ownerManager !== 'undefined') {
+            ownerManager.loadPublishHistory();
+        }
+    }
+
+    loadFetchLog() {
+        // Implémenté dans draw-manager
+    }
+
+    renderDrawsView() {
+        if (typeof ownerManager !== 'undefined') {
+            ownerManager.renderDrawsView();
+        }
+    }
+
+    renderActivityView() {
+        const container = document.getElementById('full-activity-log');
+        const activities = this.stateManager.getData('activity') || [];
+        
+        if (activities.length === 0) {
+            container.innerHTML = '<p class="no-data">Aucune activité enregistrée</p>';
+            return;
+        }
+        
+        container.innerHTML = activities.map(activity => `
+            <div class="activity-log-item" style="padding: 15px; border-bottom: 1px solid var(--border);">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div>
+                        <div style="font-weight: 500; color: var(--dark);">${activity.details || activity.action}</div>
+                        <div style="font-size: 12px; color: var(--text-dim); margin-top: 5px;">
+                            <span>${new Date(activity.timestamp).toLocaleString()}</span>
+                            <span> • </span>
+                            <span>${activity.user || 'Système'}</span>
+                            <span> • </span>
+                            <span class="badge" style="background: #f0f0f0; color: var(--text); padding: 2px 8px; border-radius: 10px; font-size: 11px;">
+                                ${activity.type || 'système'}
+                            </span>
+                        </div>
+                    </div>
+                    <div>
+                        <i class="fas fa-${this.getActivityIcon(activity.action)}" style="color: var(--text-dim);"></i>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    renderLimitsView() {
+        const container = document.getElementById('user-limits-container');
+        const settings = this.stateManager.getData('settings') || {};
+        
+        container.innerHTML = `
+            <div class="limits-section">
+                <h4 style="margin-bottom: 15px;">Configuration des Limites</h4>
+                <div class="form-group">
+                    <label>Limite quotidienne par défaut (Gdes):</label>
+                    <input type="number" class="form-control" id="default-daily-limit" value="${settings.default_daily_limit || 5000}">
+                </div>
+                <div class="form-group">
+                    <label>Limite par ticket par défaut (Gdes):</label>
+                    <input type="number" class="form-control" id="default-ticket-limit" value="${settings.default_ticket_limit || 500}">
+                </div>
+                <div class="form-group">
+                    <label>Commission maximale (%):</label>
+                    <input type="number" class="form-control" id="max-commission" value="${settings.max_commission || 20}">
+                </div>
+                <button class="btn btn-primary" onclick="this.saveLimitsConfig()">
+                    <i class="fas fa-save"></i> Sauvegarder
+                </button>
+            </div>
+        `;
+    }
+
+    async saveLimitsConfig() {
+        try {
+            const settings = {
+                default_daily_limit: document.getElementById('default-daily-limit').value,
+                default_ticket_limit: document.getElementById('default-ticket-limit').value,
+                max_commission: document.getElementById('max-commission').value
+            };
+            
+            await ApiService.updateSettings({ settings: settings });
+            this.showNotification('Configuration des limites sauvegardée', 'success');
+            
+        } catch (error) {
+            console.error('Erreur sauvegarde limites:', error);
+            this.showNotification('Erreur lors de la sauvegarde', 'error');
+        }
+    }
 }

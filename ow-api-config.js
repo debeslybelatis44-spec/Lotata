@@ -1,6 +1,8 @@
 // Configuration de l'API - Connecté à votre backend
 const API_CONFIG = {
-    BASE_URL: 'https://lotata-islp.onrender.com/api',
+    BASE_URL: window.location.origin.includes('localhost') 
+        ? 'http://localhost:10000/api' 
+        : '/api',
     ENDPOINTS: {
         AUTH: {
             LOGIN: '/auth/login',
@@ -27,8 +29,9 @@ const API_CONFIG = {
             HISTORY: '/draws/history',
             FETCH: '/draws/fetch',
             STATS: '/draws/stats',
-            RESULTS: '/draws/results',
-            SCHEDULE: '/draws/schedule'
+            RESULTS: (id) => `/draws/results/${id}`,
+            SCHEDULE: '/draws/schedule',
+            GET: (id) => `/draws/${id}`
         },
         NUMBERS: {
             LIST: '/numbers',
@@ -45,11 +48,12 @@ const API_CONFIG = {
         },
         REPORTS: {
             DASHBOARD: '/reports/dashboard',
+            REALTIME: '/reports/dashboard/realtime',
             SALES: '/reports/sales',
             ACTIVITY: '/reports/activity',
             FINANCIAL: '/reports/financial',
             PERFORMANCE: '/reports/performance',
-            EXPORT: '/reports/export'
+            EXPORT: (type) => `/reports/export/${type}`
         },
         SETTINGS: {
             GET: '/settings',
@@ -62,7 +66,21 @@ const API_CONFIG = {
             CREATE: '/alerts',
             UPDATE: (id) => `/alerts/${id}`,
             DELETE: (id) => `/alerts/${id}`
-        }
+        },
+        TICKETS: {
+            LIST: '/tickets',
+            SAVE: '/tickets/save',
+            CHECK_WINNERS: '/tickets/check-winners',
+            DELETE: (id) => `/tickets/delete/${id}`
+        },
+        WINNERS: {
+            LIST: '/winners',
+            RESULTS: '/winners/results'
+        },
+        LOTTERY_CONFIG: '/lottery-config',
+        BLOCKED_NUMBERS: '/blocked-numbers',
+        SUPERVISORS: '/supervisors',
+        AGENTS: '/agents'
     },
     
     getHeaders() {
@@ -96,7 +114,7 @@ const API_CONFIG = {
                     
                     if (refreshResponse.ok) {
                         const data = await refreshResponse.json();
-                        localStorage.setItem('auth_token', data.accessToken);
+                        localStorage.setItem('auth_token', data.token);
                         // Réessayer la requête originale
                         return this.handleResponse(response);
                     }
@@ -121,12 +139,13 @@ const API_CONFIG = {
         }
         
         if (response.status === 500) {
-            throw new Error('Erreur serveur. Veuillez réessayer plus tard.');
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || 'Erreur serveur. Veuillez réessayer plus tard.');
         }
         
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.message || `Erreur ${response.status}: ${response.statusText}`);
+            throw new Error(errorData.error || `Erreur ${response.status}: ${response.statusText}`);
         }
         
         return response.json();

@@ -16,7 +16,8 @@ class NumberManager {
         const container = document.getElementById('blocks-numbers-grid');
         if (!container) return;
         
-        const blockedNumbers = this.stateManager.getData('numbers').blocked || [];
+        const numbersData = this.stateManager.getData('numbers');
+        const blockedNumbers = numbersData?.blocked || [];
         
         let numbersHTML = '';
         for (let i = 0; i < 100; i++) {
@@ -46,7 +47,8 @@ class NumberManager {
         const container = document.getElementById('blocked-numbers-list');
         if (!container) return;
         
-        const blockedNumbers = this.stateManager.getData('numbers').blocked || [];
+        const numbersData = this.stateManager.getData('numbers');
+        const blockedNumbers = numbersData?.blocked || [];
         
         if (blockedNumbers.length === 0) {
             container.innerHTML = '<p class="no-data">Aucun boule bloqué</p>';
@@ -87,7 +89,7 @@ class NumberManager {
         try {
             await ApiService.blockNumber(number);
             
-            const numbersData = this.stateManager.getData('numbers');
+            const numbersData = this.stateManager.getData('numbers') || { blocked: [], limits: {} };
             if (!numbersData.blocked) numbersData.blocked = [];
             
             if (!numbersData.blocked.includes(number)) {
@@ -108,7 +110,7 @@ class NumberManager {
 
     // Basculer le blocage d'un numéro
     async toggleNumberBlock(number) {
-        const numbersData = this.stateManager.getData('numbers');
+        const numbersData = this.stateManager.getData('numbers') || { blocked: [], limits: {} };
         const blockedNumbers = numbersData.blocked || [];
         const isBlocked = blockedNumbers.includes(number);
         
@@ -147,7 +149,7 @@ class NumberManager {
         try {
             await ApiService.unblockNumbers(numbersToUnblock);
             
-            const numbersData = this.stateManager.getData('numbers');
+            const numbersData = this.stateManager.getData('numbers') || { blocked: [], limits: {} };
             numbersData.blocked = numbersData.blocked.filter(
                 n => !numbersToUnblock.includes(n)
             );
@@ -175,8 +177,12 @@ class NumberManager {
         }
         
         try {
-            // Ici, vous implémenteriez l'appel API pour configurer le blocage automatique
-            // await ApiService.configureAutoBlock({ threshold, action });
+            // Enregistrer dans les paramètres système
+            const settings = this.stateManager.getData('settings') || {};
+            settings.autoBlockThreshold = threshold;
+            settings.autoBlockAction = action;
+            
+            await ApiService.updateSettings({ settings: settings });
             
             this.uiManager.showNotification(
                 `Blocage automatique configuré: seuil à ${threshold} Gdes, action: ${action}`,
@@ -198,11 +204,10 @@ class NumberManager {
     async loadNumberLimits() {
         try {
             const limitsData = await ApiService.getNumberLimits();
-            this.stateManager.setData('numbers', {
-                ...this.stateManager.getData('numbers'),
-                limits: limitsData
-            });
+            const numbersData = this.stateManager.getData('numbers') || { blocked: [], limits: {} };
+            numbersData.limits = limitsData;
             
+            this.stateManager.setData('numbers', numbersData);
             this.renderLimitsList();
             
         } catch (error) {
@@ -216,7 +221,8 @@ class NumberManager {
         const container = document.getElementById('limits-list');
         if (!container) return;
         
-        const limits = this.stateManager.getData('numbers').limits || {};
+        const numbersData = this.stateManager.getData('numbers') || { blocked: [], limits: {} };
+        const limits = numbersData.limits || {};
         const limitedNumbers = Object.keys(limits);
         
         if (limitedNumbers.length === 0) {
@@ -272,7 +278,7 @@ class NumberManager {
         try {
             await ApiService.setNumberLimit(number, amount);
             
-            const numbersData = this.stateManager.getData('numbers');
+            const numbersData = this.stateManager.getData('numbers') || { blocked: [], limits: {} };
             if (!numbersData.limits) numbersData.limits = {};
             numbersData.limits[number] = amount;
             
@@ -292,7 +298,8 @@ class NumberManager {
 
     // Éditer une limite
     async editNumberLimit(number) {
-        const limits = this.stateManager.getData('numbers').limits || {};
+        const numbersData = this.stateManager.getData('numbers') || { blocked: [], limits: {} };
+        const limits = numbersData.limits || {};
         const currentLimit = limits[number] || 0;
         
         const modal = document.getElementById('advanced-modal');
@@ -307,12 +314,6 @@ class NumberManager {
                     <label>Nouvelle limite (Gdes):</label>
                     <input type="number" class="form-control" name="limit" 
                            value="${currentLimit}" min="0" step="100" required>
-                </div>
-                
-                <div class="form-group">
-                    <label>Raison du changement (optionnel):</label>
-                    <textarea class="form-control" name="reason" rows="3" 
-                              placeholder="Pourquoi modifiez-vous cette limite?"></textarea>
                 </div>
                 
                 <div style="display: flex; gap: 10px; margin-top: 20px;">
@@ -335,7 +336,6 @@ class NumberManager {
         const formData = new FormData(form);
         
         const newLimit = parseInt(formData.get('limit'));
-        const reason = formData.get('reason');
         
         if (isNaN(newLimit) || newLimit < 0) {
             this.uiManager.showNotification('Veuillez entrer une limite valide', 'error');
@@ -345,7 +345,7 @@ class NumberManager {
         try {
             await ApiService.setNumberLimit(number, newLimit);
             
-            const numbersData = this.stateManager.getData('numbers');
+            const numbersData = this.stateManager.getData('numbers') || { blocked: [], limits: {} };
             if (!numbersData.limits) numbersData.limits = {};
             numbersData.limits[number] = newLimit;
             
@@ -372,10 +372,9 @@ class NumberManager {
         }
         
         try {
-            // Pour supprimer une limite, on peut la mettre à 0
             await ApiService.setNumberLimit(number, 0);
             
-            const numbersData = this.stateManager.getData('numbers');
+            const numbersData = this.stateManager.getData('numbers') || { blocked: [], limits: {} };
             if (numbersData.limits && numbersData.limits[number]) {
                 delete numbersData.limits[number];
             }
@@ -409,7 +408,7 @@ class NumberManager {
         }
         
         try {
-            const numbersData = this.stateManager.getData('numbers');
+            const numbersData = this.stateManager.getData('numbers') || { blocked: [], limits: {} };
             const limits = numbersData.limits || {};
             
             const updatedLimits = {};
@@ -452,11 +451,15 @@ class NumberManager {
         
         try {
             // Récupérer les limites par défaut depuis l'API
-            const defaultLimits = await this.getDefaultLimits();
+            const defaultLimits = {};
+            for (let i = 0; i < 100; i++) {
+                const num = i.toString().padStart(2, '0');
+                defaultLimits[num] = 100;
+            }
             
             await ApiService.updateNumberLimits(defaultLimits);
             
-            const numbersData = this.stateManager.getData('numbers');
+            const numbersData = this.stateManager.getData('numbers') || { blocked: [], limits: {} };
             numbersData.limits = defaultLimits;
             this.stateManager.setData('numbers', numbersData);
             this.renderLimitsList();
@@ -469,36 +472,14 @@ class NumberManager {
         }
     }
 
-    // Obtenir les limites par défaut
-    async getDefaultLimits() {
-        // Valeurs par défaut pour chaque numéro
-        // Dans une implémentation réelle, cela viendrait de l'API
-        const defaultLimits = {};
-        
-        // Limite par défaut de 100 Gdes pour tous les numéros
-        for (let i = 0; i < 100; i++) {
-            const num = i.toString().padStart(2, '0');
-            defaultLimits[num] = 100;
-        }
-        
-        // Quelques numéros "chauds" avec des limites plus basses
-        const hotNumbers = ['00', '07', '13', '25', '50', '77', '99'];
-        hotNumbers.forEach(num => {
-            defaultLimits[num] = 50; // Limite plus basse pour les numéros populaires
-        });
-        
-        return defaultLimits;
-    }
-
     // Charger les statistiques des numéros
     async loadNumbersStats() {
         try {
             const stats = await ApiService.getNumberStats();
-            this.stateManager.setData('numbers', {
-                ...this.stateManager.getData('numbers'),
-                stats: stats
-            });
+            const numbersData = this.stateManager.getData('numbers') || { blocked: [], limits: {}, stats: {} };
+            numbersData.stats = stats;
             
+            this.stateManager.setData('numbers', numbersData);
             this.renderNumbersStats();
             
         } catch (error) {
@@ -512,10 +493,22 @@ class NumberManager {
         const container = document.getElementById('numbers-stats-tab');
         if (!container) return;
         
-        const stats = this.stateManager.getData('numbers').stats || {};
+        const numbersData = this.stateManager.getData('numbers') || { blocked: [], limits: {}, stats: {} };
+        const stats = numbersData.stats || {};
         
         if (!stats || Object.keys(stats).length === 0) {
-            container.innerHTML = '<p class="no-data">Aucune statistique disponible</p>';
+            container.innerHTML = `
+                <div class="stats-container">
+                    <h4>Statistiques des Boules</h4>
+                    <div style="text-align: center; padding: 40px;">
+                        <i class="fas fa-chart-bar" style="font-size: 48px; color: var(--text-dim); margin-bottom: 20px;"></i>
+                        <p style="color: var(--text-dim);">Aucune statistique disponible</p>
+                        <button class="btn btn-primary" onclick="ownerManager.loadNumbersStats()">
+                            <i class="fas fa-sync"></i> Charger les statistiques
+                        </button>
+                    </div>
+                </div>
+            `;
             return;
         }
         
@@ -528,29 +521,31 @@ class NumberManager {
             <div class="stats-summary">
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px;">
                     <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 15px;">
-                        <div style="font-size: 12px; color: var(--text-dim);">Numéro le plus joué</div>
+                        <div style="font-size: 12px; color: var(--text-dim);">Boules bloquées</div>
                         <div style="font-size: 32px; font-weight: bold; color: var(--primary); margin: 10px 0;">
-                            ${sortedNumbers[0] || 'N/A'}
+                            ${numbersData.blocked?.length || 0}
                         </div>
                         <div style="font-size: 14px; color: var(--text);">
-                            ${stats[sortedNumbers[0]]?.frequency || 0} fois
+                            sur 100 boules
                         </div>
                     </div>
                     
                     <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 15px;">
-                        <div style="font-size: 12px; color: var(--text-dim);">Gains totaux</div>
+                        <div style="font-size: 12px; color: var(--text-dim);">Boules avec limites</div>
                         <div style="font-size: 32px; font-weight: bold; color: var(--success); margin: 10px 0;">
-                            ${Object.values(stats).reduce((sum, stat) => sum + (stat.payouts || 0), 0).toLocaleString()} Gdes
+                            ${Object.keys(numbersData.limits || {}).length}
                         </div>
                         <div style="font-size: 14px; color: var(--text);">
-                            Sur tous les numéros
+                            boules limitées
                         </div>
                     </div>
                     
                     <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 15px;">
-                        <div style="font-size: 12px; color: var(--text-dim);">Moyenne par numéro</div>
+                        <div style="font-size: 12px; color: var(--text-dim);">Moyenne par boule</div>
                         <div style="font-size: 32px; font-weight: bold; color: var(--warning); margin: 10px 0;">
-                            ${Math.round(Object.values(stats).reduce((sum, stat) => sum + (stat.averageBet || 0), 0) / Object.keys(stats).length).toLocaleString()} Gdes
+                            ${Object.keys(stats).length > 0 ? 
+                                Math.round(Object.values(stats).reduce((sum, stat) => sum + (stat.averageBet || 0), 0) / Object.keys(stats).length).toLocaleString() 
+                                : '0'} Gdes
                         </div>
                         <div style="font-size: 14px; color: var(--text);">
                             Mise moyenne
@@ -558,7 +553,7 @@ class NumberManager {
                     </div>
                 </div>
                 
-                <h4 style="margin-bottom: 15px;">Top 10 des numéros les plus joués</h4>
+                <h4 style="margin-bottom: 15px;">Top 10 des boules les plus jouées</h4>
                 <div class="top-numbers-list">
                     ${sortedNumbers.slice(0, 10).map((number, index) => {
                         const stat = stats[number];
@@ -573,13 +568,16 @@ class NumberManager {
                                     <div style="font-size: 18px; font-weight: bold; color: var(--dark);">
                                         ${number}
                                     </div>
+                                    <button class="btn btn-small btn-info" onclick="ownerManager.viewNumberHistory('${number}')" style="padding: 2px 8px; font-size: 11px;">
+                                        <i class="fas fa-history"></i> Historique
+                                    </button>
                                 </div>
                                 <div style="text-align: right;">
                                     <div style="font-size: 16px; font-weight: bold; color: var(--primary);">
                                         ${stat.frequency || 0} fois
                                     </div>
                                     <div style="font-size: 12px; color: var(--text-dim);">
-                                        ${stat.payouts ? stat.payouts.toLocaleString() + ' Gdes' : '0 Gdes'} gains
+                                        ${stat.totalBets ? stat.totalBets.toLocaleString() + ' Gdes' : '0 Gdes'} total
                                     </div>
                                 </div>
                             </div>
@@ -588,12 +586,43 @@ class NumberManager {
                 </div>
                 
                 <div style="margin-top: 30px;">
-                    <h4 style="margin-bottom: 15px;">Distribution des mises</h4>
-                    <div id="bet-distribution-chart" style="height: 300px; background: #f8f9fa; border-radius: 15px; padding: 20px;">
-                        <!-- Un graphique pourrait être inséré ici avec une bibliothèque comme Chart.js -->
-                        <p style="text-align: center; color: var(--text-dim); padding: 50px 0;">
-                            Graphique de distribution des mises
-                        </p>
+                    <h4 style="margin-bottom: 15px;">Distribution des boules</h4>
+                    <div id="bet-distribution-chart" style="height: 300px; background: #f8f9fa; border-radius: 15px; padding: 20px; display: flex; align-items: flex-end; gap: 2px;">
+                        ${Array.from({length: 10}, (_, col) => {
+                            const columnNumbers = Array.from({length: 10}, (_, row) => {
+                                const num = (col * 10 + row).toString().padStart(2, '0');
+                                const stat = stats[num] || {};
+                                const height = Math.min(100, (stat.frequency || 0) * 10);
+                                const isBlocked = numbersData.blocked?.includes(num);
+                                const hasLimit = numbersData.limits?.[num];
+                                
+                                return `
+                                    <div style="position: relative; flex: 1; display: flex; flex-direction: column; align-items: center;">
+                                        <div style="width: 20px; height: ${height}px; background: ${isBlocked ? 'var(--danger)' : hasLimit ? 'var(--warning)' : 'var(--primary)'}; 
+                                             border-radius: 3px; margin-bottom: 5px;"></div>
+                                        <div style="font-size: 10px; color: ${isBlocked ? 'var(--danger)' : 'var(--text)'};">
+                                            ${num}
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('');
+                            
+                            return `<div style="flex: 1; display: flex; flex-direction: column;">${columnNumbers}</div>`;
+                        }).join('')}
+                    </div>
+                    <div style="display: flex; justify-content: center; gap: 20px; margin-top: 20px;">
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <div style="width: 15px; height: 15px; background: var(--primary); border-radius: 3px;"></div>
+                            <span style="font-size: 12px;">Normal</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <div style="width: 15px; height: 15px; background: var(--warning); border-radius: 3px;"></div>
+                            <span style="font-size: 12px;">Limité</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <div style="width: 15px; height: 15px; background: var(--danger); border-radius: 3px;"></div>
+                            <span style="font-size: 12px;">Bloqué</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -614,30 +643,34 @@ class NumberManager {
             if (!history || history.length === 0) {
                 content.innerHTML = '<p class="no-data">Aucun historique disponible pour ce numéro</p>';
             } else {
+                const totalBets = history.reduce((sum, item) => sum + (item.betAmount || 0), 0);
+                const totalWins = history.reduce((sum, item) => sum + (item.winAmount || 0), 0);
+                const winRate = (history.filter(item => item.won).length / history.length * 100).toFixed(1);
+                
                 content.innerHTML = `
                     <div class="number-history">
                         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px;">
                             <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 10px;">
                                 <div style="font-size: 12px; color: var(--text-dim);">Total mises</div>
                                 <div style="font-size: 20px; font-weight: bold; color: var(--primary);">
-                                    ${history.reduce((sum, item) => sum + (item.betAmount || 0), 0).toLocaleString()} Gdes
+                                    ${totalBets.toLocaleString()} Gdes
                                 </div>
                             </div>
                             <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 10px;">
-                                <div style="font-size: 12px; color: var(--text-dim);">Fréquence</div>
-                                <div style="font-size: 20px; font-weight: bold; color: var(--success);">
-                                    ${history.length} fois
+                                <div style="font-size: 12px; color: var(--text-dim);">Taux de gain</div>
+                                <div style="font-size: 20px; font-weight: bold; color: ${winRate > 0 ? 'var(--success)' : 'var(--text-dim)'};">
+                                    ${winRate}%
                                 </div>
                             </div>
                             <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 10px;">
-                                <div style="font-size: 12px; color: var(--text-dim);">Dernière mise</div>
-                                <div style="font-size: 20px; font-weight: bold; color: var(--warning);">
-                                    ${history[0]?.betAmount?.toLocaleString() || 0} Gdes
+                                <div style="font-size: 12px; color: var(--text-dim);">Bénéfice</div>
+                                <div style="font-size: 20px; font-weight: bold; color: ${(totalBets - totalWins) > 0 ? 'var(--success)' : 'var(--danger)'};">
+                                    ${(totalBets - totalWins).toLocaleString()} Gdes
                                 </div>
                             </div>
                         </div>
                         
-                        <h4 style="margin-bottom: 10px;">Dernières occurrences</h4>
+                        <h4 style="margin-bottom: 10px;">Dernières occurrences (${history.length} total)</h4>
                         <div class="history-list" style="max-height: 400px; overflow-y: auto;">
                             ${history.map(item => `
                                 <div class="history-item" style="padding: 10px 15px; border-bottom: 1px solid var(--border);">
@@ -653,7 +686,7 @@ class NumberManager {
                                                 ${item.betAmount?.toLocaleString() || 0} Gdes
                                             </div>
                                             <div style="font-size: 12px; color: ${item.won ? 'var(--success)' : 'var(--danger)'};">
-                                                ${item.won ? 'Gagnant' : 'Perdant'}
+                                                ${item.won ? `Gagnant: +${item.winAmount?.toLocaleString() || 0} Gdes` : 'Perdant'}
                                             </div>
                                         </div>
                                     </div>

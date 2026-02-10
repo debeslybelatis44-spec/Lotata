@@ -462,15 +462,7 @@ class UserManager {
     // Exporter les données utilisateurs
     async exportUsersData() {
         try {
-            const response = await ApiService.exportUsers('json');
-            
-            const dataStr = JSON.stringify(response, null, 2);
-            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-            
-            const linkElement = document.createElement('a');
-            linkElement.setAttribute('href', dataUri);
-            linkElement.setAttribute('download', `lotato_users_${new Date().toISOString().split('T')[0]}.json`);
-            linkElement.click();
+            await ApiService.exportUsers('csv');
             
             this.uiManager.showNotification('Données exportées avec succès', 'success');
         } catch (error) {

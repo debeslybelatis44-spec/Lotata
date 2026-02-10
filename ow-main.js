@@ -319,22 +319,41 @@ class OwnerManager {
 
     // Méthodes pour les règles
     async saveRules() {
-        // Implémentation pour sauvegarder les règles
-        this.uiManager.showNotification('Règles sauvegardées avec succès', 'success');
+        try {
+            await this.uiManager.saveRules();
+        } catch (error) {
+            console.error('Erreur sauvegarde règles:', error);
+            this.uiManager.showNotification('Erreur lors de la sauvegarde des règles', 'error');
+        }
     }
 
     async resetRules() {
-        if (confirm('Restaurer toutes les règles aux valeurs par défaut?')) {
-            // Implémentation pour réinitialiser les règles
-            this.uiManager.showNotification('Règles restaurées avec succès', 'success');
-            this.uiManager.loadRulesData();
-        }
+        await this.uiManager.resetRules();
     }
 
     // Méthodes pour les rapports
     async loadReport(reportType) {
-        // Implémentation pour charger les rapports
-        this.uiManager.showNotification(`Chargement du rapport ${reportType}...`, 'info');
+        await this.uiManager.loadReport(reportType);
+    }
+
+    // Méthode pour charger les statistiques des boules
+    async loadNumbersStats() {
+        await this.numberManager.loadNumbersStats();
+    }
+
+    // Méthode pour charger les limites
+    async loadLimitsTab() {
+        await this.numberManager.loadLimitsTab();
+    }
+
+    // Méthode pour charger les blocages
+    async loadBlocksTab() {
+        this.numberManager.loadBlocksTab();
+    }
+
+    // Méthode pour charger l'historique des publications
+    async loadPublishHistory() {
+        await this.drawManager.loadPublishHistory();
     }
 }
 

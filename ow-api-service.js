@@ -5,7 +5,6 @@ class ApiService {
         const requestOptions = {
             method: method,
             headers: API_CONFIG.getHeaders(),
-            credentials: 'include',
             ...options
         };
 
@@ -68,7 +67,7 @@ class ApiService {
     }
     
     static async getRealTimeStats() {
-        return await this.get(`${API_CONFIG.ENDPOINTS.REPORTS.DASHBOARD}/realtime`);
+        return await this.get(API_CONFIG.ENDPOINTS.REPORTS.REALTIME);
     }
 
     // Utilisateurs
@@ -101,6 +100,10 @@ class ApiService {
         return await this.get(`${API_CONFIG.ENDPOINTS.USERS.EXPORT}?format=${format}`);
     }
     
+    static async getUserStats() {
+        return await this.get(API_CONFIG.ENDPOINTS.USERS.STATS);
+    }
+    
     static async getUserActivity(userId, limit = 50) {
         return await this.get(`${API_CONFIG.ENDPOINTS.USERS.ACTIVITY}?userId=${userId}&limit=${limit}`);
     }
@@ -115,7 +118,7 @@ class ApiService {
     }
     
     static async getDrawById(id) {
-        return await this.get(`${API_CONFIG.ENDPOINTS.DRAWS.LIST}/${id}`);
+        return await this.get(API_CONFIG.ENDPOINTS.DRAWS.GET(id));
     }
 
     static async publishDraw(drawData) {
@@ -143,11 +146,15 @@ class ApiService {
     }
     
     static async getDrawResults(drawId) {
-        return await this.get(`${API_CONFIG.ENDPOINTS.DRAWS.RESULTS}/${drawId}`);
+        return await this.get(API_CONFIG.ENDPOINTS.DRAWS.RESULTS(drawId));
     }
     
     static async fetchExternalResults(source) {
         return await this.post(API_CONFIG.ENDPOINTS.DRAWS.FETCH, { source });
+    }
+    
+    static async getDrawStats() {
+        return await this.get(API_CONFIG.ENDPOINTS.DRAWS.STATS);
     }
 
     // Numéros
@@ -198,7 +205,7 @@ class ApiService {
     }
     
     static async exportActivity(format = 'csv') {
-        return await this.get(`${API_CONFIG.ENDPOINTS.REPORTS.EXPORT}/activity?format=${format}`);
+        return await this.get(`${API_CONFIG.ENDPOINTS.REPORTS.EXPORT('activity')}?format=${format}`);
     }
 
     // Règles
@@ -231,8 +238,8 @@ class ApiService {
         return await this.get(API_CONFIG.ENDPOINTS.REPORTS.PERFORMANCE);
     }
     
-    static async exportReport(type, format = 'pdf') {
-        return await this.get(`${API_CONFIG.ENDPOINTS.REPORTS.EXPORT}/${type}?format=${format}`);
+    static async exportReport(type, format = 'csv') {
+        return await this.get(`${API_CONFIG.ENDPOINTS.REPORTS.EXPORT(type)}?format=${format}`);
     }
 
     // Paramètres
@@ -267,6 +274,59 @@ class ApiService {
     
     static async deleteAlert(id) {
         return await this.delete(API_CONFIG.ENDPOINTS.ALERTS.DELETE(id));
+    }
+    
+    // Tickets
+    static async getTickets(agentId) {
+        const endpoint = agentId ? `${API_CONFIG.ENDPOINTS.TICKETS.LIST}?agentId=${agentId}` : API_CONFIG.ENDPOINTS.TICKETS.LIST;
+        return await this.get(endpoint);
+    }
+    
+    static async saveTicket(ticketData) {
+        return await this.post(API_CONFIG.ENDPOINTS.TICKETS.SAVE, ticketData);
+    }
+    
+    static async checkWinners(agentId) {
+        const endpoint = agentId ? `${API_CONFIG.ENDPOINTS.TICKETS.CHECK_WINNERS}?agentId=${agentId}` : API_CONFIG.ENDPOINTS.TICKETS.CHECK_WINNERS;
+        return await this.post(endpoint);
+    }
+    
+    static async deleteTicket(ticketId) {
+        return await this.delete(API_CONFIG.ENDPOINTS.TICKETS.DELETE(ticketId));
+    }
+    
+    // Gagnants
+    static async getWinners(agentId) {
+        const endpoint = agentId ? `${API_CONFIG.ENDPOINTS.WINNERS.LIST}?agentId=${agentId}` : API_CONFIG.ENDPOINTS.WINNERS.LIST;
+        return await this.get(endpoint);
+    }
+    
+    static async getWinnersResults() {
+        return await this.get(API_CONFIG.ENDPOINTS.WINNERS.RESULTS);
+    }
+    
+    // Configuration loterie
+    static async getLotteryConfig() {
+        return await this.get(API_CONFIG.ENDPOINTS.LOTTERY_CONFIG);
+    }
+    
+    static async updateLotteryConfig(configData) {
+        return await this.post(API_CONFIG.ENDPOINTS.LOTTERY_CONFIG, configData);
+    }
+    
+    // Numéros bloqués
+    static async getBlockedNumbers() {
+        return await this.get(API_CONFIG.ENDPOINTS.BLOCKED_NUMBERS);
+    }
+    
+    // Superviseurs
+    static async getSupervisors() {
+        return await this.get(API_CONFIG.ENDPOINTS.SUPERVISORS);
+    }
+    
+    // Agents
+    static async getAgents() {
+        return await this.get(API_CONFIG.ENDPOINTS.AGENTS);
     }
     
     // Méthodes utilitaires
