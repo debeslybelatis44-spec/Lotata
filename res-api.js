@@ -20,17 +20,18 @@ class SupervisorAPIService {
 
     // Gestionnaire d'erreurs HTTP
     async handleResponse(response) {
+        if (response.status === 401) {
+            STORAGE.remove('auth_token');
+            window.location.href = 'index.html';
+            throw new Error('Session expirée');
+        }
+        
         if (!response.ok) {
-            const error = await response.text();
-            throw new Error(`HTTP ${response.status}: ${error}`);
+            const error = await response.json().catch(() => ({ message: 'Erreur serveur' }));
+            throw new Error(`HTTP ${response.status}: ${error.message}`);
         }
         
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-            return await response.json();
-        }
-        
-        return await response.text();
+        return await response.json();
     }
 
     // Vérification du token
@@ -43,7 +44,6 @@ class SupervisorAPIService {
             
             return await this.handleResponse(response);
         } catch (error) {
-            console.error('Erreur vérification token:', error);
             throw error;
         }
     }
@@ -59,7 +59,7 @@ class SupervisorAPIService {
             return await this.handleResponse(response);
         } catch (error) {
             console.error('Erreur récupération info superviseur:', error);
-            return null;
+            throw error;
         }
     }
 
@@ -72,10 +72,10 @@ class SupervisorAPIService {
             });
             
             const data = await this.handleResponse(response);
-            return data || [];
+            return Array.isArray(data) ? data : (data.agents || data.data || []);
         } catch (error) {
             console.error('Erreur récupération agents:', error);
-            return [];
+            throw error;
         }
     }
 
@@ -88,7 +88,7 @@ class SupervisorAPIService {
             });
             
             const data = await this.handleResponse(response);
-            return data.tickets || [];
+            return data.tickets || data.data || [];
         } catch (error) {
             console.error('Erreur récupération tickets:', error);
             return [];
@@ -104,7 +104,7 @@ class SupervisorAPIService {
             });
             
             const data = await this.handleResponse(response);
-            return data.winners || [];
+            return data.winners || data.data || [];
         } catch (error) {
             console.error('Erreur récupération gains:', error);
             return [];
@@ -121,11 +121,11 @@ class SupervisorAPIService {
             
             const data = await this.handleResponse(response);
             return {
-                totalBets: data.totalBets || 0,
-                totalTickets: data.totalTickets || 0,
-                totalWins: data.totalWins || 0,
-                todaySales: data.todaySales || 0,
-                activeDays: data.activeDays || 0
+                totalBets: data.totalBets || data.total_sales || 0,
+                totalTickets: data.totalTickets || data.total_tickets || 0,
+                totalWins: data.totalWins || data.total_wins || 0,
+                todaySales: data.todaySales || data.today_sales || 0,
+                activeDays: data.activeDays || data.active_days || 0
             };
         } catch (error) {
             console.error('Erreur récupération statistiques:', error);
@@ -136,11 +136,7 @@ class SupervisorAPIService {
     // Rapports du superviseur
     async getSupervisorReports(period = 'today') {
         try {
-            let url = `${this.baseUrl}/reports/dashboard`;
-            if (period !== 'today') {
-                url += `?period=${period}`;
-            }
-            
+            const url = `${this.baseUrl}/reports/dashboard?period=${period}`;
             const response = await fetch(url, {
                 method: 'GET',
                 headers: await this.getHeaders()
@@ -148,10 +144,10 @@ class SupervisorAPIService {
             
             const data = await this.handleResponse(response);
             return {
-                totalSales: data.totalSales || 0,
-                totalTickets: data.totalTickets || 0,
-                totalWins: data.totalWins || 0,
-                activeAgents: data.activeAgents || 0,
+                totalSales: data.totalSales || data.total_sales || 0,
+                totalTickets: data.totalTickets || data.total_tickets || 0,
+                totalWins: data.totalWins || data.total_wins || 0,
+                activeAgents: data.activeAgents || data.active_agents || 0,
                 period: period
             };
         } catch (error) {
@@ -163,7 +159,7 @@ class SupervisorAPIService {
     // Suppression d'un ticket
     async deleteTicket(ticketId) {
         try {
-            const response = await fetch(`${this.baseUrl}/tickets/delete/${ticketId}`, {
+            const response = await fetch(`${this.baseUrl}/tickets/${ticketId}`, {
                 method: 'DELETE',
                 headers: await this.getHeaders()
             });
@@ -178,10 +174,10 @@ class SupervisorAPIService {
     // Blocage/déblocage d'un agent
     async blockAgent(agentId, blockStatus) {
         try {
-            const response = await fetch(`${this.baseUrl}/users/${agentId}/block`, {
-                method: 'PATCH',
+            const response = await fetch(`${this.baseUrl}/agents/${agentId}/status`, {
+                method: 'PUT',
                 headers: await this.getHeaders(),
-                body: JSON.stringify({ blocked: blockStatus })
+                body: JSON.stringify({ active: !blockStatus })
             });
             
             return await this.handleResponse(response);
@@ -234,6 +230,37 @@ class SupervisorAPIService {
             return await this.handleResponse(response);
         } catch (error) {
             console.error('Erreur génération rapport:', error);
+            throw error;
+        }
+    }
+
+    // Récupérer les paramètres du superviseur
+    async getSupervisorSettings() {
+        try {
+            const response = await fetch(`${this.baseUrl}/supervisor/settings`, {
+                method: 'GET',
+                headers: await this.getHeaders()
+            });
+            
+            return await this.handleResponse(response);
+        } catch (error) {
+            console.error('Erreur récupération paramètres:', error);
+            throw error;
+        }
+    }
+
+    // Mettre à jour les paramètres
+    async updateSettings(settings) {
+        try {
+            const response = await fetch(`${this.baseUrl}/supervisor/settings`, {
+                method: 'PUT',
+                headers: await this.getHeaders(),
+                body: JSON.stringify(settings)
+            });
+            
+            return await this.handleResponse(response);
+        } catch (error) {
+            console.error('Erreur mise à jour paramètres:', error);
             throw error;
         }
     }

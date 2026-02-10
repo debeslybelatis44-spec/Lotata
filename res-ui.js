@@ -3,6 +3,7 @@ class UIManager {
     constructor() {
         this.notificationContainer = document.getElementById('notification-container');
         this.initEventListeners();
+        this.initMobileMenu();
     }
 
     // Initialisation des écouteurs d'événements
@@ -15,6 +16,8 @@ class UIManager {
                     if (view && EVENT_HANDLERS.onViewChange) {
                         EVENT_HANDLERS.onViewChange(view, item);
                     }
+                    // Fermer le menu mobile après clic
+                    this.closeMobileMenu();
                 });
             }
         });
@@ -67,10 +70,91 @@ class UIManager {
                 EVENT_HANDLERS.onReportPeriodChange(e.target.value);
             }
         });
+
+        // Menu burger mobile
+        document.getElementById('mobile-menu-toggle')?.addEventListener('click', () => {
+            this.toggleMobileMenu();
+        });
+
+        // Fermer le menu en cliquant en dehors
+        document.addEventListener('click', (e) => {
+            const sidebar = document.querySelector('.supervisor-sidebar');
+            const menuToggle = document.getElementById('mobile-menu-toggle');
+            
+            if (SUPERVISOR_STATE.mobileMenuOpen && 
+                !sidebar.contains(e.target) && 
+                !menuToggle.contains(e.target)) {
+                this.closeMobileMenu();
+            }
+        });
+    }
+
+    // Initialiser le menu mobile
+    initMobileMenu() {
+        // Créer le bouton menu burger pour mobile
+        const headerLeft = document.querySelector('.header-left');
+        if (headerLeft && !document.getElementById('mobile-menu-toggle')) {
+            const menuToggle = document.createElement('button');
+            menuToggle.id = 'mobile-menu-toggle';
+            menuToggle.className = 'mobile-menu-toggle';
+            menuToggle.innerHTML = '<i class="fas fa-bars"></i>';
+            headerLeft.appendChild(menuToggle);
+        }
+    }
+
+    // Basculer le menu mobile
+    toggleMobileMenu() {
+        const sidebar = document.querySelector('.supervisor-sidebar');
+        const overlay = document.getElementById('mobile-overlay') || this.createMobileOverlay();
+        
+        if (SUPERVISOR_STATE.mobileMenuOpen) {
+            sidebar.classList.remove('mobile-open');
+            overlay.classList.remove('active');
+            SUPERVISOR_STATE.mobileMenuOpen = false;
+        } else {
+            sidebar.classList.add('mobile-open');
+            overlay.classList.add('active');
+            SUPERVISOR_STATE.mobileMenuOpen = true;
+        }
+    }
+
+    // Fermer le menu mobile
+    closeMobileMenu() {
+        const sidebar = document.querySelector('.supervisor-sidebar');
+        const overlay = document.getElementById('mobile-overlay');
+        
+        if (sidebar) {
+            sidebar.classList.remove('mobile-open');
+        }
+        if (overlay) {
+            overlay.classList.remove('active');
+        }
+        SUPERVISOR_STATE.mobileMenuOpen = false;
+    }
+
+    // Créer l'overlay pour mobile
+    createMobileOverlay() {
+        const overlay = document.createElement('div');
+        overlay.id = 'mobile-overlay';
+        overlay.className = 'mobile-overlay';
+        document.body.appendChild(overlay);
+        
+        overlay.addEventListener('click', () => {
+            this.closeMobileMenu();
+        });
+        
+        return overlay;
     }
 
     // Afficher une notification
     showNotification(message, type = 'info', duration = 3000) {
+        // Créer le conteneur s'il n'existe pas
+        if (!this.notificationContainer) {
+            this.notificationContainer = document.createElement('div');
+            this.notificationContainer.id = 'notification-container';
+            document.body.appendChild(this.notificationContainer);
+        }
+        
         const notification = document.createElement('div');
         notification.className = `notification ${type}`;
         
@@ -84,26 +168,39 @@ class UIManager {
         notification.innerHTML = `
             <i class="fas fa-${icon}"></i>
             <span>${message}</span>
+            <button class="notification-close"><i class="fas fa-times"></i></button>
         `;
         
         this.notificationContainer.appendChild(notification);
         
         // Animation d'entrée
         setTimeout(() => {
-            notification.style.animation = 'slideIn 0.3s';
+            notification.classList.add('show');
         }, 10);
         
+        // Fermer la notification
+        notification.querySelector('.notification-close').addEventListener('click', () => {
+            this.removeNotification(notification);
+        });
+        
         // Suppression automatique
-        setTimeout(() => {
-            notification.style.animation = 'slideIn 0.3s reverse';
+        if (duration > 0) {
             setTimeout(() => {
-                if (notification.parentNode) {
-                    notification.parentNode.removeChild(notification);
-                }
-            }, 300);
-        }, duration);
+                this.removeNotification(notification);
+            }, duration);
+        }
         
         return notification;
+    }
+
+    // Supprimer une notification
+    removeNotification(notification) {
+        notification.classList.remove('show');
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 300);
     }
 
     // Afficher une erreur
@@ -147,15 +244,13 @@ class UIManager {
             document.body.appendChild(modal);
             
             // Gestion des boutons
-            modal.querySelector('.close-modal').addEventListener('click', () => {
+            const closeModal = () => {
                 document.body.removeChild(modal);
                 resolve(false);
-            });
+            };
             
-            modal.querySelector('#confirm-cancel').addEventListener('click', () => {
-                document.body.removeChild(modal);
-                resolve(false);
-            });
+            modal.querySelector('.close-modal').addEventListener('click', closeModal);
+            modal.querySelector('#confirm-cancel').addEventListener('click', closeModal);
             
             modal.querySelector('#confirm-ok').addEventListener('click', () => {
                 document.body.removeChild(modal);
@@ -165,10 +260,18 @@ class UIManager {
             // Fermer en cliquant en dehors
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) {
-                    document.body.removeChild(modal);
-                    resolve(false);
+                    closeModal();
                 }
             });
+            
+            // Fermer avec la touche Échap
+            const handleEscape = (e) => {
+                if (e.key === 'Escape') {
+                    closeModal();
+                    document.removeEventListener('keydown', handleEscape);
+                }
+            };
+            document.addEventListener('keydown', handleEscape);
         });
     }
 
@@ -196,20 +299,17 @@ class UIManager {
             
             document.body.appendChild(modal);
             
-            modal.querySelector('.close-modal').addEventListener('click', () => {
+            const closeModal = () => {
                 document.body.removeChild(modal);
                 resolve();
-            });
+            };
             
-            modal.querySelector('#info-ok').addEventListener('click', () => {
-                document.body.removeChild(modal);
-                resolve();
-            });
+            modal.querySelector('.close-modal').addEventListener('click', closeModal);
+            modal.querySelector('#info-ok').addEventListener('click', closeModal);
             
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) {
-                    document.body.removeChild(modal);
-                    resolve();
+                    closeModal();
                 }
             });
         });
@@ -258,6 +358,17 @@ class UIManager {
             }
         });
         
+        // Fermer avec la touche Échap
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') {
+                if (EVENT_HANDLERS.onCloseModal) {
+                    EVENT_HANDLERS.onCloseModal();
+                }
+                document.removeEventListener('keydown', handleEscape);
+            }
+        };
+        document.addEventListener('keydown', handleEscape);
+        
         // Fermer en cliquant en dehors
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
@@ -274,12 +385,6 @@ class UIManager {
     closeAgentModal() {
         const modal = document.getElementById('agent-details-modal');
         modal.style.display = 'none';
-        
-        // Nettoyer les écouteurs
-        modal.querySelectorAll('.tab-btn').forEach(btn => {
-            const newBtn = btn.cloneNode(true);
-            btn.parentNode.replaceChild(newBtn, btn);
-        });
     }
 
     // Changer d'onglet dans le modal
@@ -320,16 +425,24 @@ class UIManager {
 
     // Mettre à jour les statistiques du header
     updateHeaderStats(onlineCount, totalSales, totalWins) {
-        document.getElementById('online-count').textContent = onlineCount;
-        document.getElementById('total-sales').textContent = totalSales;
-        document.getElementById('total-wins').textContent = totalWins;
+        const onlineElement = document.getElementById('online-count');
+        const salesElement = document.getElementById('total-sales');
+        const winsElement = document.getElementById('total-wins');
+        
+        if (onlineElement) onlineElement.textContent = onlineCount;
+        if (salesElement) salesElement.textContent = totalSales;
+        if (winsElement) winsElement.textContent = totalWins;
     }
 
     // Mettre à jour les informations du superviseur
     updateSupervisorInfo(name, email = '', phone = '') {
-        document.getElementById('current-supervisor').textContent = name;
-        document.getElementById('supervisor-info').textContent = 
-            `Superviseur: ${name}${email ? ` • ${email}` : ''}${phone ? ` • ${phone}` : ''}`;
+        const supervisorElement = document.getElementById('current-supervisor');
+        const infoElement = document.getElementById('supervisor-info');
+        
+        if (supervisorElement) supervisorElement.textContent = name;
+        if (infoElement) {
+            infoElement.textContent = `Superviseur: ${name}${email ? ` • ${email}` : ''}${phone ? ` • ${phone}` : ''}`;
+        }
     }
 
     // Changer de vue
@@ -355,13 +468,10 @@ class UIManager {
             targetView.style.display = 'block';
         }
         
+        // Fermer le menu mobile si ouvert
+        this.closeMobileMenu();
+        
         SUPERVISOR_STATE.currentView = viewName;
-    }
-
-    // Afficher le menu latéral sur mobile
-    toggleSidebar() {
-        const sidebar = document.querySelector('.supervisor-sidebar');
-        sidebar.classList.toggle('mobile-open');
     }
 
     // Rendre un élément vide
@@ -401,6 +511,165 @@ class UIManager {
             return true;
         }
         return false;
+    }
+
+    // Afficher le formulaire de paramètres
+    showSettingsForm(settings) {
+        const container = document.getElementById('settings-container');
+        if (!container) return;
+        
+        container.innerHTML = `
+            <div class="settings-form">
+                <div class="settings-section">
+                    <h4><i class="fas fa-bell"></i> Notifications</h4>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="notif-sales" ${settings.notifySales ? 'checked' : ''}>
+                            <span>Alertes de ventes importantes</span>
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="notif-wins" ${settings.notifyWins ? 'checked' : ''}>
+                            <span>Alertes de gros gains</span>
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="notif-agent" ${settings.notifyAgentActivity ? 'checked' : ''}>
+                            <span>Activité des agents</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="settings-section">
+                    <h4><i class="fas fa-chart-line"></i> Rapports</h4>
+                    <div class="form-group">
+                        <label>Format d'export par défaut</label>
+                        <select id="report-format" class="form-control">
+                            <option value="pdf" ${settings.defaultReportFormat === 'pdf' ? 'selected' : ''}>PDF</option>
+                            <option value="excel" ${settings.defaultReportFormat === 'excel' ? 'selected' : ''}>Excel</option>
+                            <option value="csv" ${settings.defaultReportFormat === 'csv' ? 'selected' : ''}>CSV</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Période de rapport par défaut</label>
+                        <select id="default-period" class="form-control">
+                            <option value="today" ${settings.defaultPeriod === 'today' ? 'selected' : ''}>Aujourd'hui</option>
+                            <option value="week" ${settings.defaultPeriod === 'week' ? 'selected' : ''}>Cette semaine</option>
+                            <option value="month" ${settings.defaultPeriod === 'month' ? 'selected' : ''}>Ce mois</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="settings-section">
+                    <h4><i class="fas fa-shield-alt"></i> Sécurité</h4>
+                    <div class="form-group">
+                        <label>Délai de déconnexion automatique (minutes)</label>
+                        <input type="number" id="auto-logout" class="form-control" 
+                               value="${settings.autoLogoutMinutes || 30}" min="5" max="240">
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="require-pin" ${settings.requirePinForActions ? 'checked' : ''}>
+                            <span>Demander PIN pour actions critiques</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="settings-section">
+                    <h4><i class="fas fa-palette"></i> Interface</h4>
+                    <div class="form-group">
+                        <label>Thème</label>
+                        <select id="theme" class="form-control">
+                            <option value="light" ${settings.theme === 'light' ? 'selected' : ''}>Clair</option>
+                            <option value="dark" ${settings.theme === 'dark' ? 'selected' : ''}>Sombre</option>
+                            <option value="auto" ${settings.theme === 'auto' ? 'selected' : ''}>Auto</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Taille de texte</label>
+                        <select id="font-size" class="form-control">
+                            <option value="small" ${settings.fontSize === 'small' ? 'selected' : ''}>Petit</option>
+                            <option value="normal" ${settings.fontSize === 'normal' ? 'selected' : ''}>Normal</option>
+                            <option value="large" ${settings.fontSize === 'large' ? 'selected' : ''}>Grand</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="settings-actions">
+                    <button class="btn btn-primary" id="save-settings">
+                        <i class="fas fa-save"></i> Enregistrer les paramètres
+                    </button>
+                    <button class="btn btn-secondary" id="reset-settings">
+                        <i class="fas fa-undo"></i> Rétablir les valeurs par défaut
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        // Ajouter les écouteurs d'événements
+        document.getElementById('save-settings').addEventListener('click', () => {
+            this.saveSettings();
+        });
+        
+        document.getElementById('reset-settings').addEventListener('click', () => {
+            if (confirm('Rétablir les valeurs par défaut?')) {
+                this.resetSettings();
+            }
+        });
+    }
+
+    // Enregistrer les paramètres
+    async saveSettings() {
+        const settings = {
+            notifySales: document.getElementById('notif-sales').checked,
+            notifyWins: document.getElementById('notif-wins').checked,
+            notifyAgentActivity: document.getElementById('notif-agent').checked,
+            defaultReportFormat: document.getElementById('report-format').value,
+            defaultPeriod: document.getElementById('default-period').value,
+            autoLogoutMinutes: parseInt(document.getElementById('auto-logout').value),
+            requirePinForActions: document.getElementById('require-pin').checked,
+            theme: document.getElementById('theme').value,
+            fontSize: document.getElementById('font-size').value
+        };
+        
+        try {
+            const result = await apiService.updateSettings(settings);
+            if (result.success) {
+                this.showSuccess('Paramètres enregistrés avec succès');
+                // Appliquer le thème immédiatement
+                this.applyTheme(settings.theme);
+            }
+        } catch (error) {
+            this.showError('Erreur lors de l\'enregistrement des paramètres');
+        }
+    }
+
+    // Réinitialiser les paramètres
+    async resetSettings() {
+        const defaultSettings = {
+            notifySales: true,
+            notifyWins: true,
+            notifyAgentActivity: true,
+            defaultReportFormat: 'pdf',
+            defaultPeriod: 'today',
+            autoLogoutMinutes: 30,
+            requirePinForActions: true,
+            theme: 'auto',
+            fontSize: 'normal'
+        };
+        
+        this.showSettingsForm(defaultSettings);
+    }
+
+    // Appliquer le thème
+    applyTheme(theme) {
+        if (theme === 'dark' || (theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.body.classList.add('dark-theme');
+        } else {
+            document.body.classList.remove('dark-theme');
+        }
     }
 }
 

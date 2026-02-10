@@ -81,12 +81,28 @@ class SupervisorApp {
             // Charger les rapports
             await this.reportManager.loadReports();
             
+            // Charger les paramètres
+            await this.loadSettings();
+            
             // Mettre à jour les statistiques
             await this.updateDashboardStats();
             
         } catch (error) {
             console.error('Erreur chargement données:', error);
             throw error;
+        }
+    }
+
+    // Charger les paramètres
+    async loadSettings() {
+        try {
+            const settings = await this.apiService.getSupervisorSettings();
+            this.uiManager.showSettingsForm(settings);
+            this.uiManager.applyTheme(settings.theme);
+        } catch (error) {
+            console.error('Erreur chargement paramètres:', error);
+            // Charger les paramètres par défaut
+            this.uiManager.resetSettings();
         }
     }
 
@@ -148,10 +164,15 @@ class SupervisorApp {
             const totalCommission = DATA_FORMATTERS.calculateCommission(todaySales, 0.05);
             
             // Mettre à jour les statistiques principales
-            document.getElementById('active-agents').textContent = activeAgents;
-            document.getElementById('today-sales').textContent = DATA_FORMATTERS.formatCurrency(todaySales);
-            document.getElementById('total-tickets').textContent = totalTickets;
-            document.getElementById('total-commission').textContent = DATA_FORMATTERS.formatCurrency(totalCommission);
+            const activeAgentsElement = document.getElementById('active-agents');
+            const todaySalesElement = document.getElementById('today-sales');
+            const totalTicketsElement = document.getElementById('total-tickets');
+            const totalCommissionElement = document.getElementById('total-commission');
+            
+            if (activeAgentsElement) activeAgentsElement.textContent = activeAgents;
+            if (todaySalesElement) todaySalesElement.textContent = DATA_FORMATTERS.formatCurrency(todaySales);
+            if (totalTicketsElement) totalTicketsElement.textContent = totalTickets;
+            if (totalCommissionElement) totalCommissionElement.textContent = DATA_FORMATTERS.formatCurrency(totalCommission);
             
             // Mettre à jour l'en-tête
             this.uiManager.updateHeaderStats(
@@ -188,7 +209,7 @@ class SupervisorApp {
                 // À implémenter
                 break;
             case 'settings':
-                // À implémenter
+                this.loadSettings();
                 break;
         }
     }
@@ -284,117 +305,6 @@ class SupervisorApp {
 document.addEventListener('DOMContentLoaded', () => {
     // Créer l'instance de l'application
     window.supervisorApp = new SupervisorApp();
-    
-    // Ajouter des styles supplémentaires dynamiquement
-    const additionalStyles = `
-        .performance-excellent { color: var(--success) !important; }
-        .performance-good { color: #28a745 !important; }
-        .performance-average { color: var(--warning) !important; }
-        .performance-poor { color: var(--danger) !important; }
-        
-        .sales-stats-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-        }
-        
-        .sales-stat-card {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 10px;
-            text-align: center;
-        }
-        
-        .sales-stat-value {
-            font-size: 20px;
-            font-weight: bold;
-            color: var(--primary);
-            margin-top: 5px;
-        }
-        
-        .sales-stat-value.success {
-            color: var(--success);
-        }
-        
-        .win-card {
-            background: linear-gradient(135deg, #28a745, #20c997);
-            color: white;
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 10px;
-        }
-        
-        .win-card.pending {
-            background: linear-gradient(135deg, #ffc107, #fd7e14);
-        }
-        
-        .win-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        
-        .win-amount {
-            font-size: 18px;
-            font-weight: bold;
-        }
-        
-        .detailed-report {
-            background: white;
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
-        }
-        
-        .report-summary {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        
-        .summary-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 10px;
-            background: #f8f9fa;
-            border-radius: 8px;
-        }
-        
-        .reports-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 20px;
-        }
-        
-        .report-card {
-            background: white;
-            border-radius: 15px;
-            padding: 20px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
-        }
-        
-        @media (min-width: 768px) {
-            .reports-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-            
-            .report-card.summary-card {
-                grid-column: 1 / -1;
-            }
-        }
-        
-        @media (min-width: 992px) {
-            .reports-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-    `;
-    
-    const styleSheet = document.createElement('style');
-    styleSheet.textContent = additionalStyles;
-    document.head.appendChild(styleSheet);
 });
 
 // Service Worker pour le mode hors ligne (optionnel)

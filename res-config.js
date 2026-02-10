@@ -20,7 +20,8 @@ let SUPERVISOR_STATE = {
     selectedAgent: null,
     currentView: 'dashboard',
     reports: null,
-    isLoading: false
+    isLoading: false,
+    mobileMenuOpen: false
 };
 
 // Gestionnaire d'événements global
@@ -28,18 +29,29 @@ const EVENT_HANDLERS = {
     onAgentBlock: null,
     onTicketDelete: null,
     onViewChange: null,
-    onDataRefresh: null
+    onDataRefresh: null,
+    onAgentsRefresh: null,
+    onExportAgents: null,
+    onSearchAgent: null,
+    onFilterChange: null,
+    onAgentTabChange: null,
+    onDeleteRecentTickets: null,
+    onToggleAgentBlock: null,
+    onCloseModal: null,
+    onReportPeriodChange: null,
+    onLogout: null
 };
 
-// URLs API selon l'environnement
+// URLs API
 const API_CONFIG = {
-    LOCAL: 'http://localhost:10000/api',
-    PRODUCTION: '/api',
+    LOCAL: 'http://localhost:3000/api',
+    PRODUCTION: 'https://api.lotato.com/api',
     
     getBaseUrl: function() {
-        return window.location.hostname === 'localhost' || 
-               window.location.hostname === '127.0.0.1' ? 
-               this.LOCAL : this.PRODUCTION;
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            return this.LOCAL;
+        }
+        return this.PRODUCTION;
     }
 };
 
@@ -124,6 +136,7 @@ const VALIDATORS = {
     },
     
     isRecentTicket: function(ticketDate) {
+        if (!ticketDate) return false;
         const ticketTime = new Date(ticketDate);
         const now = new Date();
         const diffMinutes = (now - ticketTime) / (1000 * 60);
@@ -173,17 +186,3 @@ const STORAGE = {
         }
     }
 };
-
-// Export des configurations
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        SUPERVISOR_CONFIG,
-        SUPERVISOR_STATE,
-        EVENT_HANDLERS,
-        API_CONFIG,
-        MESSAGES,
-        DATA_FORMATTERS,
-        VALIDATORS,
-        STORAGE
-    };
-}

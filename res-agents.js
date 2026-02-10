@@ -59,42 +59,46 @@ class AgentManager {
         let html = '';
 
         for (const agent of agentsToShow) {
-            const stats = await this.apiService.getAgentStats(agent.id);
-            
-            html += `
-                <div class="agent-card ${!agent.active ? 'blocked' : ''}">
-                    <div class="agent-header">
-                        <div class="agent-status">
-                            <span class="status-dot ${agent.online ? 'online' : 'offline'}"></span>
-                            ${agent.active ? 'Actif' : 'Bloqué'}
+            try {
+                const stats = await this.apiService.getAgentStats(agent.id);
+                
+                html += `
+                    <div class="agent-card ${!agent.active ? 'blocked' : ''}">
+                        <div class="agent-header">
+                            <div class="agent-status">
+                                <span class="status-dot ${agent.online ? 'online' : 'offline'}"></span>
+                                ${agent.active ? 'Actif' : 'Bloqué'}
+                            </div>
+                            <span class="agent-location">${agent.location || 'Non spécifié'}</span>
                         </div>
-                        <span class="agent-location">${agent.location || 'Non spécifié'}</span>
-                    </div>
-                    <div class="agent-info">
-                        <div class="agent-name">${agent.name}</div>
-                        <div class="agent-id">${agent.id}</div>
-                    </div>
-                    <div class="agent-stats">
-                        <div class="stat-item">
-                            <span class="stat-label">Ventes</span>
-                            <span class="stat-value">${DATA_FORMATTERS.formatCurrency(stats.totalBets)}</span>
+                        <div class="agent-info">
+                            <div class="agent-name">${agent.name}</div>
+                            <div class="agent-id">${agent.id}</div>
                         </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Tickets</span>
-                            <span class="stat-value">${stats.totalTickets}</span>
+                        <div class="agent-stats">
+                            <div class="stat-item">
+                                <span class="stat-label">Ventes</span>
+                                <span class="stat-value">${DATA_FORMATTERS.formatCurrency(stats.totalBets)}</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Tickets</span>
+                                <span class="stat-value">${stats.totalTickets}</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Gains</span>
+                                <span class="stat-value">${DATA_FORMATTERS.formatCurrency(stats.totalWins)}</span>
+                            </div>
                         </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Gains</span>
-                            <span class="stat-value">${DATA_FORMATTERS.formatCurrency(stats.totalWins)}</span>
+                        <div class="agent-actions">
+                            <button class="btn-small btn-warning view-agent-btn" data-agent-id="${agent.id}">
+                                <i class="fas fa-eye"></i> Voir
+                            </button>
                         </div>
                     </div>
-                    <div class="agent-actions">
-                        <button class="btn-small btn-warning view-agent-btn" data-agent-id="${agent.id}">
-                            <i class="fas fa-eye"></i> Voir
-                        </button>
-                    </div>
-                </div>
-            `;
+                `;
+            } catch (error) {
+                console.error(`Erreur stats agent ${agent.id}:`, error);
+            }
         }
 
         container.innerHTML = html;
@@ -121,52 +125,56 @@ class AgentManager {
         let html = '';
 
         for (const agent of SUPERVISOR_STATE.agents) {
-            const stats = await this.apiService.getAgentStats(agent.id);
-            
-            html += `
-                <div class="agent-card ${!agent.active ? 'blocked' : ''}">
-                    <div class="agent-header">
-                        <div class="agent-status">
-                            <span class="status-dot ${agent.online ? 'online' : 'offline'}"></span>
-                            ${agent.active ? 'Actif' : 'Bloqué'}
-                            ${!agent.active ? ' <span class="blocked-label">(Bloqué)</span>' : ''}
+            try {
+                const stats = await this.apiService.getAgentStats(agent.id);
+                
+                html += `
+                    <div class="agent-card ${!agent.active ? 'blocked' : ''}">
+                        <div class="agent-header">
+                            <div class="agent-status">
+                                <span class="status-dot ${agent.online ? 'online' : 'offline'}"></span>
+                                ${agent.active ? 'Actif' : 'Bloqué'}
+                                ${!agent.active ? ' <span class="blocked-label">(Bloqué)</span>' : ''}
+                            </div>
+                            <div class="agent-header-actions">
+                                <button class="btn-small ${!agent.active ? 'btn-success' : 'btn-danger'} block-agent-btn" 
+                                        data-agent-id="${agent.id}" data-current-status="${agent.active}">
+                                    ${!agent.active ? 'Débloquer' : 'Bloquer'}
+                                </button>
+                                <button class="btn-small btn-warning view-agent-btn" data-agent-id="${agent.id}">
+                                    Détails
+                                </button>
+                            </div>
                         </div>
-                        <div class="agent-header-actions">
-                            <button class="btn-small ${!agent.active ? 'btn-success' : 'btn-danger'} block-agent-btn" 
-                                    data-agent-id="${agent.id}" data-current-status="${agent.active}">
-                                ${!agent.active ? 'Débloquer' : 'Bloquer'}
-                            </button>
-                            <button class="btn-small btn-warning view-agent-btn" data-agent-id="${agent.id}">
-                                Détails
-                            </button>
+                        <div class="agent-info">
+                            <div class="agent-name">${agent.name}</div>
+                            <div class="agent-details">
+                                <p><i class="fas fa-id-card"></i> <strong>ID:</strong> ${agent.id}</p>
+                                ${agent.email ? `<p><i class="fas fa-envelope"></i> <strong>Email:</strong> ${agent.email}</p>` : ''}
+                                ${agent.phone ? `<p><i class="fas fa-phone"></i> <strong>Téléphone:</strong> ${agent.phone}</p>` : ''}
+                                ${agent.location ? `<p><i class="fas fa-map-marker-alt"></i> <strong>Localisation:</strong> ${agent.location}</p>` : ''}
+                                <p><i class="fas fa-percentage"></i> <strong>Commission:</strong> ${agent.commission || 5}%</p>
+                            </div>
+                        </div>
+                        <div class="agent-stats">
+                            <div class="stat-item">
+                                <span class="stat-label">Ventes Aujourd'hui</span>
+                                <span class="stat-value">${DATA_FORMATTERS.formatCurrency(stats.todaySales)}</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Tickets</span>
+                                <span class="stat-value">${stats.totalTickets}</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Gains</span>
+                                <span class="stat-value">${DATA_FORMATTERS.formatCurrency(stats.totalWins)}</span>
+                            </div>
                         </div>
                     </div>
-                    <div class="agent-info">
-                        <div class="agent-name">${agent.name}</div>
-                        <div class="agent-details">
-                            <p><i class="fas fa-id-card"></i> <strong>ID:</strong> ${agent.id}</p>
-                            ${agent.email ? `<p><i class="fas fa-envelope"></i> <strong>Email:</strong> ${agent.email}</p>` : ''}
-                            ${agent.phone ? `<p><i class="fas fa-phone"></i> <strong>Téléphone:</strong> ${agent.phone}</p>` : ''}
-                            ${agent.location ? `<p><i class="fas fa-map-marker-alt"></i> <strong>Localisation:</strong> ${agent.location}</p>` : ''}
-                            <p><i class="fas fa-percentage"></i> <strong>Commission:</strong> ${agent.commission || 5}%</p>
-                        </div>
-                    </div>
-                    <div class="agent-stats">
-                        <div class="stat-item">
-                            <span class="stat-label">Ventes Aujourd'hui</span>
-                            <span class="stat-value">${DATA_FORMATTERS.formatCurrency(stats.todaySales)}</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Tickets</span>
-                            <span class="stat-value">${stats.totalTickets}</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Gains</span>
-                            <span class="stat-value">${DATA_FORMATTERS.formatCurrency(stats.totalWins)}</span>
-                        </div>
-                    </div>
-                </div>
-            `;
+                `;
+            } catch (error) {
+                console.error(`Erreur stats agent ${agent.id}:`, error);
+            }
         }
 
         container.innerHTML = html;
@@ -228,10 +236,10 @@ class AgentManager {
         }
         
         container.innerHTML = tickets.map(ticket => {
-            const canDelete = VALIDATORS.isRecentTicket(ticket.timestamp || ticket.date);
-            const formattedTime = DATA_FORMATTERS.formatTimeAgo(ticket.timestamp || ticket.date);
-            const amount = ticket.total || ticket.total_amount || 0;
-            const betsCount = ticket.betsCount || ticket.bets?.length || 0;
+            const canDelete = VALIDATORS.isRecentTicket(ticket.timestamp || ticket.date || ticket.created_at);
+            const formattedTime = DATA_FORMATTERS.formatTimeAgo(ticket.timestamp || ticket.date || ticket.created_at);
+            const amount = ticket.total || ticket.total_amount || ticket.amount || 0;
+            const betsCount = ticket.betsCount || ticket.bets?.length || 1;
             
             return `
                 <div class="ticket-item">
@@ -302,10 +310,10 @@ class AgentManager {
         }
         
         container.innerHTML = wins.map(win => {
-            const amount = win.win_amount || win.amount || 0;
+            const amount = win.win_amount || win.amount || win.winAmount || 0;
             const status = win.paid ? 'Payé' : 'En attente';
             const statusClass = win.paid ? 'paid' : 'pending';
-            const formattedDate = DATA_FORMATTERS.formatDate(win.date || win.created_at);
+            const formattedDate = DATA_FORMATTERS.formatDate(win.date || win.created_at || win.timestamp);
             
             return `
                 <div class="win-card ${statusClass}">
@@ -418,7 +426,7 @@ class AgentManager {
             
             // Filtrer les tickets récents
             const recentTickets = tickets.filter(ticket => {
-                return VALIDATORS.isRecentTicket(ticket.timestamp || ticket.date);
+                return VALIDATORS.isRecentTicket(ticket.timestamp || ticket.date || ticket.created_at);
             });
             
             // Supprimer chaque ticket récent
@@ -451,7 +459,7 @@ class AgentManager {
         if (!confirmed) return;
         
         try {
-            const result = await this.apiService.blockAgent(agentId, !currentStatus);
+            const result = await this.apiService.blockAgent(agentId, currentStatus);
             
             if (result.success) {
                 // Mettre à jour l'état local
@@ -560,48 +568,52 @@ class AgentManager {
         let html = '';
         
         for (const agent of agents) {
-            const stats = await this.apiService.getAgentStats(agent.id);
-            
-            html += `
-                <div class="agent-card ${!agent.active ? 'blocked' : ''}">
-                    <div class="agent-header">
-                        <div class="agent-status">
-                            <span class="status-dot ${agent.online ? 'online' : 'offline'}"></span>
-                            ${agent.active ? 'Actif' : 'Bloqué'}
+            try {
+                const stats = await this.apiService.getAgentStats(agent.id);
+                
+                html += `
+                    <div class="agent-card ${!agent.active ? 'blocked' : ''}">
+                        <div class="agent-header">
+                            <div class="agent-status">
+                                <span class="status-dot ${agent.online ? 'online' : 'offline'}"></span>
+                                ${agent.active ? 'Actif' : 'Bloqué'}
+                            </div>
+                            <div class="agent-header-actions">
+                                <button class="btn-small ${!agent.active ? 'btn-success' : 'btn-danger'} block-agent-btn" 
+                                        data-agent-id="${agent.id}" data-current-status="${agent.active}">
+                                    ${!agent.active ? 'Débloquer' : 'Bloquer'}
+                                </button>
+                                <button class="btn-small btn-warning view-agent-btn" data-agent-id="${agent.id}">
+                                    Détails
+                                </button>
+                            </div>
                         </div>
-                        <div class="agent-header-actions">
-                            <button class="btn-small ${!agent.active ? 'btn-success' : 'btn-danger'} block-agent-btn" 
-                                    data-agent-id="${agent.id}" data-current-status="${agent.active}">
-                                ${!agent.active ? 'Débloquer' : 'Bloquer'}
-                            </button>
-                            <button class="btn-small btn-warning view-agent-btn" data-agent-id="${agent.id}">
-                                Détails
-                            </button>
+                        <div class="agent-info">
+                            <div class="agent-name">${agent.name}</div>
+                            <div class="agent-details">
+                                <p><strong>ID:</strong> ${agent.id}</p>
+                                ${agent.email ? `<p><strong>Email:</strong> ${agent.email}</p>` : ''}
+                            </div>
+                        </div>
+                        <div class="agent-stats">
+                            <div class="stat-item">
+                                <span class="stat-label">Ventes</span>
+                                <span class="stat-value">${DATA_FORMATTERS.formatCurrency(stats.todaySales)}</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Tickets</span>
+                                <span class="stat-value">${stats.totalTickets}</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Gains</span>
+                                <span class="stat-value">${DATA_FORMATTERS.formatCurrency(stats.totalWins)}</span>
+                            </div>
                         </div>
                     </div>
-                    <div class="agent-info">
-                        <div class="agent-name">${agent.name}</div>
-                        <div class="agent-details">
-                            <p><strong>ID:</strong> ${agent.id}</p>
-                            ${agent.email ? `<p><strong>Email:</strong> ${agent.email}</p>` : ''}
-                        </div>
-                    </div>
-                    <div class="agent-stats">
-                        <div class="stat-item">
-                            <span class="stat-label">Ventes</span>
-                            <span class="stat-value">${DATA_FORMATTERS.formatCurrency(stats.todaySales)}</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Tickets</span>
-                            <span class="stat-value">${stats.totalTickets}</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Gains</span>
-                            <span class="stat-value">${DATA_FORMATTERS.formatCurrency(stats.totalWins)}</span>
-                        </div>
-                    </div>
-                </div>
-            `;
+                `;
+            } catch (error) {
+                console.error(`Erreur stats agent ${agent.id}:`, error);
+            }
         }
         
         container.innerHTML = html;
