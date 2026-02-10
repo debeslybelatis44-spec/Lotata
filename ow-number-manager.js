@@ -1,4 +1,4 @@
-// Gestionnaire des numéros
+// Gestionnaire des numéros - COMPLÉTÉ
 class NumberManager {
     constructor(uiManager, stateManager) {
         this.uiManager = uiManager;
@@ -177,12 +177,11 @@ class NumberManager {
         }
         
         try {
-            // Enregistrer dans les paramètres système
             const settings = this.stateManager.getData('settings') || {};
             settings.autoBlockThreshold = threshold;
             settings.autoBlockAction = action;
             
-            await ApiService.updateSettings({ settings: settings });
+            await ApiService.updateSettings(settings);
             
             this.uiManager.showNotification(
                 `Blocage automatique configuré: seuil à ${threshold} Gdes, action: ${action}`,
@@ -419,7 +418,6 @@ class NumberManager {
                     newLimit = Math.round(newLimit * (1 + adjustment / 100));
                 } else {
                     newLimit = Math.round(newLimit * (1 - adjustment / 100));
-                    // Ne pas descendre en dessous de 0
                     if (newLimit < 0) newLimit = 0;
                 }
                 
@@ -450,7 +448,6 @@ class NumberManager {
         }
         
         try {
-            // Récupérer les limites par défaut depuis l'API
             const defaultLimits = {};
             for (let i = 0; i < 100; i++) {
                 const num = i.toString().padStart(2, '0');
@@ -488,9 +485,9 @@ class NumberManager {
         }
     }
 
-    // Rendre les statistiques des numéros
+    // Rendre les statistiques des numéros - CORRIGÉ (ID corrigé)
     renderNumbersStats() {
-        const container = document.getElementById('numbers-stats-tab');
+        const container = document.getElementById('stats-tab'); // ID CORRIGÉ
         if (!container) return;
         
         const numbersData = this.stateManager.getData('numbers') || { blocked: [], limits: {}, stats: {} };

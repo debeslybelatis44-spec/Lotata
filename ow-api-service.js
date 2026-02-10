@@ -1,4 +1,4 @@
-// Service API pour communiquer avec le backend
+// Service API pour communiquer avec le backend - CORRIGÉ
 class ApiService {
     static async request(endpoint, method = 'GET', data = null, options = {}) {
         const url = API_CONFIG.BASE_URL + endpoint;
@@ -18,7 +18,6 @@ class ApiService {
         } catch (error) {
             console.error(`Erreur API ${method} ${endpoint}:`, error);
             
-            // Notification d'erreur utilisateur
             if (typeof ownerManager !== 'undefined' && ownerManager.showNotification) {
                 ownerManager.showNotification(
                     error.message || 'Erreur de connexion au serveur',
@@ -50,8 +49,18 @@ class ApiService {
         return await this.request(endpoint, 'DELETE', null, options);
     }
 
-    // Méthodes spécifiques pour l'application LOTATO
-    
+    // NOUVELLES MÉTHODES AJOUTÉES
+
+    // Mettre à jour un tirage
+    static async updateDraw(drawId, data) {
+        return await this.put(`/draws/${drawId}`, data);
+    }
+
+    // Transferer un agent
+    static async transferAgent(agentId, data) {
+        return await this.post(`/agents/${agentId}/transfer`, data);
+    }
+
     // Authentification
     static async verifyToken() {
         return await this.get(API_CONFIG.ENDPOINTS.AUTH.VERIFY);

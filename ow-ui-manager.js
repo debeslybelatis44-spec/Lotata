@@ -1,4 +1,4 @@
-// Gestionnaire d'interface utilisateur
+// Gestionnaire d'interface utilisateur - COMPLÉTÉ
 class UIManager {
     constructor(stateManager) {
         this.stateManager = stateManager;
@@ -14,7 +14,6 @@ class UIManager {
     }
 
     initEventListeners() {
-        // Écouteur pour la prévisualisation des résultats
         const form = document.getElementById('manual-publish-form');
         if (form) {
             form.querySelectorAll('input[type="number"]').forEach(input => {
@@ -22,10 +21,8 @@ class UIManager {
             });
         }
 
-        // Écouteur pour les changements de vue sur mobile
         window.addEventListener('resize', () => this.handleResize());
         
-        // Écouteur pour fermer les modals avec ESC
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 this.closeAllModals();
@@ -34,7 +31,6 @@ class UIManager {
     }
 
     initResponsiveHandlers() {
-        // Détecter l'orientation et ajuster l'UI
         window.addEventListener('orientationchange', () => {
             setTimeout(() => {
                 this.adjustUIForScreenSize();
@@ -43,7 +39,6 @@ class UIManager {
     }
 
     initNotifications() {
-        // Créer le conteneur de notifications s'il n'existe pas
         if (!document.getElementById('notifications-container')) {
             this.notificationContainer = document.createElement('div');
             this.notificationContainer.id = 'notifications-container';
@@ -65,7 +60,6 @@ class UIManager {
 
     // Gestion des vues
     switchView(viewName) {
-        // Mettre à jour les éléments de navigation
         document.querySelectorAll('.nav-item').forEach(item => {
             item.classList.remove('active');
         });
@@ -75,23 +69,19 @@ class UIManager {
             clickedItem.classList.add('active');
         }
         
-        // Cacher toutes les vues
         document.querySelectorAll('.view-content').forEach(view => {
             view.style.display = 'none';
         });
         
-        // Afficher la vue sélectionnée
         const viewElement = document.getElementById(`${viewName}-view`);
         if (viewElement) {
             viewElement.style.display = 'block';
             this.stateManager.setCurrentView(viewName);
             
-            // Fermer le menu mobile si ouvert
             if (window.innerWidth <= 768) {
                 this.stateManager.closeMobileMenu();
             }
             
-            // Charger les données spécifiques à la vue
             this.loadViewData(viewName);
         }
     }
@@ -104,7 +94,6 @@ class UIManager {
         if (event?.target) {
             event.target.classList.add('active');
         } else {
-            // Si appelé programmatiquement, trouver le bon tab
             const tab = document.querySelector(`#publish-view .tab[onclick*="${tabName}"]`);
             if (tab) tab.classList.add('active');
         }
@@ -122,6 +111,7 @@ class UIManager {
                 this.loadPublishHistory();
             } else if (tabName === 'auto') {
                 this.updateFetchStatus();
+                this.loadFetchLog();
             }
         }
     }
@@ -213,8 +203,6 @@ class UIManager {
             const data = await ApiService.getDashboardData();
             this.stateManager.updateDashboardStats(data);
             this.renderRecentActivity();
-            
-            // Charger les alertes
             await this.loadAlerts();
             
         } catch (error) {
@@ -303,6 +291,44 @@ class UIManager {
     async loadReportsData() {
         const tabName = this.stateManager.state.currentReportsTab;
         await this.loadReport(tabName);
+    }
+
+    // NOUVELLES MÉTHODES AJOUTÉES
+
+    async loadBlocksTab() {
+        if (typeof ownerManager !== 'undefined' && ownerManager.loadBlocksTab) {
+            await ownerManager.loadBlocksTab();
+        }
+    }
+
+    async loadLimitsTab() {
+        if (typeof ownerManager !== 'undefined' && ownerManager.loadLimitsTab) {
+            await ownerManager.loadLimitsTab();
+        }
+    }
+
+    async loadNumbersStats() {
+        if (typeof ownerManager !== 'undefined' && ownerManager.loadNumbersStats) {
+            await ownerManager.loadNumbersStats();
+        }
+    }
+
+    async loadPublishHistory() {
+        if (typeof ownerManager !== 'undefined' && ownerManager.loadPublishHistory) {
+            await ownerManager.loadPublishHistory();
+        }
+    }
+
+    async loadFetchLog() {
+        if (typeof ownerManager !== 'undefined' && ownerManager.drawManager && ownerManager.drawManager.loadFetchLog) {
+            await ownerManager.drawManager.loadFetchLog();
+        }
+    }
+
+    renderDrawsView() {
+        if (typeof ownerManager !== 'undefined' && ownerManager.renderDrawsView) {
+            ownerManager.renderDrawsView();
+        }
     }
 
     // Rendu des vues
@@ -468,7 +494,6 @@ class UIManager {
     showNotification(message, type = 'success', duration = 5000) {
         const notification = this.stateManager.addNotification(message, type, duration);
         
-        // Créer l'élément UI
         const notificationElement = document.createElement('div');
         notificationElement.className = `notification notification-${type}`;
         notificationElement.style.cssText = `
@@ -502,7 +527,6 @@ class UIManager {
         
         this.notificationContainer.appendChild(notificationElement);
         
-        // Auto-suppression
         setTimeout(() => {
             if (notificationElement.parentNode) {
                 notificationElement.style.animation = 'slideOut 0.3s';
@@ -528,7 +552,6 @@ class UIManager {
                 modal.querySelector('h3').textContent = title;
             }
             
-            // Empêcher le défilement du body
             document.body.style.overflow = 'hidden';
         }
     }
@@ -537,8 +560,6 @@ class UIManager {
         const modal = document.getElementById(modalId);
         if (modal) {
             modal.style.display = 'none';
-            
-            // Restaurer le défilement du body
             document.body.style.overflow = '';
         }
     }
@@ -554,7 +575,6 @@ class UIManager {
     handleResize() {
         this.adjustUIForScreenSize();
         
-        // Fermer le menu mobile si on passe en desktop
         if (window.innerWidth > 768 && this.stateManager.state.mobileMenuOpen) {
             this.stateManager.closeMobileMenu();
         }
@@ -565,18 +585,12 @@ class UIManager {
         const isMobile = width <= 768;
         const isTablet = width > 768 && width <= 1024;
         
-        // Ajuster les grilles
         this.adjustGridLayouts(isMobile, isTablet);
-        
-        // Ajuster les tailles de police
         this.adjustFontSizes(isMobile, isTablet);
-        
-        // Ajuster les padding/margin
         this.adjustSpacing(isMobile, isTablet);
     }
 
     adjustGridLayouts(isMobile, isTablet) {
-        // Ajuster la grille du dashboard
         const dashboardGrid = document.querySelector('.dashboard-grid');
         if (dashboardGrid) {
             if (isMobile) {
@@ -588,7 +602,6 @@ class UIManager {
             }
         }
         
-        // Ajuster la grille des utilisateurs
         const usersGrid = document.querySelector('.users-grid');
         if (usersGrid) {
             if (isMobile) {
@@ -640,13 +653,11 @@ class UIManager {
         const loaded = this.stateManager.loadFromLocalStorage();
         
         if (loaded) {
-            // Restaurer la vue courante
             const currentView = this.stateManager.getCurrentView();
             if (currentView && currentView !== 'dashboard') {
                 this.switchView(currentView);
             }
             
-            // Restaurer les onglets actifs
             this.restoreActiveTabs();
         }
     }
@@ -654,17 +665,14 @@ class UIManager {
     restoreActiveTabs() {
         const state = this.stateManager.state;
         
-        // Restaurer les onglets de publication
         if (state.currentPublishTab && state.currentPublishTab !== 'manual') {
             this.switchPublishTab(state.currentPublishTab);
         }
         
-        // Restaurer les onglets de numéros
         if (state.currentNumbersTab && state.currentNumbersTab !== 'blocks') {
             this.switchNumbersTab(state.currentNumbersTab);
         }
         
-        // Restaurer les onglets de rapports
         if (state.currentReportsTab && state.currentReportsTab !== 'sales') {
             this.switchReportsTab(state.currentReportsTab);
         }
@@ -690,7 +698,6 @@ class UIManager {
         
         const rules = rulesData || {};
         
-        // Règles financières
         financialContainer.innerHTML = `
             <div class="rule-item">
                 <label>Mise minimale:</label>
@@ -712,7 +719,6 @@ class UIManager {
             </div>
         `;
         
-        // Règles temporelles
         timeContainer.innerHTML = `
             <div class="rule-item">
                 <label>Heure ouverture:</label>
@@ -734,7 +740,6 @@ class UIManager {
             </div>
         `;
         
-        // Règles de commission
         commissionContainer.innerHTML = `
             <div class="rule-item">
                 <label>Commission agent:</label>
@@ -756,7 +761,6 @@ class UIManager {
             </div>
         `;
         
-        // Ajouter les événements
         document.querySelectorAll('.rule-input').forEach(input => {
             input.addEventListener('change', () => this.updateRule(input));
         });
@@ -786,7 +790,6 @@ class UIManager {
         try {
             const rules = {};
             
-            // Récupérer toutes les règles
             document.querySelectorAll('.rule-input').forEach(input => {
                 const key = input.dataset.key;
                 rules[key] = {
@@ -795,7 +798,7 @@ class UIManager {
                 };
             });
             
-            await ApiService.updateRules({ rules: rules });
+            await ApiService.updateRules(rules);
             this.showNotification('Toutes les règles ont été sauvegardées', 'success');
             
         } catch (error) {
@@ -822,7 +825,7 @@ class UIManager {
                 game_tax: { value: '15', description: 'Taxe sur les jeux (%)' }
             };
             
-            await ApiService.updateRules({ rules: defaultRules });
+            await ApiService.updateRules(defaultRules);
             this.showNotification('Règles restaurées avec succès', 'success');
             this.loadRulesData();
             
@@ -1167,6 +1170,83 @@ class UIManager {
         return colors[type] || 'var(--primary)';
     }
 
+    // Activité
+    renderActivityView() {
+        const container = document.getElementById('full-activity-log');
+        const activities = this.stateManager.getData('activity') || [];
+        
+        if (activities.length === 0) {
+            container.innerHTML = '<p class="no-data">Aucune activité enregistrée</p>';
+            return;
+        }
+        
+        container.innerHTML = activities.map(activity => `
+            <div class="activity-log-item" style="padding: 15px; border-bottom: 1px solid var(--border);">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div>
+                        <div style="font-weight: 500; color: var(--dark);">${activity.details || activity.action}</div>
+                        <div style="font-size: 12px; color: var(--text-dim); margin-top: 5px;">
+                            <span>${new Date(activity.timestamp).toLocaleString()}</span>
+                            <span> • </span>
+                            <span>${activity.user || 'Système'}</span>
+                            <span> • </span>
+                            <span class="badge" style="background: #f0f0f0; color: var(--text); padding: 2px 8px; border-radius: 10px; font-size: 11px;">
+                                ${activity.type || 'système'}
+                            </span>
+                        </div>
+                    </div>
+                    <div>
+                        <i class="fas fa-${this.getActivityIcon(activity.action)}" style="color: var(--text-dim);"></i>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    // Limites
+    renderLimitsView() {
+        const container = document.getElementById('user-limits-container');
+        const settings = this.stateManager.getData('settings') || {};
+        
+        container.innerHTML = `
+            <div class="limits-section">
+                <h4 style="margin-bottom: 15px;">Configuration des Limites</h4>
+                <div class="form-group">
+                    <label>Limite quotidienne par défaut (Gdes):</label>
+                    <input type="number" class="form-control" id="default-daily-limit" value="${settings.default_daily_limit || 5000}">
+                </div>
+                <div class="form-group">
+                    <label>Limite par ticket par défaut (Gdes):</label>
+                    <input type="number" class="form-control" id="default-ticket-limit" value="${settings.default_ticket_limit || 500}">
+                </div>
+                <div class="form-group">
+                    <label>Commission maximale (%):</label>
+                    <input type="number" class="form-control" id="max-commission" value="${settings.max_commission || 20}">
+                </div>
+                <button class="btn btn-primary" onclick="ownerManager.saveLimitsConfig()">
+                    <i class="fas fa-save"></i> Sauvegarder
+                </button>
+            </div>
+        `;
+    }
+
+    async saveLimitsConfig() {
+        try {
+            const settings = {
+                default_daily_limit: document.getElementById('default-daily-limit').value,
+                default_ticket_limit: document.getElementById('default-ticket-limit').value,
+                max_commission: document.getElementById('max-commission').value
+            };
+            
+            await ApiService.updateSettings(settings);
+            this.showNotification('Configuration des limites sauvegardée', 'success');
+            
+        } catch (error) {
+            console.error('Erreur sauvegarde limites:', error);
+            this.showNotification('Erreur lors de la sauvegarde', 'error');
+        }
+    }
+
     // Utilitaires
     getActivityIcon(action) {
         const icons = {
@@ -1206,115 +1286,5 @@ class UIManager {
             minimumFractionDigits: 0,
             maximumFractionDigits: 0
         }).format(amount);
-    }
-
-    // Méthodes à compléter par les autres gestionnaires
-    loadBlocksTab() {
-        if (typeof ownerManager !== 'undefined') {
-            ownerManager.loadBlocksTab();
-        }
-    }
-
-    loadLimitsTab() {
-        if (typeof ownerManager !== 'undefined') {
-            ownerManager.loadLimitsTab();
-        }
-    }
-
-    loadNumbersStats() {
-        if (typeof ownerManager !== 'undefined') {
-            ownerManager.loadNumbersStats();
-        }
-    }
-
-    loadPublishHistory() {
-        if (typeof ownerManager !== 'undefined') {
-            ownerManager.loadPublishHistory();
-        }
-    }
-
-    loadFetchLog() {
-        // Implémenté dans draw-manager
-    }
-
-    renderDrawsView() {
-        if (typeof ownerManager !== 'undefined') {
-            ownerManager.renderDrawsView();
-        }
-    }
-
-    renderActivityView() {
-        const container = document.getElementById('full-activity-log');
-        const activities = this.stateManager.getData('activity') || [];
-        
-        if (activities.length === 0) {
-            container.innerHTML = '<p class="no-data">Aucune activité enregistrée</p>';
-            return;
-        }
-        
-        container.innerHTML = activities.map(activity => `
-            <div class="activity-log-item" style="padding: 15px; border-bottom: 1px solid var(--border);">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                    <div>
-                        <div style="font-weight: 500; color: var(--dark);">${activity.details || activity.action}</div>
-                        <div style="font-size: 12px; color: var(--text-dim); margin-top: 5px;">
-                            <span>${new Date(activity.timestamp).toLocaleString()}</span>
-                            <span> • </span>
-                            <span>${activity.user || 'Système'}</span>
-                            <span> • </span>
-                            <span class="badge" style="background: #f0f0f0; color: var(--text); padding: 2px 8px; border-radius: 10px; font-size: 11px;">
-                                ${activity.type || 'système'}
-                            </span>
-                        </div>
-                    </div>
-                    <div>
-                        <i class="fas fa-${this.getActivityIcon(activity.action)}" style="color: var(--text-dim);"></i>
-                    </div>
-                </div>
-            </div>
-        `).join('');
-    }
-
-    renderLimitsView() {
-        const container = document.getElementById('user-limits-container');
-        const settings = this.stateManager.getData('settings') || {};
-        
-        container.innerHTML = `
-            <div class="limits-section">
-                <h4 style="margin-bottom: 15px;">Configuration des Limites</h4>
-                <div class="form-group">
-                    <label>Limite quotidienne par défaut (Gdes):</label>
-                    <input type="number" class="form-control" id="default-daily-limit" value="${settings.default_daily_limit || 5000}">
-                </div>
-                <div class="form-group">
-                    <label>Limite par ticket par défaut (Gdes):</label>
-                    <input type="number" class="form-control" id="default-ticket-limit" value="${settings.default_ticket_limit || 500}">
-                </div>
-                <div class="form-group">
-                    <label>Commission maximale (%):</label>
-                    <input type="number" class="form-control" id="max-commission" value="${settings.max_commission || 20}">
-                </div>
-                <button class="btn btn-primary" onclick="this.saveLimitsConfig()">
-                    <i class="fas fa-save"></i> Sauvegarder
-                </button>
-            </div>
-        `;
-    }
-
-    async saveLimitsConfig() {
-        try {
-            const settings = {
-                default_daily_limit: document.getElementById('default-daily-limit').value,
-                default_ticket_limit: document.getElementById('default-ticket-limit').value,
-                max_commission: document.getElementById('max-commission').value
-            };
-            
-            await ApiService.updateSettings({ settings: settings });
-            this.showNotification('Configuration des limites sauvegardée', 'success');
-            
-        } catch (error) {
-            console.error('Erreur sauvegarde limites:', error);
-            this.showNotification('Erreur lors de la sauvegarde', 'error');
-        }
     }
 }

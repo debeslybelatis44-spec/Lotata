@@ -1,4 +1,4 @@
-// Gestionnaire principal de l'application
+// Gestionnaire principal de l'application - COMPLÉTÉ
 class OwnerManager {
     constructor() {
         this.stateManager = new StateManager();
@@ -12,14 +12,12 @@ class OwnerManager {
 
     async init() {
         try {
-            // Vérifier l'authentification
             const token = localStorage.getItem('auth_token');
             if (!token) {
                 window.location.href = '/login.html';
                 return;
             }
 
-            // Vérifier le token avec l'API
             try {
                 await ApiService.verifyToken();
             } catch (error) {
@@ -30,13 +28,8 @@ class OwnerManager {
                 return;
             }
 
-            // Définir le nom d'admin
             document.getElementById('admin-name').textContent = 'ADMIN PROPRIÉTAIRE';
-            
-            // Initialiser l'UI
             this.uiManager.init();
-            
-            // Charger les données initiales
             await this.loadInitialData();
             
             console.log('Panneau propriétaire LOTATO initialisé');
@@ -44,15 +37,12 @@ class OwnerManager {
         } catch (error) {
             console.error('Erreur lors de l\'initialisation:', error);
             this.uiManager.showNotification('Erreur de chargement des données', 'error');
-            
-            // Afficher un message d'erreur mais garder l'interface fonctionnelle
             this.showFallbackUI();
         }
     }
 
     async loadInitialData() {
         try {
-            // Charger les données en parallèle pour plus de rapidité
             const [dashboardData, usersData, drawsData, numbersData, activityData] = await Promise.all([
                 ApiService.getDashboardData().catch(() => ({})),
                 ApiService.getUsers().catch(() => ({ supervisors: [], agents: [] })),
@@ -61,19 +51,16 @@ class OwnerManager {
                 ApiService.getActivityLog().catch(() => [])
             ]);
 
-            // Mettre à jour l'état
             this.stateManager.setData('dashboard', dashboardData);
             this.stateManager.setData('users', usersData);
             this.stateManager.setData('draws', drawsData);
             this.stateManager.setData('numbers', numbersData);
             this.stateManager.setData('activity', activityData);
 
-            // Mettre à jour l'UI
             this.stateManager.updateUIStats(dashboardData);
             this.uiManager.renderRecentActivity();
             this.uiManager.loadAlerts();
 
-            // Mettre en cache les données
             this.stateManager.cacheData('dashboard', dashboardData);
             this.stateManager.cacheData('users', usersData);
             
@@ -84,7 +71,6 @@ class OwnerManager {
     }
 
     showFallbackUI() {
-        // Afficher un message dans le dashboard
         const dashboardView = document.getElementById('dashboard-view');
         if (dashboardView) {
             const errorDiv = document.createElement('div');
@@ -276,6 +262,33 @@ class OwnerManager {
         await this.numberManager.viewNumberHistory(number);
     }
 
+    // NOUVELLES MÉTHODES AJOUTÉES
+
+    async loadLimitsTab() {
+        await this.numberManager.loadLimitsTab();
+    }
+
+    async loadBlocksTab() {
+        await this.numberManager.loadBlocksTab();
+    }
+
+    async loadNumbersStats() {
+        await this.numberManager.loadNumbersStats();
+    }
+
+    async loadPublishHistory() {
+        await this.drawManager.loadPublishHistory();
+    }
+
+    async saveLimitsConfig() {
+        try {
+            await this.uiManager.saveLimitsConfig();
+        } catch (error) {
+            console.error('Erreur sauvegarde limites:', error);
+            this.uiManager.showNotification('Erreur lors de la sauvegarde des limites', 'error');
+        }
+    }
+
     // Méthodes utilitaires
     showNotification(message, type = 'success') {
         this.uiManager.showNotification(message, type);
@@ -336,37 +349,20 @@ class OwnerManager {
         await this.uiManager.loadReport(reportType);
     }
 
-    // Méthode pour charger les statistiques des boules
-    async loadNumbersStats() {
-        await this.numberManager.loadNumbersStats();
-    }
-
-    // Méthode pour charger les limites
-    async loadLimitsTab() {
-        await this.numberManager.loadLimitsTab();
-    }
-
-    // Méthode pour charger les blocages
-    async loadBlocksTab() {
-        this.numberManager.loadBlocksTab();
-    }
-
-    // Méthode pour charger l'historique des publications
-    async loadPublishHistory() {
-        await this.drawManager.loadPublishHistory();
+    // Méthodes pour charger les vues
+    renderDrawsView() {
+        this.drawManager.renderDrawsView();
     }
 }
 
 // Initialiser l'application
 document.addEventListener('DOMContentLoaded', () => {
-    // Vérifier si l'utilisateur est authentifié
     const token = localStorage.getItem('auth_token');
     if (!token) {
         window.location.href = '/login.html';
         return;
     }
     
-    // Initialiser le gestionnaire principal
     window.ownerManager = new OwnerManager();
 });
 
@@ -382,7 +378,6 @@ window.addEventListener('error', (event) => {
     }
 });
 
-// Gestionnaire pour les promesses non catchées
 window.addEventListener('unhandledrejection', (event) => {
     console.error('Promesse non gérée:', event.reason);
     
@@ -398,7 +393,6 @@ window.addEventListener('unhandledrejection', (event) => {
 window.addEventListener('online', () => {
     if (typeof ownerManager !== 'undefined') {
         ownerManager.showNotification('Connexion rétablie', 'success');
-        // Recharger les données
         setTimeout(() => {
             if (ownerManager.loadInitialData) {
                 ownerManager.loadInitialData().catch(() => {});

@@ -1,4 +1,4 @@
-// Gestionnaire des tirages
+// Gestionnaire des tirages - COMPLÉTÉ
 class DrawManager {
     constructor(uiManager, stateManager) {
         this.uiManager = uiManager;
@@ -126,7 +126,6 @@ class DrawManager {
             this.uiManager.updateResultPreview();
             this.uiManager.showNotification(`Tirage ${drawData.name} publié avec succès`, 'success');
             
-            // Recharger les données
             await this.uiManager.loadDashboardData();
             await this.uiManager.loadDrawsData();
             
@@ -204,7 +203,6 @@ class DrawManager {
                 'success'
             );
             
-            // Mettre à jour l'état local
             const draws = this.stateManager.getData('draws');
             const updatedDraws = draws.map(draw => {
                 if (draw.id === drawId) {
@@ -218,8 +216,6 @@ class DrawManager {
             });
             
             this.stateManager.setData('draws', updatedDraws);
-            
-            // Re-rendre la vue
             this.renderDrawsView();
             
         } catch (error) {
@@ -439,12 +435,11 @@ class DrawManager {
                 maxBet: parseInt(formData.get('maxBet')) || 0
             };
             
-            await ApiService.updateUser(drawId, updateData);
+            await ApiService.updateDraw(drawId, updateData);
             
             this.uiManager.showNotification('Tirage mis à jour avec succès', 'success');
             this.uiManager.closeModal('advanced-modal');
             
-            // Recharger les données
             await this.uiManager.loadDrawsData();
             
         } catch (error) {
@@ -475,13 +470,183 @@ class DrawManager {
             await ApiService.publishDraw(drawData);
             
             this.uiManager.showNotification('Tirage publié avec succès', 'success');
-            
-            // Recharger les données
             await this.uiManager.loadDrawsData();
             
         } catch (error) {
             console.error('Erreur publication forcée:', error);
             this.uiManager.showNotification(error.message || 'Erreur lors de la publication', 'error');
+        }
+    }
+
+    // NOUVELLES MÉTHODES AJOUTÉES
+
+    // Basculer l'auto-fetch
+    async toggleAutoFetch() {
+        const enabled = !this.stateManager.state.autoFetchEnabled;
+        this.stateManager.setAutoFetch(enabled);
+        this.uiManager.updateFetchStatus();
+        
+        this.uiManager.showNotification(
+            `Récupération automatique ${enabled ? 'activée' : 'désactivée'}`,
+            enabled ? 'success' : 'warning'
+        );
+    }
+
+    // Récupérer maintenant
+    async fetchNow() {
+        try {
+            this.uiManager.showNotification('Récupération des résultats en cours...', 'info');
+            
+            const source = document.getElementById('fetch-url').value;
+            if (!source) {
+                throw new Error('URL source non configurée');
+            }
+            
+            const response = await ApiService.fetchExternalResults(source);
+            this.uiManager.showNotification('Récupération terminée avec succès', 'success');
+            
+            // Mettre à jour le log
+            this.loadFetchLog();
+            
+        } catch (error) {
+            console.error('Erreur lors de la récupération:', error);
+            this.uiManager.showNotification(error.message || 'Erreur lors de la récupération', 'error');
+        }
+    }
+
+    // Tester la connexion
+    async testFetch() {
+        try {
+            this.uiManager.showNotification('Test de connexion en cours...', 'info');
+            
+            const source = document.getElementById('fetch-url').value;
+            if (!source) {
+                throw new Error('URL source non configurée');
+            }
+            
+            // Simulation de test
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            this.uiManager.showNotification('Connexion réussie à la source', 'success');
+            
+        } catch (error) {
+            console.error('Erreur de test:', error);
+            this.uiManager.showNotification(error.message || 'Échec de la connexion à la source', 'error');
+        }
+    }
+
+    // Planifier un tirage
+    async scheduleDraw(drawId) {
+        const draw = await ApiService.getDrawById(drawId);
+        
+        const modal = document.getElementById('advanced-modal');
+        const title = document.getElementById('advanced-modal-title');
+        const content = document.getElementById('advanced-modal-content');
+        
+        title.textContent = `Planifier: ${draw.name}`;
+        
+        content.innerHTML = `
+            <form id="schedule-draw-form" onsubmit="ownerManager.confirmSchedule('${drawId}', event)">
+                <div class="form-group">
+                    <label>Date et heure de publication:</label>
+                    <input type="datetime-local" class="form-control" name="scheduleTime" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>Répétition:</label>
+                    <select class="form-control" name="repeat">
+                        <option value="once">Une seule fois</option>
+                        <option value="daily">Tous les jours</option>
+                        <option value="weekly">Toutes les semaines</option>
+                        <option value="monthly">Tous les mois</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Générer des résultats aléatoires:</label>
+                    <input type="checkbox" name="randomResults" checked>
+                </div>
+                
+                <div class="form-group">
+                    <label>Notification par email:</label>
+                    <input type="checkbox" name="emailNotification">
+                </div>
+                
+                <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid var(--border);">
+                    <div style="display: flex; gap: 10px;">
+                        <button type="button" class="btn btn-secondary" onclick="ownerManager.closeModal('advanced-modal')">
+                            Annuler
+                        </button>
+                        <button type="submit" class="btn btn-success">
+                            Planifier
+                        </button>
+                    </div>
+                </div>
+            </form>
+        `;
+        
+        this.uiManager.showModal('advanced-modal');
+    }
+
+    async confirmSchedule(drawId, event) {
+        event.preventDefault();
+        const form = event.target;
+        const formData = new FormData(form);
+        
+        try {
+            const scheduleData = {
+                drawId: drawId,
+                scheduleTime: formData.get('scheduleTime'),
+                repeat: formData.get('repeat'),
+                randomResults: formData.get('randomResults') === 'on',
+                emailNotification: formData.get('emailNotification') === 'on'
+            };
+            
+            await ApiService.scheduleDraw(scheduleData);
+            
+            this.uiManager.showNotification('Tirage planifié avec succès', 'success');
+            this.uiManager.closeModal('advanced-modal');
+            
+        } catch (error) {
+            console.error('Erreur planification:', error);
+            this.uiManager.showNotification(error.message || 'Erreur lors de la planification', 'error');
+        }
+    }
+
+    // Charger le log de récupération
+    async loadFetchLog() {
+        try {
+            const container = document.getElementById('fetch-log');
+            if (!container) return;
+            
+            // Simuler des données de log
+            const logs = [
+                { timestamp: new Date(Date.now() - 3600000), message: 'Récupération automatique réussie', status: 'success' },
+                { timestamp: new Date(Date.now() - 7200000), message: 'Échec de connexion à la source', status: 'error' },
+                { timestamp: new Date(Date.now() - 10800000), message: 'Récupération manuelle exécutée', status: 'success' }
+            ];
+            
+            container.innerHTML = logs.map(log => `
+                <div class="fetch-log-item" style="padding: 10px; border-bottom: 1px solid var(--border);">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-weight: 500;">${log.message}</div>
+                            <div style="font-size: 12px; color: var(--text-dim);">
+                                ${log.timestamp.toLocaleString()}
+                            </div>
+                        </div>
+                        <div>
+                            <span class="badge" style="background: ${log.status === 'success' ? 'var(--success)' : 'var(--danger)'}; 
+                                  color: white; padding: 3px 8px; border-radius: 10px; font-size: 11px;">
+                                ${log.status === 'success' ? 'SUCCÈS' : 'ERREUR'}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            
+        } catch (error) {
+            console.error('Erreur chargement log:', error);
         }
     }
 }

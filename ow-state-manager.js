@@ -1,4 +1,4 @@
-// État de l'application
+// État de l'application - CORRIGÉ
 class StateManager {
     constructor() {
         this.state = {
@@ -148,19 +148,12 @@ class StateManager {
                 this.state.filters = parsedState.filters || this.state.filters;
                 this.state.notifications = parsedState.notifications || [];
                 
-                // Restaurer les notifications dans l'UI
-                this.restoreNotifications();
-                
                 return true;
             }
         } catch (error) {
             console.error('Erreur lors du chargement depuis localStorage:', error);
         }
         return false;
-    }
-
-    restoreNotifications() {
-        // Cette fonction sera complétée dans ow-ui-manager.js
     }
 
     // Gestion de l'auto-fetch
@@ -178,7 +171,7 @@ class StateManager {
         const interval = parseInt(document.getElementById('fetch-interval')?.value || 5) * 60000;
         
         this.state.autoFetchInterval = setInterval(() => {
-            if (typeof ownerManager !== 'undefined') {
+            if (typeof ownerManager !== 'undefined' && ownerManager.fetchNow) {
                 ownerManager.fetchNow();
             }
         }, interval);
@@ -192,7 +185,7 @@ class StateManager {
     }
 
     // Gestion des données temporaires
-    cacheData(key, data, ttl = 300000) { // 5 minutes par défaut
+    cacheData(key, data, ttl = 300000) {
         const cacheItem = {
             data,
             timestamp: Date.now(),
@@ -211,7 +204,6 @@ class StateManager {
                 if (Date.now() - timestamp < ttl) {
                     return data;
                 } else {
-                    // Cache expiré
                     localStorage.removeItem(`lotato_cache_${key}`);
                 }
             }
@@ -222,7 +214,6 @@ class StateManager {
     }
 
     clearCache() {
-        // Supprimer tous les éléments du cache
         Object.keys(localStorage).forEach(key => {
             if (key.startsWith('lotato_cache_')) {
                 localStorage.removeItem(key);
@@ -239,7 +230,6 @@ class StateManager {
     }
 
     updateUIStats(stats) {
-        // Mettre à jour les éléments UI avec les nouvelles stats
         const updateElement = (id, value) => {
             const element = document.getElementById(id);
             if (element) {
