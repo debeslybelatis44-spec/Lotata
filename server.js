@@ -178,7 +178,7 @@ async function initializeDatabase() {
       )
     `);
 
-    // Table des tirages
+    // Table des tirages - CORRIGÉ
     await pool.query(`
       CREATE TABLE IF NOT EXISTS draws (
         id VARCHAR(50) PRIMARY KEY,
@@ -242,7 +242,7 @@ async function initializeDatabase() {
       )
     `);
 
-    // Insérer des tirages par défaut
+    // Insérer des tirages par défaut - CORRIGÉ
     const draws = [
       { id: 'tn_matin', name: 'Tunisia Matin', time: '10:00' },
       { id: 'tn_soir', name: 'Tunisia Soir', time: '17:00' },
@@ -258,20 +258,24 @@ async function initializeDatabase() {
 
     for (const draw of draws) {
       await pool.query(`
-        INSERT INTO draws (id, name, time, active)
-        VALUES ($1, $2, $3, true)
+        INSERT INTO draws (id, name, time, active, created_at, updated_at)
+        VALUES ($1, $2, $3, true, NOW(), NOW())
         ON CONFLICT (id) DO UPDATE SET
           name = EXCLUDED.name,
           time = EXCLUDED.time,
-          updated_at = NOW()
+          updated_at = NOW(),
+          active = EXCLUDED.active
       `, [draw.id, draw.name, draw.time]);
     }
 
-    // Configuration loterie par défaut
+    // Configuration loterie par défaut - CORRIGÉ
     await pool.query(`
-      INSERT INTO lottery_config (name, logo, address, phone)
-      VALUES ('LOTATO PRO', 'https://raw.githubusercontent.com/your-username/your-repo/main/logo.png', '', '')
-      ON CONFLICT (id) DO NOTHING
+      INSERT INTO lottery_config (name, logo, address, phone, updated_at)
+      VALUES ('LOTATO PRO', 'https://raw.githubusercontent.com/your-username/your-repo/main/logo.png', '', '', NOW())
+      ON CONFLICT (id) DO UPDATE SET
+        name = EXCLUDED.name,
+        logo = EXCLUDED.logo,
+        updated_at = NOW()
     `);
 
     console.log('✅ Tables initialisées avec succès');
@@ -296,7 +300,8 @@ const authenticateToken = (req, res, next) => {
     '/api/tickets/check-winners'
   ];
   
-  if (publicRoutes.includes(req.path)) {
+  // Vérifier si la route actuelle est publique
+  if (publicRoutes.some(route => req.path.startsWith(route))) {
     return next();
   }
 
@@ -1586,8 +1591,8 @@ app.post('/api/draws', async (req, res) => {
     const drawId = `DRAW-${Date.now()}`;
     
     const result = await pool.query(
-      `INSERT INTO draws (id, name, time, frequency, description, min_bet, max_bet, active, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, true, NOW()) RETURNING *`,
+      `INSERT INTO draws (id, name, time, frequency, description, min_bet, max_bet, active, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, true, NOW(), NOW()) RETURNING *`,
       [drawId, name, time, frequency || 'daily', description, minBet || 0, maxBet || 0]
     );
     
@@ -1648,7 +1653,7 @@ app.post('/api/draws/publish', async (req, res) => {
     await pool.query(
       `INSERT INTO activity_log (user_id, user_role, action, details, timestamp)
        VALUES ($1, $2, $3, $4, NOW())`,
-      [req.user?.id || 'owner', 'owner', 'draw_published', `Tirage ${name} publié manuellement`]
+      [req.user?.id || 'system', 'owner', 'draw_published', `Tirage ${name} publié manuellement`]
     );
     
     res.json({ 
@@ -3263,12 +3268,12 @@ app.post('/api/lottery-config', async (req, res) => {
     
     if (check.rows.length === 0) {
       await pool.query(
-        'INSERT INTO lottery_config (name, logo, address, phone) VALUES ($1, $2, $3, $4)',
+        'INSERT INTO lottery_config (name, logo, address, phone, updated_at) VALUES ($1, $2, $3, $4, NOW())',
         [name, logo, address, phone]
       );
     } else {
       await pool.query(
-        'UPDATE lottery_config SET name = $1, logo = $2, address = $3, phone = $4',
+        'UPDATE lottery_config SET name = $1, logo = $2, address = $3, phone = $4, updated_at = NOW()',
         [name, logo, address, phone]
       );
     }
