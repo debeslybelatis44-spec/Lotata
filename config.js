@@ -29,7 +29,6 @@ const CONFIG = {
         AUTO_LOTTO4: 1000,
         AUTO_LOTTO5: 5000
     },
-    // Tunisie en premier, Florida (anciennement Miami) et autres tirages
     DRAWS: [
         { id: 'tn_matin', name: 'Tunisia Matin', time: '10:00', color: 'var(--tunisia)' },
         { id: 'tn_soir', name: 'Tunisia Soir', time: '17:00', color: 'var(--tunisia)' },
@@ -64,7 +63,24 @@ let APP_STATE = {
     showSpecialGames: false,
     currentTab: 'home',
     isDrawBlocked: false,
-    agentId: 'agent-01',
-    agentName: 'Agent-01',
+    agentId: localStorage.getItem('agent_id') || 'agent-01',
+    agentName: localStorage.getItem('agent_name') || 'Agent-01',
     lotteryConfig: null
 };
+
+// Initialisation au chargement de la page
+document.addEventListener('DOMContentLoaded', function() {
+    // Récupérer les infos de l'agent depuis localStorage
+    const agentId = localStorage.getItem('agent_id');
+    const agentName = localStorage.getItem('agent_name');
+    const userRole = localStorage.getItem('user_role');
+    
+    if (agentId) {
+        APP_STATE.agentId = agentId;
+    }
+    if (agentName) {
+        APP_STATE.agentName = agentName;
+    }
+    
+    console.log('👤 Agent connecté:', APP_STATE.agentName, 'ID:', APP_STATE.agentId);
+});

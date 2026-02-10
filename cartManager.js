@@ -301,6 +301,14 @@ async function processFinalTicket() {
         return;
     }
 
+    // Vérifier l'authentification
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
+        alert("Ou pa konekte! Tanpri rekonekte.");
+        window.location.href = 'index.html';
+        return;
+    }
+
     const betsByDraw = {};
     APP_STATE.currentCart.forEach(bet => {
         if (!betsByDraw[bet.drawId]) {
@@ -334,29 +342,19 @@ async function processFinalTicket() {
                 total: drawBets.reduce((sum, b) => sum + (parseFloat(b.amount) || 0), 0)
             };
 
-            const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.SAVE_TICKET}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(ticketData)
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Erreur serveur: ${response.status} - ${errorText}`);
-            }
-
-            const savedTicket = await response.json();
-            console.log('Ticket sauvegardé:', savedTicket);
-            tickets.push(savedTicket.ticket);
+            console.log('📤 Envoi ticket vers API:', ticketData);
             
-            if (savedTicket.ticket) {
-                APP_STATE.ticketsHistory.unshift(savedTicket.ticket);
-            }
+            // Utiliser APIService.saveTicket qui gère déjà l'authentification
+            const responseData = await APIService.saveTicket(ticketData);
             
-            if (savedTicket.ticket) {
-                printThermalTicket(savedTicket.ticket);
+            console.log('✅ Ticket sauvegardé:', responseData);
+            
+            if (responseData.ticket) {
+                tickets.push(responseData.ticket);
+                APP_STATE.ticketsHistory.unshift(responseData.ticket);
+                
+                // Imprimer le ticket
+                printThermalTicket(responseData.ticket);
             }
         }
         
@@ -366,8 +364,19 @@ async function processFinalTicket() {
             alert(`✅ ${tickets.length} fich sove ak siksè epi enprime!`);
         }
         
+        // Vider le panier
         APP_STATE.currentCart = [];
         CartManager.renderCart();
+        
+        // Rafraîchir l'historique
+        if (APP_STATE.currentTab === 'history') {
+            loadHistory();
+        }
+        
+        // Rafraîchir les rapports
+        if (APP_STATE.currentTab === 'reports') {
+            loadReports();
+        }
         
     } catch (error) {
         console.error('❌ Erreur sauvegarde:', error);
