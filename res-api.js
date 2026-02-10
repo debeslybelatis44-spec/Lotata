@@ -1,251 +1,243 @@
-// Classe pour gérer les appels API
-class SupervisorAPI {
-    // URL de base corrigée
-    static API_BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:10000/api' : '/api';
-
-    static async getHeaders() {
-        const token = localStorage.getItem('auth_token');
-        return {
-            'Content-Type': 'application/json',
-            'Authorization': token ? `Bearer ${token}` : ''
-        };
+// Service API pour les communications avec le backend
+class SupervisorAPIService {
+    constructor() {
+        this.baseUrl = API_CONFIG.getBaseUrl();
+        this.authToken = STORAGE.get('auth_token');
     }
 
-    static async verifyToken() {
+    // En-têtes HTTP communs
+    async getHeaders() {
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+
+        if (this.authToken) {
+            headers['Authorization'] = `Bearer ${this.authToken}`;
+        }
+
+        return headers;
+    }
+
+    // Gestionnaire d'erreurs HTTP
+    async handleResponse(response) {
+        if (!response.ok) {
+            const error = await response.text();
+            throw new Error(`HTTP ${response.status}: ${error}`);
+        }
+        
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            return await response.json();
+        }
+        
+        return await response.text();
+    }
+
+    // Vérification du token
+    async verifyToken() {
         try {
-            const response = await fetch(`${this.API_BASE_URL}/auth/verify`, {
+            const response = await fetch(`${this.baseUrl}/auth/verify`, {
                 method: 'GET',
                 headers: await this.getHeaders()
             });
-
-            if (!response.ok) {
-                throw new Error('Authentification échouée');
-            }
-
-            return await response.json();
+            
+            return await this.handleResponse(response);
         } catch (error) {
             console.error('Erreur vérification token:', error);
             throw error;
         }
     }
 
-    static async getSupervisorInfo() {
+    // Informations du superviseur
+    async getSupervisorInfo() {
         try {
-            const response = await fetch(`${this.API_BASE_URL}/supervisor/auth/verify`, {
+            const response = await fetch(`${this.baseUrl}/supervisor/auth/verify`, {
                 method: 'GET',
                 headers: await this.getHeaders()
             });
-
-            if (!response.ok) {
-                throw new Error('Erreur de récupération des informations superviseur');
-            }
-
-            return await response.json();
+            
+            return await this.handleResponse(response);
         } catch (error) {
             console.error('Erreur récupération info superviseur:', error);
             return null;
         }
     }
 
-    static async getSupervisorAgents() {
+    // Liste des agents
+    async getSupervisorAgents() {
         try {
-            const response = await fetch(`${this.API_BASE_URL}/supervisor/agents`, {
+            const response = await fetch(`${this.baseUrl}/supervisor/agents`, {
                 method: 'GET',
                 headers: await this.getHeaders()
             });
-
-            if (!response.ok) {
-                throw new Error('Erreur de récupération des agents');
-            }
-
-            const data = await response.json();
-            return data.agents || data || [];
+            
+            const data = await this.handleResponse(response);
+            return data || [];
         } catch (error) {
             console.error('Erreur récupération agents:', error);
             return [];
         }
     }
 
-    static async getAgentTickets(agentId) {
+    // Tickets d'un agent
+    async getAgentTickets(agentId) {
         try {
-            const response = await fetch(`${this.API_BASE_URL}/tickets/agent/${agentId}`, {
+            const response = await fetch(`${this.baseUrl}/tickets/agent/${agentId}`, {
                 method: 'GET',
                 headers: await this.getHeaders()
             });
-
-            if (!response.ok) {
-                throw new Error('Erreur de récupération des tickets');
-            }
-
-            const data = await response.json();
-            return data.tickets || data || [];
+            
+            const data = await this.handleResponse(response);
+            return data.tickets || [];
         } catch (error) {
             console.error('Erreur récupération tickets:', error);
             return [];
         }
     }
 
-    static async getAgentWins(agentId) {
+    // Gains d'un agent
+    async getAgentWins(agentId) {
         try {
-            const response = await fetch(`${this.API_BASE_URL}/winners/agent/${agentId}`, {
+            const response = await fetch(`${this.baseUrl}/winners/agent/${agentId}`, {
                 method: 'GET',
                 headers: await this.getHeaders()
             });
-
-            if (!response.ok) {
-                throw new Error('Erreur de récupération des gains');
-            }
-
-            const data = await response.json();
-            return data.winners || data || [];
+            
+            const data = await this.handleResponse(response);
+            return data.winners || [];
         } catch (error) {
             console.error('Erreur récupération gains:', error);
             return [];
         }
     }
 
-    static async deleteTicket(ticketId) {
+    // Statistiques d'un agent
+    async getAgentStats(agentId) {
         try {
-            const response = await fetch(`${this.API_BASE_URL}/tickets/delete/${ticketId}`, {
+            const response = await fetch(`${this.baseUrl}/reports?agentId=${agentId}`, {
+                method: 'GET',
+                headers: await this.getHeaders()
+            });
+            
+            const data = await this.handleResponse(response);
+            return {
+                totalBets: data.totalBets || 0,
+                totalTickets: data.totalTickets || 0,
+                totalWins: data.totalWins || 0,
+                todaySales: data.todaySales || 0,
+                activeDays: data.activeDays || 0
+            };
+        } catch (error) {
+            console.error('Erreur récupération statistiques:', error);
+            return { totalBets: 0, totalTickets: 0, totalWins: 0, todaySales: 0, activeDays: 0 };
+        }
+    }
+
+    // Rapports du superviseur
+    async getSupervisorReports(period = 'today') {
+        try {
+            let url = `${this.baseUrl}/reports/dashboard`;
+            if (period !== 'today') {
+                url += `?period=${period}`;
+            }
+            
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: await this.getHeaders()
+            });
+            
+            const data = await this.handleResponse(response);
+            return {
+                totalSales: data.totalSales || 0,
+                totalTickets: data.totalTickets || 0,
+                totalWins: data.totalWins || 0,
+                activeAgents: data.activeAgents || 0,
+                period: period
+            };
+        } catch (error) {
+            console.error('Erreur récupération rapports:', error);
+            return { totalSales: 0, totalTickets: 0, totalWins: 0, activeAgents: 0, period };
+        }
+    }
+
+    // Suppression d'un ticket
+    async deleteTicket(ticketId) {
+        try {
+            const response = await fetch(`${this.baseUrl}/tickets/delete/${ticketId}`, {
                 method: 'DELETE',
                 headers: await this.getHeaders()
             });
-
-            if (!response.ok) {
-                throw new Error('Erreur de suppression du ticket');
-            }
-
-            return await response.json();
+            
+            return await this.handleResponse(response);
         } catch (error) {
             console.error('Erreur suppression ticket:', error);
             throw error;
         }
     }
 
-    static async blockAgent(agentId, blockStatus) {
+    // Blocage/déblocage d'un agent
+    async blockAgent(agentId, blockStatus) {
         try {
-            const response = await fetch(`${this.API_BASE_URL}/users/${agentId}/block`, {
+            const response = await fetch(`${this.baseUrl}/users/${agentId}/block`, {
                 method: 'PATCH',
                 headers: await this.getHeaders(),
                 body: JSON.stringify({ blocked: blockStatus })
             });
-
-            if (!response.ok) {
-                throw new Error('Erreur de blocage/déblocage agent');
-            }
-
-            return await response.json();
+            
+            return await this.handleResponse(response);
         } catch (error) {
             console.error('Erreur blocage agent:', error);
             throw error;
         }
     }
 
-    static async getAgentStats(agentId) {
+    // Déconnexion
+    async logout() {
         try {
-            const response = await fetch(`${this.API_BASE_URL}/reports/agent/${agentId}`, {
-                method: 'GET',
-                headers: await this.getHeaders()
-            });
-
-            if (!response.ok) {
-                throw new Error('Erreur de récupération des statistiques');
-            }
-
-            const data = await response.json();
-            return data.stats || data || { totalBets: 0, totalTickets: 0, totalWins: 0 };
-        } catch (error) {
-            console.error('Erreur récupération statistiques:', error);
-            return { totalBets: 0, totalTickets: 0, totalWins: 0 };
-        }
-    }
-
-    static async getSupervisorReports(period = 'today') {
-        try {
-            const response = await fetch(`${this.API_BASE_URL}/reports/supervisor?period=${period}`, {
-                method: 'GET',
-                headers: await this.getHeaders()
-            });
-
-            if (!response.ok) {
-                throw new Error('Erreur de récupération des rapports');
-            }
-
-            const data = await response.json();
-            return data.report || data || { totalSales: 0, totalTickets: 0, totalWins: 0, activeAgents: 0 };
-        } catch (error) {
-            console.error('Erreur récupération rapports:', error);
-            return { totalSales: 0, totalTickets: 0, totalWins: 0, activeAgents: 0 };
-        }
-    }
-
-    static async getSupervisorWinners() {
-        try {
-            const response = await fetch(`${this.API_BASE_URL}/winners/supervisor`, {
-                method: 'GET',
-                headers: await this.getHeaders()
-            });
-
-            if (!response.ok) {
-                throw new Error('Erreur de récupération des gagnants');
-            }
-
-            const data = await response.json();
-            return data.winners || data || [];
-        } catch (error) {
-            console.error('Erreur récupération gagnants:', error);
-            return [];
-        }
-    }
-
-    static async logout() {
-        try {
-            const response = await fetch(`${this.API_BASE_URL}/auth/logout`, {
+            const response = await fetch(`${this.baseUrl}/auth/logout`, {
                 method: 'POST',
                 headers: await this.getHeaders()
             });
-
-            return await response.json();
+            
+            return await this.handleResponse(response);
         } catch (error) {
             console.error('Erreur déconnexion:', error);
             return { success: false };
         }
     }
 
-    static async getSupervisorSettings() {
+    // Mise à jour du profil
+    async updateProfile(profileData) {
         try {
-            const response = await fetch(`${this.API_BASE_URL}/supervisor/settings`, {
-                method: 'GET',
-                headers: await this.getHeaders()
+            const response = await fetch(`${this.baseUrl}/supervisor/profile`, {
+                method: 'PUT',
+                headers: await this.getHeaders(),
+                body: JSON.stringify(profileData)
             });
-
-            if (!response.ok) {
-                throw new Error('Erreur de récupération des paramètres');
-            }
-
-            return await response.json();
+            
+            return await this.handleResponse(response);
         } catch (error) {
-            console.error('Erreur récupération paramètres:', error);
-            return {};
+            console.error('Erreur mise à jour profil:', error);
+            throw error;
         }
     }
 
-    static async updateSupervisorSettings(settings) {
+    // Génération de rapport
+    async generateReport(params) {
         try {
-            const response = await fetch(`${this.API_BASE_URL}/supervisor/settings`, {
-                method: 'PUT',
-                headers: await this.getHeaders(),
-                body: JSON.stringify(settings)
+            const queryString = new URLSearchParams(params).toString();
+            const response = await fetch(`${this.baseUrl}/reports/generate?${queryString}`, {
+                method: 'GET',
+                headers: await this.getHeaders()
             });
-
-            if (!response.ok) {
-                throw new Error('Erreur de mise à jour des paramètres');
-            }
-
-            return await response.json();
+            
+            return await this.handleResponse(response);
         } catch (error) {
-            console.error('Erreur mise à jour paramètres:', error);
+            console.error('Erreur génération rapport:', error);
             throw error;
         }
     }
 }
+
+// Instance unique du service API
+const apiService = new SupervisorAPIService();

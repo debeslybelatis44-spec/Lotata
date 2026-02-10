@@ -1,456 +1,408 @@
-// Gestion de l'interface utilisateur
-class UI {
-    static showNotification(message, type = 'info') {
+// Gestionnaire d'interface utilisateur
+class UIManager {
+    constructor() {
+        this.notificationContainer = document.getElementById('notification-container');
+        this.initEventListeners();
+    }
+
+    // Initialisation des écouteurs d'événements
+    initEventListeners() {
+        // Navigation
+        document.querySelectorAll('.nav-item').forEach(item => {
+            if (!item.classList.contains('logout-btn')) {
+                item.addEventListener('click', (e) => {
+                    const view = item.getAttribute('data-view');
+                    if (view && EVENT_HANDLERS.onViewChange) {
+                        EVENT_HANDLERS.onViewChange(view, item);
+                    }
+                });
+            }
+        });
+
+        // Déconnexion
+        document.querySelector('.logout-btn')?.addEventListener('click', () => {
+            if (EVENT_HANDLERS.onLogout) {
+                EVENT_HANDLERS.onLogout();
+            }
+        });
+
+        // Boutons d'action
+        document.getElementById('refresh-data')?.addEventListener('click', () => {
+            if (EVENT_HANDLERS.onDataRefresh) {
+                EVENT_HANDLERS.onDataRefresh();
+            }
+        });
+
+        document.getElementById('refresh-agents')?.addEventListener('click', () => {
+            if (EVENT_HANDLERS.onAgentsRefresh) {
+                EVENT_HANDLERS.onAgentsRefresh();
+            }
+        });
+
+        document.getElementById('export-agents')?.addEventListener('click', () => {
+            if (EVENT_HANDLERS.onExportAgents) {
+                EVENT_HANDLERS.onExportAgents();
+            }
+        });
+
+        // Recherche et filtres
+        const searchInput = document.getElementById('search-agent');
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                if (EVENT_HANDLERS.onSearchAgent) {
+                    EVENT_HANDLERS.onSearchAgent(e.target.value);
+                }
+            });
+        }
+
+        document.getElementById('filter-status')?.addEventListener('change', (e) => {
+            if (EVENT_HANDLERS.onFilterChange) {
+                EVENT_HANDLERS.onFilterChange(e.target.value);
+            }
+        });
+
+        // Période de rapport
+        document.getElementById('report-period')?.addEventListener('change', (e) => {
+            if (EVENT_HANDLERS.onReportPeriodChange) {
+                EVENT_HANDLERS.onReportPeriodChange(e.target.value);
+            }
+        });
+    }
+
+    // Afficher une notification
+    showNotification(message, type = 'info', duration = 3000) {
         const notification = document.createElement('div');
-        notification.className = `notification notification-${type}`;
+        notification.className = `notification ${type}`;
+        
+        let icon = 'info-circle';
+        switch(type) {
+            case 'success': icon = 'check-circle'; break;
+            case 'error': icon = 'exclamation-circle'; break;
+            case 'warning': icon = 'exclamation-triangle'; break;
+        }
         
         notification.innerHTML = `
-            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+            <i class="fas fa-${icon}"></i>
             <span>${message}</span>
         `;
         
-        document.body.appendChild(notification);
+        this.notificationContainer.appendChild(notification);
         
         // Animation d'entrée
         setTimeout(() => {
-            notification.classList.add('show');
+            notification.style.animation = 'slideIn 0.3s';
         }, 10);
         
-        // Supprimer après 3 secondes
+        // Suppression automatique
         setTimeout(() => {
-            notification.classList.remove('show');
+            notification.style.animation = 'slideIn 0.3s reverse';
             setTimeout(() => {
                 if (notification.parentNode) {
                     notification.parentNode.removeChild(notification);
                 }
             }, 300);
-        }, 3000);
-    }
-
-    static formatTime(dateString) {
-        const date = new Date(dateString);
-        const now = new Date();
-        const diffMs = now - date;
-        const diffMins = Math.floor(diffMs / 60000);
+        }, duration);
         
-        if (diffMins < 1) return 'À l\'instant';
-        if (diffMins < 60) return `Il y a ${diffMins} min`;
-        if (diffMins < 1440) return `Il y a ${Math.floor(diffMins / 60)} h`;
-        return date.toLocaleDateString();
+        return notification;
     }
 
-    static formatCurrency(amount) {
-        return `${parseFloat(amount).toLocaleString('fr-FR')} Gdes`;
+    // Afficher une erreur
+    showError(message, duration = 4000) {
+        return this.showNotification(message, 'error', duration);
     }
 
-    static toggleMobileMode() {
-        MOBILE_MODE = !MOBILE_MODE;
+    // Afficher un succès
+    showSuccess(message, duration = 3000) {
+        return this.showNotification(message, 'success', duration);
+    }
+
+    // Afficher un avertissement
+    showWarning(message, duration = 3000) {
+        return this.showNotification(message, 'warning', duration);
+    }
+
+    // Afficher une boîte de dialogue de confirmation
+    showConfirm(message, title = 'Confirmation') {
+        return new Promise((resolve) => {
+            const modal = document.createElement('div');
+            modal.className = 'modal confirm-modal';
+            modal.style.display = 'flex';
+            
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 400px;">
+                    <div class="modal-header">
+                        <h3>${title}</h3>
+                        <button class="close-modal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <p>${message}</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" id="confirm-cancel">Annuler</button>
+                        <button class="btn btn-danger" id="confirm-ok">Confirmer</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Gestion des boutons
+            modal.querySelector('.close-modal').addEventListener('click', () => {
+                document.body.removeChild(modal);
+                resolve(false);
+            });
+            
+            modal.querySelector('#confirm-cancel').addEventListener('click', () => {
+                document.body.removeChild(modal);
+                resolve(false);
+            });
+            
+            modal.querySelector('#confirm-ok').addEventListener('click', () => {
+                document.body.removeChild(modal);
+                resolve(true);
+            });
+            
+            // Fermer en cliquant en dehors
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    document.body.removeChild(modal);
+                    resolve(false);
+                }
+            });
+        });
+    }
+
+    // Afficher une boîte de dialogue d'informations
+    showInfo(message, title = 'Information') {
+        return new Promise((resolve) => {
+            const modal = document.createElement('div');
+            modal.className = 'modal info-modal';
+            modal.style.display = 'flex';
+            
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 400px;">
+                    <div class="modal-header">
+                        <h3>${title}</h3>
+                        <button class="close-modal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <p>${message}</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-primary" id="info-ok">OK</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            modal.querySelector('.close-modal').addEventListener('click', () => {
+                document.body.removeChild(modal);
+                resolve();
+            });
+            
+            modal.querySelector('#info-ok').addEventListener('click', () => {
+                document.body.removeChild(modal);
+                resolve();
+            });
+            
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    document.body.removeChild(modal);
+                    resolve();
+                }
+            });
+        });
+    }
+
+    // Afficher le modal de détails d'agent
+    showAgentModal(agentName) {
+        const modal = document.getElementById('agent-details-modal');
+        const title = document.getElementById('modal-agent-name');
         
-        if (MOBILE_MODE) {
-            document.body.classList.add('mobile-mode');
-            document.querySelector('.supervisor-sidebar').classList.remove('active');
-            document.querySelector('.mobile-toggle i').className = 'fas fa-desktop';
-            document.querySelector('.mobile-toggle').title = 'Mode PC';
-        } else {
-            document.body.classList.remove('mobile-mode');
-            document.querySelector('.mobile-toggle i').className = 'fas fa-mobile-alt';
-            document.querySelector('.mobile-toggle').title = 'Mode Mobile';
-        }
+        title.textContent = `Détails: ${agentName}`;
+        modal.style.display = 'flex';
         
-        // Sauvegarder le préférence
-        localStorage.setItem('mobile_mode', MOBILE_MODE);
-    }
-
-    static toggleSidebar() {
-        const sidebar = document.querySelector('.supervisor-sidebar');
-        sidebar.classList.toggle('active');
-    }
-
-    static initEventListeners() {
-        // Recherche d'agents
-        const searchInput = document.getElementById('search-agent');
-        if (searchInput) {
-            searchInput.addEventListener('input', (e) => {
-                const searchTerm = e.target.value.toLowerCase();
-                const agentCards = document.querySelectorAll('.agent-card');
-                
-                agentCards.forEach(card => {
-                    const agentName = card.querySelector('.agent-name').textContent.toLowerCase();
-                    const agentId = card.querySelector('.agent-id').textContent.toLowerCase();
-                    
-                    if (agentName.includes(searchTerm) || agentId.includes(searchTerm)) {
-                        card.style.display = 'block';
-                    } else {
-                        card.style.display = 'none';
-                    }
-                });
+        // Écouteurs pour les onglets
+        modal.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const tabName = this.getAttribute('data-tab');
+                if (EVENT_HANDLERS.onAgentTabChange) {
+                    EVENT_HANDLERS.onAgentTabChange(tabName, this);
+                }
             });
-        }
-
-        // Filtre par statut
-        const filterSelect = document.getElementById('filter-status');
-        if (filterSelect) {
-            filterSelect.addEventListener('change', (e) => {
-                const filterValue = e.target.value;
-                const agentCards = document.querySelectorAll('.agent-card');
-                
-                agentCards.forEach(card => {
-                    const isOnline = card.querySelector('.status-dot').classList.contains('online');
-                    const isBlocked = card.classList.contains('blocked');
-                    
-                    let shouldShow = false;
-                    
-                    switch(filterValue) {
-                        case 'all':
-                            shouldShow = true;
-                            break;
-                        case 'online':
-                            shouldShow = isOnline && !isBlocked;
-                            break;
-                        case 'offline':
-                            shouldShow = !isOnline && !isBlocked;
-                            break;
-                        case 'blocked':
-                            shouldShow = isBlocked;
-                            break;
-                    }
-                    
-                    card.style.display = shouldShow ? 'block' : 'none';
-                });
-            });
-        }
-
-        // Période des rapports
-        const reportPeriod = document.getElementById('report-period');
-        if (reportPeriod) {
-            reportPeriod.addEventListener('change', () => {
-                supervisorManager.loadReports();
-            });
-        }
-
-        // Fermer le modal en cliquant en dehors
-        document.addEventListener('click', (e) => {
-            const modal = document.getElementById('agent-details-modal');
+        });
+        
+        // Écouteurs pour les boutons du modal
+        modal.querySelector('#delete-recent-tickets').addEventListener('click', () => {
+            if (EVENT_HANDLERS.onDeleteRecentTickets) {
+                EVENT_HANDLERS.onDeleteRecentTickets();
+            }
+        });
+        
+        modal.querySelector('#toggle-agent-block').addEventListener('click', () => {
+            if (EVENT_HANDLERS.onToggleAgentBlock) {
+                EVENT_HANDLERS.onToggleAgentBlock();
+            }
+        });
+        
+        modal.querySelector('#close-modal').addEventListener('click', () => {
+            if (EVENT_HANDLERS.onCloseModal) {
+                EVENT_HANDLERS.onCloseModal();
+            }
+        });
+        
+        modal.querySelector('.close-modal').addEventListener('click', () => {
+            if (EVENT_HANDLERS.onCloseModal) {
+                EVENT_HANDLERS.onCloseModal();
+            }
+        });
+        
+        // Fermer en cliquant en dehors
+        modal.addEventListener('click', (e) => {
             if (e.target === modal) {
-                supervisorManager.closeModal();
+                if (EVENT_HANDLERS.onCloseModal) {
+                    EVENT_HANDLERS.onCloseModal();
+                }
             }
         });
+        
+        return modal;
+    }
 
-        // Touche Échap pour fermer le modal
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                supervisorManager.closeModal();
-            }
+    // Fermer le modal
+    closeAgentModal() {
+        const modal = document.getElementById('agent-details-modal');
+        modal.style.display = 'none';
+        
+        // Nettoyer les écouteurs
+        modal.querySelectorAll('.tab-btn').forEach(btn => {
+            const newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
         });
+    }
 
-        // Bouton de basculement de la sidebar sur mobile
-        const sidebarToggle = document.querySelector('.sidebar-toggle');
-        if (sidebarToggle) {
-            sidebarToggle.addEventListener('click', UI.toggleSidebar);
+    // Changer d'onglet dans le modal
+    switchAgentTab(tabName, button) {
+        // Mettre à jour les boutons actifs
+        document.querySelectorAll('#agent-details-modal .tab-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        
+        // Cacher tous les contenus
+        document.querySelectorAll('#agent-details-modal .tab-content').forEach(content => {
+            content.classList.remove('active');
+        });
+        
+        // Activer le bouton et le contenu sélectionnés
+        button.classList.add('active');
+        document.getElementById(`agent-${tabName}-tab`).classList.add('active');
+    }
+
+    // Basculer l'état de chargement
+    toggleLoading(show, elementId = null) {
+        if (elementId) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                if (show) {
+                    element.innerHTML = `
+                        <div class="loading-spinner">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <p>Chargement...</p>
+                        </div>
+                    `;
+                }
+            }
+        }
+        
+        SUPERVISOR_STATE.isLoading = show;
+    }
+
+    // Mettre à jour les statistiques du header
+    updateHeaderStats(onlineCount, totalSales, totalWins) {
+        document.getElementById('online-count').textContent = onlineCount;
+        document.getElementById('total-sales').textContent = totalSales;
+        document.getElementById('total-wins').textContent = totalWins;
+    }
+
+    // Mettre à jour les informations du superviseur
+    updateSupervisorInfo(name, email = '', phone = '') {
+        document.getElementById('current-supervisor').textContent = name;
+        document.getElementById('supervisor-info').textContent = 
+            `Superviseur: ${name}${email ? ` • ${email}` : ''}${phone ? ` • ${phone}` : ''}`;
+    }
+
+    // Changer de vue
+    switchView(viewName) {
+        // Mettre à jour la navigation
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.classList.remove('active');
+        });
+        
+        const navItem = document.querySelector(`.nav-item[data-view="${viewName}"]`);
+        if (navItem) {
+            navItem.classList.add('active');
+        }
+        
+        // Cacher toutes les vues
+        document.querySelectorAll('.view-content').forEach(view => {
+            view.style.display = 'none';
+        });
+        
+        // Afficher la vue sélectionnée
+        const targetView = document.getElementById(`${viewName}-view`);
+        if (targetView) {
+            targetView.style.display = 'block';
+        }
+        
+        SUPERVISOR_STATE.currentView = viewName;
+    }
+
+    // Afficher le menu latéral sur mobile
+    toggleSidebar() {
+        const sidebar = document.querySelector('.supervisor-sidebar');
+        sidebar.classList.toggle('mobile-open');
+    }
+
+    // Rendre un élément vide
+    setEmptyState(elementId, message = 'Aucune donnée disponible') {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.innerHTML = `<p class="empty-state">${message}</p>`;
         }
     }
 
-    static addStyles() {
-        const style = document.createElement('style');
-        style.textContent = `
-            .notification {
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                padding: 15px 20px;
-                border-radius: 10px;
-                box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-                z-index: 10000;
-                transform: translateX(150%);
-                transition: transform 0.3s ease;
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                max-width: 400px;
-            }
-            
-            .notification.show {
-                transform: translateX(0);
-            }
-            
-            .notification-success {
-                background: var(--success);
-                color: white;
-            }
-            
-            .notification-error {
-                background: var(--danger);
-                color: white;
-            }
-            
-            .notification-info {
-                background: var(--primary);
-                color: white;
-            }
-            
-            .notification-warning {
-                background: var(--warning);
-                color: var(--dark);
-            }
-            
-            .no-data {
-                text-align: center;
-                color: var(--text-dim);
-                padding: 40px 20px;
-                grid-column: 1/-1;
-                background: #f8f9fa;
-                border-radius: 10px;
-                margin: 20px 0;
-            }
-            
-            .stats-grid-small {
-                display: grid;
-                grid-template-columns: repeat(2, 1fr);
-                gap: 15px;
-            }
-            
-            .stat-card-small {
-                background: #f8f9fa;
-                padding: 15px;
-                border-radius: 10px;
-                text-align: center;
-            }
-            
-            .stat-card-small h5 {
-                margin-bottom: 10px;
-                color: var(--text-dim);
-                font-size: 14px;
-            }
-            
-            .stat-value-large {
-                font-size: 24px;
-                font-weight: bold;
-                color: var(--primary);
-                margin: 0;
-            }
-            
-            .success-text {
-                color: var(--success);
-            }
-            
-            .warning-text {
-                color: var(--warning);
-            }
-            
-            .blocked-text {
-                color: var(--danger);
-            }
-            
-            .expired-text {
-                color: var(--text-dim);
-                font-size: 12px;
-            }
-            
-            .win-card {
-                background: linear-gradient(135deg, #28a745, #20c997);
-                color: white;
-                padding: 15px;
-                border-radius: 10px;
-                margin-bottom: 10px;
-            }
-            
-            .win-header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 10px;
-            }
-            
-            .win-amount {
-                font-size: 20px;
-                font-weight: bold;
-            }
-            
-            .win-details {
-                font-size: 14px;
-                opacity: 0.9;
-            }
-            
-            .detailed-report {
-                background: white;
-                border-radius: 10px;
-                padding: 20px;
-                box-shadow: 0 5px 15px rgba(0,0,0,0.05);
-            }
-            
-            .report-stats {
-                display: grid;
-                grid-template-columns: repeat(2, 1fr);
-                gap: 15px;
-                margin-bottom: 20px;
-            }
-            
-            .report-stat {
-                text-align: center;
-            }
-            
-            .detailed-stats {
-                margin-top: 20px;
-            }
-            
-            .stats-list {
-                color: var(--text-dim);
-                list-style: none;
-                padding: 0;
-            }
-            
-            .stats-list li {
-                padding: 5px 0;
-                border-bottom: 1px solid var(--border);
-            }
-            
-            .reports-grid {
-                display: grid;
-                grid-template-columns: repeat(2, 1fr);
-                gap: 20px;
-            }
-            
-            .report-card {
-                background: white;
-                border-radius: 15px;
-                padding: 20px;
-                box-shadow: 0 5px 15px rgba(0,0,0,0.05);
-            }
-            
-            .report-summary {
-                height: 200px;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-            }
-            
-            .summary-value {
-                font-size: 48px;
-                color: var(--primary);
-                font-weight: bold;
-            }
-            
-            .summary-label {
-                color: var(--text-dim);
-                font-size: 18px;
-            }
-            
-            .key-stats {
-                display: grid;
-                gap: 15px;
-            }
-            
-            .key-stat {
-                display: flex;
-                justify-content: space-between;
-                padding: 10px;
-                background: #f8f9fa;
-                border-radius: 8px;
-            }
-            
-            .winner-card {
-                background: white;
-                border-radius: 10px;
-                padding: 20px;
-                margin-bottom: 15px;
-                box-shadow: 0 5px 15px rgba(0,0,0,0.05);
-                border-left: 4px solid var(--success);
-            }
-            
-            .winner-header {
-                display: flex;
-                justify-content: space-between;
-                align-items: flex-start;
-                margin-bottom: 15px;
-            }
-            
-            .winner-amount {
-                text-align: right;
-            }
-            
-            .winner-amount .amount {
-                font-size: 24px;
-                font-weight: bold;
-                color: var(--success);
-                display: block;
-            }
-            
-            .winner-amount .status {
-                font-size: 12px;
-                padding: 3px 8px;
-                border-radius: 12px;
-                display: inline-block;
-            }
-            
-            .winner-amount .status.paid {
-                background: #d4edda;
-                color: #155724;
-            }
-            
-            .winner-amount .status.pending {
-                background: #fff3cd;
-                color: #856404;
-            }
-            
-            .settings-card {
-                background: white;
-                border-radius: 10px;
-                padding: 20px;
-                box-shadow: 0 5px 15px rgba(0,0,0,0.05);
-            }
-            
-            .settings-form {
-                max-width: 500px;
-            }
-            
-            .form-group {
-                margin-bottom: 20px;
-            }
-            
-            .form-group label {
-                display: block;
-                margin-bottom: 5px;
-                color: var(--text);
-                font-weight: 500;
-            }
-            
-            .sidebar-toggle {
-                display: none;
-            }
-            
-            @media (max-width: 992px) {
-                .sidebar-toggle {
-                    display: flex;
-                }
-                
-                .reports-grid {
-                    grid-template-columns: 1fr;
-                }
-                
-                .stats-grid-small {
-                    grid-template-columns: 1fr;
-                }
-                
-                .report-stats {
-                    grid-template-columns: 1fr;
-                }
-            }
-            
-            @media (max-width: 768px) {
-                .notification {
-                    left: 20px;
-                    right: 20px;
-                    max-width: none;
-                }
-            }
-        `;
-        
-        document.head.appendChild(style);
+    // Ajouter un indicateur de chargement
+    addLoadingSpinner(elementId) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.innerHTML = `
+                <div class="loading-spinner">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Chargement...</p>
+                </div>
+            `;
+        }
+    }
+
+    // Vérifier la connexion Internet
+    checkInternetConnection() {
+        if (!navigator.onLine) {
+            this.showError(MESSAGES.ERROR.NETWORK_ERROR, 5000);
+            return false;
+        }
+        return true;
+    }
+
+    // Gérer les erreurs de connexion
+    handleConnectionError(error) {
+        if (error.message.includes('Failed to fetch') || error.message.includes('Network')) {
+            this.showError(MESSAGES.ERROR.NETWORK_ERROR, 5000);
+            return true;
+        }
+        return false;
     }
 }
 
-// Fonction globale pour basculer le mode mobile
-function toggleMobileMode() {
-    UI.toggleMobileMode();
-}
+// Instance unique de l'UI Manager
+const uiManager = new UIManager();
