@@ -2,764 +2,492 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
-    <title>LOTATO - Panneau Propriétaire</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LOTATO PRO · Administration</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="ow-style.css">
+    <style>
+        /* Même style que responsable.html avec quelques ajouts */
+        * { margin:0; padding:0; box-sizing:border-box; font-family:'Inter',sans-serif; }
+        body { background:#0a0b1e; color:#fff; padding:20px; }
+        .app { max-width:1400px; margin:0 auto; }
+        header { display:flex; justify-content:space-between; align-items:center; margin-bottom:30px; background:rgba(255,255,255,0.03); border-radius:20px; padding:20px; }
+        .logo h1 { font-size:1.8rem; background:linear-gradient(135deg,#ad00f1,#ff007a); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+        .logout-btn { background:rgba(255,77,77,0.2); border:1px solid #ff4d4d; color:#ff4d4d; padding:10px 20px; border-radius:30px; cursor:pointer; }
+        .section-title { margin:30px 0 20px; font-size:1.4rem; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:10px; display:flex; align-items:center; gap:10px; }
+        .tabs { display:flex; gap:10px; margin-bottom:30px; flex-wrap:wrap; }
+        .tab { background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:30px; padding:12px 24px; cursor:pointer; }
+        .tab.active { background:linear-gradient(135deg,#ad00f1,#00d4ff); color:white; border-color:transparent; }
+        .tab-content { display:none; }
+        .tab-content.active { display:block; }
+        .form-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:20px; background:rgba(255,255,255,0.03); border-radius:20px; padding:25px; margin-bottom:20px; }
+        .form-group { margin-bottom:15px; }
+        .form-group label { display:block; color:#a0a0b8; margin-bottom:6px; font-size:0.9rem; }
+        .form-group input, .form-group select, .form-group textarea { width:100%; padding:12px 16px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); border-radius:12px; color:white; }
+        .btn-primary { background:linear-gradient(135deg,#ad00f1,#00d4ff); border:none; border-radius:30px; padding:12px 30px; color:white; font-weight:600; cursor:pointer; }
+        .btn-danger { background:rgba(255,77,77,0.2); border:1px solid #ff4d4d; color:#ff4d4d; border-radius:30px; padding:10px 20px; }
+        .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:20px; margin-bottom:30px; }
+        .stat-card { background:rgba(255,255,255,0.05); border-radius:16px; padding:20px; }
+        .list-container { background:rgba(255,255,255,0.02); border-radius:20px; padding:20px; max-height:400px; overflow-y:auto; }
+        .item-row { display:flex; justify-content:space-between; align-items:center; padding:12px; border-bottom:1px solid rgba(255,255,255,0.05); }
+        .badge-success { background:#00f190; color:black; padding:4px 12px; border-radius:20px; }
+        .badge-danger { background:#ff4d4d; color:white; padding:4px 12px; border-radius:20px; }
+    </style>
 </head>
 <body>
-    <!-- Bouton menu mobile -->
-    <button class="mobile-menu-toggle" onclick="ownerManager.toggleMobileMenu()">
-        <i class="fas fa-bars"></i>
-    </button>
-    
-    <!-- Overlay menu mobile -->
-    <div class="mobile-menu-overlay" id="mobile-overlay" onclick="ownerManager.closeMobileMenu()"></div>
-    
-    <div class="owner-container fade-in">
-        <!-- Header -->
-        <header class="owner-header">
-            <div class="logo-section">
-                <div class="logo">
-                    <i class="fas fa-crown"></i>
-                </div>
-                <div class="header-title">
-                    <h1>LOTATO - Administration Propriétaire</h1>
-                    <p>Système de gestion complète - Version Pro</p>
-                </div>
+    <div class="app">
+        <header>
+            <div class="logo">
+                <h1>LOTATO PRO · Propriétaire</h1>
             </div>
-            <div class="header-stats">
-                <div class="stat-item">
-                    <div class="stat-number" id="total-users">0</div>
-                    <div class="stat-label">Utilisateurs</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-number" id="total-sales">0</div>
-                    <div class="stat-label">Ventes</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-number" id="online-users">0</div>
-                    <div class="stat-label">En ligne</div>
-                </div>
+            <div class="user-info">
+                <span id="owner-name"></span>
+                <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Déconnexion</button>
             </div>
         </header>
 
-        <!-- Main Layout -->
-        <div class="owner-main">
-            <!-- Sidebar -->
-            <aside class="owner-sidebar" id="sidebar">
-                <button class="sidebar-close" onclick="ownerManager.closeMobileMenu()">
-                    <i class="fas fa-times"></i>
-                </button>
-                
-                <div class="admin-profile">
-                    <div class="admin-avatar">
-                        <i class="fas fa-user-shield"></i>
-                    </div>
-                    <div class="admin-name" id="admin-name">ADMIN PROPRIÉTAIRE</div>
-                    <div class="admin-role">ADMINISTRATEUR PROPRIÉTAIRE</div>
-                </div>
-                
-                <ul class="nav-menu">
-                    <li class="nav-item active" onclick="ownerManager.switchView('dashboard')">
-                        <i class="fas fa-chart-pie"></i>
-                        <span>Tableau de Bord</span>
-                    </li>
-                    <li class="nav-item" onclick="ownerManager.switchView('users')">
-                        <i class="fas fa-users-cog"></i>
-                        <span>Gestion Utilisateurs</span>
-                    </li>
-                    <li class="nav-item" onclick="ownerManager.switchView('draws')">
-                        <i class="fas fa-calendar-alt"></i>
-                        <span>Contrôle des Tirages</span>
-                    </li>
-                    <li class="nav-item" onclick="ownerManager.switchView('publish')">
-                        <i class="fas fa-upload"></i>
-                        <span>Publication Tirages</span>
-                    </li>
-                    <li class="nav-item" onclick="ownerManager.switchView('numbers')">
-                        <i class="fas fa-dice"></i>
-                        <span>Gestion des Boules</span>
-                    </li>
-                    <li class="nav-item" onclick="ownerManager.switchView('rules')">
-                        <i class="fas fa-sliders-h"></i>
-                        <span>Règles de Jeu</span>
-                    </li>
-                    <li class="nav-item" onclick="ownerManager.switchView('limits')">
-                        <i class="fas fa-tachometer-alt"></i>
-                        <span>Limites et Blocages</span>
-                    </li>
-                    <li class="nav-item" onclick="ownerManager.switchView('reports')">
-                        <i class="fas fa-file-chart-line"></i>
-                        <span>Rapports Avancés</span>
-                    </li>
-                    <li class="nav-item" onclick="ownerManager.switchView('activity')">
-                        <i class="fas fa-history"></i>
-                        <span>Journal d'Activité</span>
-                    </li>
-                    <li class="nav-item" onclick="ownerManager.logout()" style="color: #ff416c;">
-                        <i class="fas fa-sign-out-alt"></i>
-                        <span>Déconnexion</span>
-                    </li>
-                </ul>
-            </aside>
-
-            <!-- Content Area -->
-            <main class="owner-content">
-                <!-- Dashboard View -->
-                <div id="dashboard-view" class="view-content">
-                    <div class="view-header">
-                        <h2><i class="fas fa-chart-pie"></i> Tableau de Bord Principal</h2>
-                        <p>Vue d'ensemble de votre réseau LOTATO</p>
-                    </div>
-                    
-                    <div class="dashboard-grid">
-                        <div class="dashboard-card">
-                            <div class="card-header">
-                                <div class="card-icon icon-users">
-                                    <i class="fas fa-users"></i>
-                                </div>
-                                <div class="card-title">
-                                    <h3>Utilisateurs Totaux</h3>
-                                    <p>Actifs ce mois</p>
-                                </div>
-                            </div>
-                            <div class="card-value" id="dashboard-users">0</div>
-                            <div class="card-change change-up">
-                                <i class="fas fa-arrow-up"></i>
-                                <span>12% ce mois</span>
-                            </div>
-                        </div>
-                        
-                        <div class="dashboard-card">
-                            <div class="card-header">
-                                <div class="card-icon icon-sales">
-                                    <i class="fas fa-money-bill-wave"></i>
-                                </div>
-                                <div class="card-title">
-                                    <h3>Ventes Totales</h3>
-                                    <p>30 derniers jours</p>
-                                </div>
-                            </div>
-                            <div class="card-value" id="dashboard-sales">0 Gdes</div>
-                            <div class="card-change change-up">
-                                <i class="fas fa-arrow-up"></i>
-                                <span>8% ce mois</span>
-                            </div>
-                        </div>
-                        
-                        <div class="dashboard-card">
-                            <div class="card-header">
-                                <div class="card-icon icon-tickets">
-                                    <i class="fas fa-ticket-alt"></i>
-                                </div>
-                                <div class="card-title">
-                                    <h3>Tickets Émis</h3>
-                                    <p>Aujourd'hui</p>
-                                </div>
-                            </div>
-                            <div class="card-value" id="dashboard-tickets">0</div>
-                            <div class="card-change change-up">
-                                <i class="fas fa-arrow-up"></i>
-                                <span>15% aujourd'hui</span>
-                            </div>
-                        </div>
-                        
-                        <div class="dashboard-card">
-                            <div class="card-header">
-                                <div class="card-icon icon-wins">
-                                    <i class="fas fa-trophy"></i>
-                                </div>
-                                <div class="card-title">
-                                    <h3>Gains Distribués</h3>
-                                    <p>Aujourd'hui</p>
-                                </div>
-                            </div>
-                            <div class="card-value" id="dashboard-wins">0 Gdes</div>
-                            <div class="card-change change-down">
-                                <i class="fas fa-arrow-down"></i>
-                                <span>5% aujourd'hui</span>
-                            </div>
-                        </div>
-                        
-                        <div class="dashboard-card">
-                            <div class="card-header">
-                                <div class="card-icon icon-blocks">
-                                    <i class="fas fa-ban"></i>
-                                </div>
-                                <div class="card-title">
-                                    <h3>Éléments Bloqués</h3>
-                                    <p>Actuellement</p>
-                                </div>
-                            </div>
-                            <div class="card-value" id="dashboard-blocks">0</div>
-                            <div class="card-change change-up">
-                                <i class="fas fa-arrow-up"></i>
-                                <span>3 nouveaux</span>
-                            </div>
-                        </div>
-                        
-                        <div class="dashboard-card">
-                            <div class="card-header">
-                                <div class="card-icon icon-draw">
-                                    <i class="fas fa-upload"></i>
-                                </div>
-                                <div class="card-title">
-                                    <h3>Tirages Publiés</h3>
-                                    <p>Aujourd'hui</p>
-                                </div>
-                            </div>
-                            <div class="card-value" id="dashboard-draws">0</div>
-                            <div class="card-change change-up">
-                                <i class="fas fa-arrow-up"></i>
-                                <span>2 aujourd'hui</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div style="margin-top: 40px;">
-                        <h3 style="margin-bottom: 20px;">Aperçu en Temps Réel</h3>
-                        <div class="dashboard-overview">
-                            <div class="recent-activity">
-                                <h4 style="margin-bottom: 20px;">Activité Récente</h4>
-                                <div id="recent-activity" style="max-height: 300px; overflow-y: auto;">
-                                    <!-- Activité récente chargée ici -->
-                                </div>
-                            </div>
-                            <div class="alerts-container">
-                                <h4 style="margin-bottom: 20px;">Alertes</h4>
-                                <div id="alerts-container">
-                                    <!-- Alertes chargées ici -->
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Users Management View -->
-                <div id="users-view" class="view-content" style="display: none;">
-                    <div class="view-header">
-                        <h2><i class="fas fa-users-cog"></i> Gestion des Utilisateurs</h2>
-                        <p>Créez et gérez agents et superviseurs</p>
-                    </div>
-                    
-                    <div class="user-actions-header">
-                        <button class="btn btn-success" onclick="ownerManager.showCreateUserModal('supervisor')">
-                            <i class="fas fa-user-shield"></i> Nouveau Superviseur
-                        </button>
-                        <button class="btn btn-primary" onclick="ownerManager.showCreateUserModal('agent')">
-                            <i class="fas fa-user-plus"></i> Nouvel Agent
-                        </button>
-                        <button class="btn btn-secondary" onclick="ownerManager.exportUsersData()">
-                            <i class="fas fa-download"></i> Exporter Données
-                        </button>
-                    </div>
-                    
-                    <div class="users-management">
-                        <h3>Superviseurs</h3>
-                        <div id="supervisors-container" class="users-grid" style="margin-bottom: 30px;">
-                            <!-- Superviseurs chargés ici -->
-                        </div>
-                        
-                        <h3>Agents</h3>
-                        <div id="agents-container" class="users-grid">
-                            <!-- Agents chargés ici -->
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Draws Control View -->
-                <div id="draws-view" class="view-content" style="display: none;">
-                    <div class="view-header">
-                        <h2><i class="fas fa-calendar-alt"></i> Contrôle des Tirages</h2>
-                        <p>Activez ou désactivez les tirages spécifiques</p>
-                    </div>
-                    
-                    <div class="draws-list" id="draws-container">
-                        <!-- Tirages chargés ici -->
-                    </div>
-                </div>
-
-                <!-- Publish Draws View -->
-                <div id="publish-view" class="view-content" style="display: none;">
-                    <div class="view-header">
-                        <h2><i class="fas fa-upload"></i> Publication des Tirages</h2>
-                        <p>Publiez des tirages manuellement ou automatiquement</p>
-                    </div>
-                    
-                    <div class="tabs">
-                        <button class="tab active" onclick="ownerManager.switchPublishTab('manual')">Publication Manuelle</button>
-                        <button class="tab" onclick="ownerManager.switchPublishTab('auto')">Publication Automatique</button>
-                        <button class="tab" onclick="ownerManager.switchPublishTab('history')">Historique</button>
-                    </div>
-                    
-                    <!-- Manual Publish Tab -->
-                    <div id="manual-publish-tab" class="tab-content active">
-                        <div class="publish-form-container">
-                            <h3><i class="fas fa-hand-paper"></i> Publication Manuelle</h3>
-                            <form id="manual-publish-form" onsubmit="ownerManager.publishDrawManually(event)">
-                                <div class="form-group">
-                                    <label>Nom du Tirage:</label>
-                                    <select class="form-control" name="drawName" required>
-                                        <option value="">Sélectionner un tirage</option>
-                                        <option value="Florida Matin">Florida Matin</option>
-                                        <option value="Florida Soir">Florida Soir</option>
-                                        <option value="New York Matin">New York Matin</option>
-                                        <option value="New York Soir">New York Soir</option>
-                                        <option value="Georgia Matin">Georgia Matin</option>
-                                        <option value="Georgia Soir">Georgia Soir</option>
-                                        <option value="Texas Matin">Texas Matin</option>
-                                        <option value="Texas Soir">Texas Soir</option>
-                                        <option value="Tunisia Matin">Tunisia Matin</option>
-                                        <option value="Tunisia Soir">Tunisia Soir</option>
-                                    </select>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label>Date et Heure:</label>
-                                    <input type="datetime-local" class="form-control" name="drawDateTime" required>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label>Résultats (5 numéros):</label>
-                                    <div class="manual-publish-numbers">
-                                        <input type="number" class="form-control" name="num1" min="0" max="99" placeholder="Num 1" required>
-                                        <input type="number" class="form-control" name="num2" min="0" max="99" placeholder="Num 2" required>
-                                        <input type="number" class="form-control" name="num3" min="0" max="99" placeholder="Num 3" required>
-                                        <input type="number" class="form-control" name="num4" min="0" max="99" placeholder="Num 4" required>
-                                        <input type="number" class="form-control" name="num5" min="0" max="99" placeholder="Num 5" required>
-                                    </div>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label>Numéro Chance (optionnel):</label>
-                                    <input type="number" class="form-control" name="luckyNumber" min="0" max="99" placeholder="0-99">
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label>Commentaire (optionnel):</label>
-                                    <textarea class="form-control" name="comment" rows="3" placeholder="Ajouter un commentaire..."></textarea>
-                                </div>
-                                
-                                <div class="publish-actions">
-                                    <button type="submit" class="btn btn-success">
-                                        <i class="fas fa-paper-plane"></i> Publier le Tirage
-                                    </button>
-                                    <button type="button" class="btn btn-secondary" onclick="ownerManager.generateRandomResults()">
-                                        <i class="fas fa-random"></i> Générer Aléatoire
-                                    </button>
-                                </div>
-                            </form>
-                            
-                            <div class="result-preview">
-                                <h4>Aperçu du Résultat</h4>
-                                <div class="preview-numbers" id="result-preview">
-                                    <div class="preview-number">00</div>
-                                    <div class="preview-number">00</div>
-                                    <div class="preview-number">00</div>
-                                    <div class="preview-number">00</div>
-                                    <div class="preview-number">00</div>
-                                </div>
-                                <p>Les résultats s'afficheront ici</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Auto Publish Tab -->
-                    <div id="auto-publish-tab" class="tab-content">
-                        <div class="auto-publish-container">
-                            <h3><i class="fas fa-robot"></i> Publication Automatique</h3>
-                            
-                            <div class="auto-fetch-settings">
-                                <div class="fetch-status">
-                                    <div class="status-indicator status-inactive" id="fetch-status-indicator"></div>
-                                    <span id="fetch-status-text">Récupération automatique désactivée</span>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label>URL Source des Résultats:</label>
-                                    <input type="url" class="form-control" id="fetch-url" placeholder="https://exemple.com/tirages" value="https://loteries-nationales.com/tirages">
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label>Intervalle de Récupération (minutes):</label>
-                                    <input type="number" class="form-control" id="fetch-interval" min="1" value="5">
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label>Tirages à Récupérer:</label>
-                                    <div class="auto-draws-checkboxes">
-                                        <label>
-                                            <input type="checkbox" name="auto-draws" value="Florida Matin" checked>
-                                            Florida Matin
-                                        </label>
-                                        <label>
-                                            <input type="checkbox" name="auto-draws" value="Florida Soir" checked>
-                                            Florida Soir
-                                        </label>
-                                        <label>
-                                            <input type="checkbox" name="auto-draws" value="New York Matin">
-                                            New York Matin
-                                        </label>
-                                        <label>
-                                            <input type="checkbox" name="auto-draws" value="New York Soir">
-                                            New York Soir
-                                        </label>
-                                    </div>
-                                </div>
-                                
-                                <div class="fetch-actions">
-                                    <button class="btn btn-success" onclick="ownerManager.toggleAutoFetch()">
-                                        <i class="fas fa-play"></i> Activer l'Auto-Récupération
-                                    </button>
-                                    <button class="btn btn-warning" onclick="ownerManager.fetchNow()">
-                                        <i class="fas fa-sync"></i> Récupérer Maintenant
-                                    </button>
-                                    <button class="btn btn-secondary" onclick="ownerManager.testFetch()">
-                                        <i class="fas fa-vial"></i> Tester la Connexion
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            <div class="fetch-log-container">
-                                <h4>Dernières Récupérations</h4>
-                                <div id="fetch-log">
-                                    <!-- Log de récupération -->
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- History Tab -->
-                    <div id="history-publish-tab" class="tab-content">
-                        <div class="publish-history-container">
-                            <h3><i class="fas fa-history"></i> Historique des Publications</h3>
-                            <div id="publish-history">
-                                <!-- Historique des publications -->
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Numbers Management View -->
-                <div id="numbers-view" class="view-content" style="display: none;">
-                    <div class="view-header">
-                        <h2><i class="fas fa-dice"></i> Gestion des Boules</h2>
-                        <p>Contrôle complet des numéros et limites</p>
-                    </div>
-                    
-                    <div class="tabs">
-                        <button class="tab active" onclick="ownerManager.switchNumbersTab('blocks')">Blocages</button>
-                        <button class="tab" onclick="ownerManager.switchNumbersTab('limits')">Limites</button>
-                        <button class="tab" onclick="ownerManager.switchNumbersTab('stats')">Statistiques</button>
-                    </div>
-                    
-                    <div id="blocks-tab" class="tab-content active">
-                        <div class="controls-grid">
-                            <div class="control-section">
-                                <div class="section-title">
-                                    <i class="fas fa-ban"></i> Blocage Manuel
-                                </div>
-                                <div class="form-group">
-                                    <label>Bloquer un boule spécifique:</label>
-                                    <div class="block-input-group">
-                                        <input type="text" id="block-number-input" class="form-control" 
-                                               placeholder="Ex: 45" maxlength="2" pattern="[0-9]{2}">
-                                        <button class="btn btn-danger" onclick="ownerManager.blockNumber()">
-                                            <i class="fas fa-ban"></i> Bloquer
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="numbers-grid" id="blocks-numbers-grid">
-                                    <!-- Grille des boules avec blocages -->
-                                </div>
-                            </div>
-                            
-                            <div class="control-section">
-                                <div class="section-title">
-                                    <i class="fas fa-unlock"></i> Déblocage
-                                </div>
-                                <div class="form-group">
-                                    <label>Sélectionnez les boules à débloquer:</label>
-                                    <div id="blocked-numbers-list">
-                                        <!-- Liste des boules bloquées -->
-                                    </div>
-                                </div>
-                                <button class="btn btn-success" onclick="ownerManager.unblockSelected()">
-                                    <i class="fas fa-unlock-alt"></i> Débloquer la Sélection
-                                </button>
-                            </div>
-                            
-                            <div class="control-section">
-                                <div class="section-title">
-                                    <i class="fas fa-cog"></i> Configuration Automatique
-                                </div>
-                                <div class="form-group">
-                                    <label>Blocage automatique par seuil:</label>
-                                    <div class="auto-block-settings">
-                                        <input type="number" id="auto-block-threshold" class="form-control" placeholder="Seuil (Gdes)" value="100">
-                                        <select id="auto-block-action" class="form-control">
-                                            <option value="block">Bloquer</option>
-                                            <option value="limit">Limiter</option>
-                                            <option value="alert">Alerte seulement</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <button class="btn btn-warning" onclick="ownerManager.configureAutoBlock()">
-                                    <i class="fas fa-robot"></i> Configurer
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div id="limits-tab" class="tab-content">
-                        <div class="controls-grid">
-                            <div class="control-section">
-                                <div class="section-title">
-                                    <i class="fas fa-tachometer-alt"></i> Limites Manuelles
-                                </div>
-                                <div class="form-group">
-                                    <label>Ajouter une limite:</label>
-                                    <div class="limit-input-group">
-                                        <input type="text" id="limit-number" class="form-control" placeholder="Boule" maxlength="2">
-                                        <input type="number" id="limit-amount" class="form-control" placeholder="Limite max (Gdes)" min="1">
-                                    </div>
-                                    <button class="btn btn-primary" onclick="ownerManager.addNumberLimit()">
-                                        <i class="fas fa-plus"></i> Ajouter Limite
-                                    </button>
-                                </div>
-                                <div id="limits-list">
-                                    <!-- Liste des limites -->
-                                </div>
-                            </div>
-                            
-                            <div class="control-section">
-                                <div class="section-title">
-                                    <i class="fas fa-chart-line"></i> Ajustement des Limites
-                                </div>
-                                <div class="form-group">
-                                    <label>Pourcentage d'ajustement:</label>
-                                    <input type="range" id="limit-adjustment" class="form-control" min="50" max="200" value="100" 
-                                           oninput="document.getElementById('adjustment-value').textContent = this.value + '%'">
-                                    <div class="adjustment-value-display">
-                                        <span id="adjustment-value">100%</span>
-                                    </div>
-                                </div>
-                                <div class="limit-adjustment-actions">
-                                    <button class="btn btn-warning" onclick="ownerManager.adjustAllLimits('increase')">
-                                        <i class="fas fa-arrow-up"></i> Augmenter
-                                    </button>
-                                    <button class="btn btn-info" onclick="ownerManager.adjustAllLimits('decrease')">
-                                        <i class="fas fa-arrow-down"></i> Réduire
-                                    </button>
-                                    <button class="btn btn-danger" onclick="ownerManager.resetAllLimits()">
-                                        <i class="fas fa-undo"></i> Réinitialiser
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Activity Log View -->
-                <div id="activity-view" class="view-content" style="display: none;">
-                    <div class="view-header">
-                        <h2><i class="fas fa-history"></i> Journal d'Activité</h2>
-                        <p>Historique complet des actions du système</p>
-                    </div>
-                    
-                    <div class="activity-controls">
-                        <div class="form-group">
-                            <label>Filtrer par période:</label>
-                            <select id="activity-period" class="form-control" onchange="ownerManager.filterActivity()">
-                                <option value="today">Aujourd'hui</option>
-                                <option value="week">Cette semaine</option>
-                                <option value="month">Ce mois</option>
-                                <option value="all">Tout l'historique</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Filtrer par type:</label>
-                            <select id="activity-type" class="form-control" onchange="ownerManager.filterActivity()">
-                                <option value="all">Tous les types</option>
-                                <option value="user">Utilisateurs</option>
-                                <option value="draw">Tirages</option>
-                                <option value="system">Système</option>
-                                <option value="security">Sécurité</option>
-                            </select>
-                        </div>
-                        <button class="btn btn-secondary" onclick="ownerManager.exportActivity()">
-                            <i class="fas fa-download"></i> Exporter Journal
-                        </button>
-                    </div>
-                    
-                    <div class="activity-log" id="full-activity-log">
-                        <!-- Journal d'activité complet -->
-                    </div>
-                </div>
-
-                <!-- Rules Management View -->
-                <div id="rules-view" class="view-content" style="display: none;">
-                    <div class="view-header">
-                        <h2><i class="fas fa-sliders-h"></i> Règles de Jeu</h2>
-                        <p>Configurez les règles et paramètres du jeu</p>
-                    </div>
-                    
-                    <div class="controls-grid">
-                        <div class="control-section">
-                            <div class="section-title">
-                                <i class="fas fa-coins"></i> Paramètres Financiers
-                            </div>
-                            <div class="rules-grid" id="financial-rules">
-                                <!-- Règles financières -->
-                            </div>
-                        </div>
-                        
-                        <div class="control-section">
-                            <div class="section-title">
-                                <i class="fas fa-clock"></i> Paramètres Temporels
-                            </div>
-                            <div class="rules-grid" id="time-rules">
-                                <!-- Règles temporelles -->
-                            </div>
-                        </div>
-                        
-                        <div class="control-section">
-                            <div class="section-title">
-                                <i class="fas fa-percentage"></i> Commission et Taxes
-                            </div>
-                            <div class="rules-grid" id="commission-rules">
-                                <!-- Règles de commission -->
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="rules-actions">
-                        <button class="btn btn-success" onclick="ownerManager.saveRules()">
-                            <i class="fas fa-save"></i> Sauvegarder les Règles
-                        </button>
-                        <button class="btn btn-secondary" onclick="ownerManager.resetRules()">
-                            <i class="fas fa-undo"></i> Restaurer les Valeurs par Défaut
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Limits and Blocks View -->
-                <div id="limits-view" class="view-content" style="display: none;">
-                    <div class="view-header">
-                        <h2><i class="fas fa-tachometer-alt"></i> Limites et Blocages</h2>
-                        <p>Gérez les limites de mise et les blocages</p>
-                    </div>
-                    
-                    <div class="controls-grid">
-                        <div class="control-section">
-                            <div class="section-title">
-                                <i class="fas fa-user-shield"></i> Limites par Utilisateur
-                            </div>
-                            <div id="user-limits-container">
-                                <!-- Limites utilisateurs -->
-                            </div>
-                        </div>
-                        
-                        <div class="control-section">
-                            <div class="section-title">
-                                <i class="fas fa-map-marker-alt"></i> Limites par Zone
-                            </div>
-                            <div id="zone-limits-container">
-                                <!-- Limites par zone -->
-                            </div>
-                        </div>
-                        
-                        <div class="control-section">
-                            <div class="section-title">
-                                <i class="fas fa-calendar-times"></i> Blocages Temporaires
-                            </div>
-                            <div id="temporary-blocks-container">
-                                <!-- Blocages temporaires -->
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Reports View -->
-                <div id="reports-view" class="view-content" style="display: none;">
-                    <div class="view-header">
-                        <h2><i class="fas fa-file-chart-line"></i> Rapports Avancés</h2>
-                        <p>Analysez les performances et statistiques</p>
-                    </div>
-                    
-                    <div class="tabs">
-                        <button class="tab active" onclick="ownerManager.switchReportsTab('sales')">Ventes</button>
-                        <button class="tab" onclick="ownerManager.switchReportsTab('users')">Utilisateurs</button>
-                        <button class="tab" onclick="ownerManager.switchReportsTab('draws')">Tirages</button>
-                        <button class="tab" onclick="ownerManager.switchReportsTab('financial')">Financier</button>
-                    </div>
-                    
-                    <div id="sales-reports-tab" class="tab-content active">
-                        <div class="report-container" id="sales-report">
-                            <!-- Rapport des ventes -->
-                        </div>
-                    </div>
-                    
-                    <div id="users-reports-tab" class="tab-content">
-                        <div class="report-container" id="users-report">
-                            <!-- Rapport utilisateurs -->
-                        </div>
-                    </div>
-                    
-                    <div id="draws-reports-tab" class="tab-content">
-                        <div class="report-container" id="draws-report">
-                            <!-- Rapport tirages -->
-                        </div>
-                    </div>
-                    
-                    <div id="financial-reports-tab" class="tab-content">
-                        <div class="report-container" id="financial-report">
-                            <!-- Rapport financier -->
-                        </div>
-                    </div>
-                </div>
-            </main>
+        <!-- Onglets -->
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('users')">👥 Utilisateurs</div>
+            <div class="tab" onclick="switchTab('draws')">🎲 Tirages & Résultats</div>
+            <div class="tab" onclick="switchTab('numbers')">🔢 Boules & Limites</div>
+            <div class="tab" onclick="switchTab('reports')">📊 Rapports</div>
         </div>
-    </div>
 
-    <!-- Modal pour créer un utilisateur -->
-    <div id="create-user-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="modal-user-title">Créer un Utilisateur</h3>
-                <button class="close-modal" onclick="ownerManager.closeModal()">&times;</button>
+        <!-- 1. GESTION UTILISATEURS -->
+        <div id="tab-users" class="tab-content active">
+            <div class="section-title"><i class="fas fa-user-plus"></i> Créer un utilisateur</div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Nom complet</label>
+                    <input type="text" id="create-fullname" placeholder="Jean Dupont">
+                </div>
+                <div class="form-group">
+                    <label>CIN (optionnel)</label>
+                    <input type="text" id="create-cin" placeholder="01-02-03-04-05">
+                </div>
+                <div class="form-group">
+                    <label>Identifiant (login)</label>
+                    <input type="text" id="create-username" placeholder="jean.dupont">
+                </div>
+                <div class="form-group">
+                    <label>Mot de passe</label>
+                    <input type="password" id="create-password" value="default123">
+                </div>
+                <div class="form-group">
+                    <label>Rôle</label>
+                    <select id="create-role">
+                        <option value="agent">Agent</option>
+                        <option value="supervisor">Superviseur</option>
+                    </select>
+                </div>
+                <div class="form-group" id="supervisor-field">
+                    <label>Superviseur (pour agent)</label>
+                    <select id="create-supervisor">
+                        <option value="">Aucun (agent libre)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Zone / Localisation</label>
+                    <input type="text" id="create-zone" placeholder="Port-au-Prince">
+                </div>
+                <div style="display:flex; align-items:end;">
+                    <button class="btn-primary" onclick="createUser()"><i class="fas fa-save"></i> Créer</button>
+                </div>
             </div>
-            <div class="modal-body">
-                <form id="create-user-form" onsubmit="ownerManager.createUser(event)">
-                    <!-- Formulaire chargé dynamiquement -->
-                </form>
+
+            <div class="section-title"><i class="fas fa-list"></i> Agents & Superviseurs</div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+                <div>
+                    <h3>Superviseurs</h3>
+                    <div id="supervisors-list" class="list-container"></div>
+                </div>
+                <div>
+                    <h3>Agents</h3>
+                    <div id="agents-list" class="list-container"></div>
+                </div>
+            </div>
+
+            <div class="section-title"><i class="fas fa-arrows-spread"></i> Changer superviseur d'un agent</div>
+            <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr auto;">
+                <select id="change-agent-select"></select>
+                <select id="change-supervisor-select"></select>
+                <button class="btn-primary" onclick="changeSupervisor()">Transférer</button>
             </div>
         </div>
-    </div>
 
-    <!-- Modal pour configuration avancée -->
-    <div id="advanced-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="advanced-modal-title">Configuration Avancée</h3>
-                <button class="close-modal" onclick="ownerManager.closeModal('advanced-modal')">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div id="advanced-modal-content">
-                    <!-- Contenu dynamique -->
+        <!-- 2. TIRAGES & RÉSULTATS -->
+        <div id="tab-draws" class="tab-content">
+            <div class="section-title"><i class="fas fa-pen"></i> Publier un résultat</div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Tirage</label>
+                    <select id="draw-select"></select>
+                </div>
+                <div class="form-group">
+                    <label>1er lot (3 chiffres)</label>
+                    <input type="text" id="draw-lot1" maxlength="3" placeholder="465">
+                </div>
+                <div class="form-group">
+                    <label>2e lot (2 chiffres)</label>
+                    <input type="text" id="draw-lot2" maxlength="2" placeholder="67">
+                </div>
+                <div class="form-group">
+                    <label>3e lot (2 chiffres)</label>
+                    <input type="text" id="draw-lot3" maxlength="2" placeholder="88">
+                </div>
+                <div style="display:flex; gap:10px; align-items:end;">
+                    <button class="btn-primary" onclick="publishManual()">Publier</button>
                 </div>
             </div>
-        </div>
-    </div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Ou URL de résultats</label>
+                    <input type="url" id="draw-url" placeholder="https://...">
+                </div>
+                <div style="display:flex; align-items:end;">
+                    <button class="btn-primary" onclick="publishFromUrl()">Importer</button>
+                </div>
+            </div>
 
-    <script src="ow-api-config.js"></script>
-    <script src="ow-api-service.js"></script>
-    <script src="ow-state-manager.js"></script>
-    <script src="ow-ui-manager.js"></script>
-    <script src="ow-user-manager.js"></script>
-    <script src="ow-draw-manager.js"></script>
-    <script src="ow-number-manager.js"></script>
-    <script src="ow-main.js"></script>
+            <div class="section-title"><i class="fas fa-ban"></i> Bloquer / Débloquer un tirage</div>
+            <div class="form-grid">
+                <select id="draw-block-select"></select>
+                <button class="btn-danger" onclick="toggleDrawBlock(true)">Bloquer</button>
+                <button class="btn-primary" onclick="toggleDrawBlock(false)">Débloquer</button>
+            </div>
+        </div>
+
+        <!-- 3. BOULES & LIMITES -->
+        <div id="tab-numbers" class="tab-content">
+            <div class="section-title"><i class="fas fa-ban"></i> Bloquer une boule (tous tirages)</div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Numéro à bloquer (00-99)</label>
+                    <input type="text" id="block-number" maxlength="2" placeholder="82">
+                </div>
+                <button class="btn-danger" onclick="blockNumber()">Bloquer</button>
+                <button class="btn-primary" onclick="unblockNumber()">Débloquer</button>
+            </div>
+            <div id="blocked-numbers-list" class="list-container" style="max-height:150px;"></div>
+
+            <div class="section-title"><i class="fas fa-chart-line"></i> Limiter une boule (montant max)</div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Tirage</label>
+                    <select id="limit-draw"></select>
+                </div>
+                <div class="form-group">
+                    <label>Numéro</label>
+                    <input type="text" id="limit-number" maxlength="2" placeholder="48">
+                </div>
+                <div class="form-group">
+                    <label>Montant maximum (G)</label>
+                    <input type="number" id="limit-amount" placeholder="100">
+                </div>
+                <button class="btn-primary" onclick="setNumberLimit()">Appliquer</button>
+            </div>
+        </div>
+
+        <!-- 4. RAPPORTS -->
+        <div id="tab-reports" class="tab-content">
+            <div class="section-title"><i class="fas fa-filter"></i> Générer rapport</div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Superviseur</label>
+                    <select id="report-supervisor">
+                        <option value="all">Tous</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Agent</label>
+                    <select id="report-agent">
+                        <option value="all">Tous</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Période</label>
+                    <select id="report-period">
+                        <option value="today">Aujourd'hui</option>
+                        <option value="yesterday">Hier</option>
+                        <option value="week">Cette semaine</option>
+                        <option value="month">Ce mois</option>
+                        <option value="custom">Personnalisée</option>
+                    </select>
+                </div>
+                <div class="form-group" id="custom-dates" style="display:none;">
+                    <label>Du</label>
+                    <input type="date" id="report-from">
+                    <label>Au</label>
+                    <input type="date" id="report-to">
+                </div>
+                <button class="btn-primary" onclick="generateReport()">Générer</button>
+                <button class="btn-primary" onclick="printReport()"><i class="fas fa-print"></i> Imprimer</button>
+            </div>
+            <div id="report-result" style="margin-top:30px;"></div>
+        </div>
+
+        <script>
+            // ---------- INIT AUTH ----------
+            (function() {
+                const token = localStorage.getItem('auth_token');
+                const role = localStorage.getItem('user_role');
+                if (!token || role !== 'owner') {
+                    window.location.href = 'index.html';
+                }
+                document.getElementById('owner-name').innerHTML = `<i class="fas fa-crown"></i> ${localStorage.getItem('user_name') || 'Propriétaire'}`;
+            })();
+
+            const API_URL = 'https://lotata-islp.onrender.com/api';
+
+            // ---------- ONGLETS ----------
+            function switchTab(tabId) {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                document.querySelector(`.tab[onclick*="${tabId}"]`).classList.add('active');
+                document.getElementById(`tab-${tabId}`).classList.add('active');
+                if (tabId === 'users') loadUsersLists();
+                if (tabId === 'draws') loadDraws();
+                if (tabId === 'numbers') { loadBlockedNumbers(); loadDrawsForLimits(); }
+                if (tabId === 'reports') loadSupervisorsForReport();
+            }
+
+            // ---------- GESTION UTILISATEURS ----------
+            async function loadUsersLists() {
+                // superviseurs
+                const supRes = await fetch(`${API_URL}/owner/supervisors`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
+                });
+                const supervisors = await supRes.json();
+                let supHtml = '';
+                supervisors.forEach(s => {
+                    supHtml += `<div class="item-row">
+                        <span><strong>${s.name}</strong> (${s.username})</span>
+                        <span class="badge-success">Actif</span>
+                    </div>`;
+                });
+                document.getElementById('supervisors-list').innerHTML = supHtml || '<p>Aucun superviseur</p>';
+
+                // agents
+                const agentRes = await fetch(`${API_URL}/owner/agents`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
+                });
+                const agents = await agentRes.json();
+                let agentHtml = '';
+                agents.forEach(a => {
+                    agentHtml += `<div class="item-row">
+                        <span><strong>${a.name}</strong> (${a.username})</span>
+                        <span>Superviseur: ${a.supervisor_name || 'libre'}</span>
+                        <button class="btn-danger" style="padding:4px 10px;" onclick="toggleUserBlock('${a.id}','agent')">${a.blocked ? 'Débloquer' : 'Bloquer'}</button>
+                    </div>`;
+                });
+                document.getElementById('agents-list').innerHTML = agentHtml;
+
+                // remplir selects pour changement superviseur
+                let agentOpts = '<option value="">Choisir agent</option>';
+                agents.forEach(a => { agentOpts += `<option value="${a.id}">${a.name}</option>`; });
+                document.getElementById('change-agent-select').innerHTML = agentOpts;
+
+                let supOpts = '<option value="">Aucun (libre)</option>';
+                supervisors.forEach(s => { supOpts += `<option value="${s.id}">${s.name}</option>`; });
+                document.getElementById('change-supervisor-select').innerHTML = supOpts;
+                document.getElementById('create-supervisor').innerHTML = supOpts;
+            }
+
+            async function createUser() {
+                const data = {
+                    name: document.getElementById('create-fullname').value,
+                    cin: document.getElementById('create-cin').value,
+                    username: document.getElementById('create-username').value,
+                    password: document.getElementById('create-password').value,
+                    role: document.getElementById('create-role').value,
+                    supervisorId: document.getElementById('create-supervisor').value || null,
+                    zone: document.getElementById('create-zone').value
+                };
+                if (!data.name || !data.username || !data.password) { alert('Champs requis'); return; }
+                try {
+                    await fetch(`${API_URL}/owner/create-user`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type':'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                    alert('Utilisateur créé');
+                    loadUsersLists();
+                } catch(e) { alert('Erreur'); }
+            }
+
+            async function changeSupervisor() {
+                const agentId = document.getElementById('change-agent-select').value;
+                const supervisorId = document.getElementById('change-supervisor-select').value;
+                if (!agentId) return;
+                await fetch(`${API_URL}/owner/change-supervisor`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type':'application/json' },
+                    body: JSON.stringify({ agentId, supervisorId })
+                });
+                loadUsersLists();
+            }
+
+            async function toggleUserBlock(userId, type) {
+                await fetch(`${API_URL}/owner/block-user`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type':'application/json' },
+                    body: JSON.stringify({ userId, type })
+                });
+                loadUsersLists();
+            }
+
+            // ---------- TIRAGES ----------
+            async function loadDraws() {
+                const res = await fetch(`${API_URL}/owner/draws`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
+                });
+                const draws = await res.json();
+                let opts = '';
+                draws.forEach(d => { opts += `<option value="${d.id}">${d.name}</option>`; });
+                document.getElementById('draw-select').innerHTML = opts;
+                document.getElementById('draw-block-select').innerHTML = opts;
+            }
+
+            async function publishManual() {
+                const drawId = document.getElementById('draw-select').value;
+                const lot1 = document.getElementById('draw-lot1').value;
+                const lot2 = document.getElementById('draw-lot2').value;
+                const lot3 = document.getElementById('draw-lot3').value;
+                if (!drawId || !lot1 || !lot2 || !lot3) return;
+                await fetch(`${API_URL}/owner/publish-results`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type':'application/json' },
+                    body: JSON.stringify({ drawId, numbers: [lot1, lot2, lot3] })
+                });
+                alert('Résultats publiés');
+            }
+
+            async function toggleDrawBlock(block) {
+                const drawId = document.getElementById('draw-block-select').value;
+                await fetch(`${API_URL}/owner/block-draw`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type':'application/json' },
+                    body: JSON.stringify({ drawId, block })
+                });
+                alert(block ? 'Tirage bloqué' : 'Tirage débloqué');
+            }
+
+            // ---------- BOULES ----------
+            async function loadBlockedNumbers() {
+                const res = await fetch(`${API_URL}/owner/blocked-numbers`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
+                });
+                const data = await res.json();
+                let html = '<strong>Numéros bloqués:</strong> ';
+                html += (data.blockedNumbers || []).join(', ') || 'aucun';
+                document.getElementById('blocked-numbers-list').innerHTML = html;
+            }
+
+            async function blockNumber() {
+                const num = document.getElementById('block-number').value.padStart(2,'0');
+                await fetch(`${API_URL}/owner/block-number`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type':'application/json' },
+                    body: JSON.stringify({ number: num })
+                });
+                loadBlockedNumbers();
+            }
+
+            async function unblockNumber() {
+                const num = document.getElementById('block-number').value.padStart(2,'0');
+                await fetch(`${API_URL}/owner/unblock-number`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type':'application/json' },
+                    body: JSON.stringify({ number: num })
+                });
+                loadBlockedNumbers();
+            }
+
+            async function loadDrawsForLimits() {
+                const res = await fetch(`${API_URL}/owner/draws`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
+                });
+                const draws = await res.json();
+                let opts = '';
+                draws.forEach(d => { opts += `<option value="${d.id}">${d.name}</option>`; });
+                document.getElementById('limit-draw').innerHTML = opts;
+            }
+
+            async function setNumberLimit() {
+                const drawId = document.getElementById('limit-draw').value;
+                const number = document.getElementById('limit-number').value.padStart(2,'0');
+                const amount = parseFloat(document.getElementById('limit-amount').value);
+                await fetch(`${API_URL}/owner/number-limit`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type':'application/json' },
+                    body: JSON.stringify({ drawId, number, limitAmount: amount })
+                });
+                alert('Limite appliquée');
+            }
+
+            // ---------- RAPPORTS ----------
+            async function loadSupervisorsForReport() {
+                const res = await fetch(`${API_URL}/owner/supervisors`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
+                });
+                const supervisors = await res.json();
+                let opts = '<option value="all">Tous superviseurs</option>';
+                supervisors.forEach(s => { opts += `<option value="${s.id}">${s.name}</option>`; });
+                document.getElementById('report-supervisor').innerHTML = opts;
+                // agents
+                const agentRes = await fetch(`${API_URL}/owner/agents`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
+                });
+                const agents = await agentRes.json();
+                let agentOpts = '<option value="all">Tous agents</option>';
+                agents.forEach(a => { agentOpts += `<option value="${a.id}">${a.name}</option>`; });
+                document.getElementById('report-agent').innerHTML = agentOpts;
+            }
+
+            document.getElementById('report-period').addEventListener('change', function(e) {
+                document.getElementById('custom-dates').style.display = e.target.value === 'custom' ? 'block' : 'none';
+            });
+
+            async function generateReport() {
+                const params = new URLSearchParams({
+                    supervisorId: document.getElementById('report-supervisor').value,
+                    agentId: document.getElementById('report-agent').value,
+                    period: document.getElementById('report-period').value,
+                    fromDate: document.getElementById('report-from').value,
+                    toDate: document.getElementById('report-to').value
+                });
+                const res = await fetch(`${API_URL}/owner/reports?${params}`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
+                });
+                const report = await res.json();
+                let html = `<div class="stats-grid">`;
+                html += `<div class="stat-card"><div class="stat-value">${report.totalTickets||0}</div><div>Tickets</div></div>`;
+                html += `<div class="stat-card"><div class="stat-value">${(report.totalBets||0).toLocaleString()} G</div><div>Pariés</div></div>`;
+                html += `<div class="stat-card"><div class="stat-value profit">${(report.totalWins||0).toLocaleString()} G</div><div>Gains</div></div>`;
+                const balance = (report.totalBets||0) - (report.totalWins||0);
+                html += `<div class="stat-card"><div class="stat-value ${balance>=0?'profit':'loss'}">${balance.toLocaleString()} G</div><div>Balance</div></div>`;
+                html += `</div>`;
+                document.getElementById('report-result').innerHTML = html;
+            }
+
+            function printReport() {
+                const content = document.getElementById('report-result').innerHTML;
+                const w = window.open('', '_blank');
+                w.document.write(`<html><head><title>Rapport</title><style>body{font-family:Arial;padding:20px;}</style></head><body>${content}</body></html>`);
+                w.document.close();
+                w.print();
+            }
+
+            function logout() { localStorage.clear(); window.location.href='index.html'; }
+
+            window.onload = function() {
+                loadUsersLists();
+                loadDraws();
+                loadBlockedNumbers();
+                loadDrawsForLimits();
+                loadSupervisorsForReport();
+            };
+        </script>
+    </div>
 </body>
 </html>
