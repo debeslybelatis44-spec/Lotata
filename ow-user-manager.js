@@ -1,123 +1,163 @@
-// Gestionnaire des utilisateurs
+// Gestionnaire des utilisateurs - COMPLET
 class UserManager {
     constructor(uiManager, stateManager) {
         this.uiManager = uiManager;
         this.stateManager = stateManager;
     }
-
-    // Afficher le modal de création d'utilisateur
+    
+    // === CRÉATION D'UTILISATEUR ===
     showCreateUserModal(type) {
         const modal = document.getElementById('create-user-modal');
         const title = document.getElementById('modal-user-title');
         const form = document.getElementById('create-user-form');
         
+        if (!modal || !title || !form) return;
+        
         if (type === 'supervisor') {
             title.textContent = 'Créer un Nouveau Superviseur';
-            form.innerHTML = `
-                <div class="form-group">
-                    <label>Nom Complet:</label>
-                    <input type="text" class="form-control" name="name" required>
-                </div>
-                <div class="form-group">
-                    <label>Email:</label>
-                    <input type="email" class="form-control" name="email" required>
-                </div>
-                <div class="form-group">
-                    <label>Téléphone:</label>
-                    <input type="tel" class="form-control" name="phone" required>
-                </div>
-                <div class="form-group">
-                    <label>Mot de passe:</label>
-                    <div class="password-input-group">
-                        <input type="password" class="form-control" name="password" id="password-input" required>
-                        <button type="button" class="btn btn-secondary btn-small" 
-                                onclick="this.querySelector('i').classList.toggle('fa-eye');
-                                         this.querySelector('i').classList.toggle('fa-eye-slash');
-                                         const input = document.getElementById('password-input');
-                                         input.type = input.type === 'password' ? 'text' : 'password'">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Commission par défaut (%):</label>
-                    <input type="number" class="form-control" name="defaultCommission" value="10" min="1" max="30">
-                </div>
-                <div class="form-group">
-                    <label>Limite de vente quotidienne (Gdes):</label>
-                    <input type="number" class="form-control" name="dailyLimit" value="10000" min="0">
-                </div>
-                <div style="display: flex; gap: 10px; margin-top: 20px;">
-                    <button type="button" class="btn btn-secondary" onclick="ownerManager.closeModal()">Annuler</button>
-                    <button type="submit" class="btn btn-success">Créer le Superviseur</button>
-                </div>
-                <input type="hidden" name="type" value="supervisor">
-            `;
+            form.innerHTML = this.getSupervisorFormHTML();
         } else {
             title.textContent = 'Créer un Nouvel Agent';
-            const supervisors = this.stateManager.getData('users').supervisors || [];
-            const supervisorsOptions = supervisors
-                .map(s => `<option value="${s.id}">${s.name} (${s.id})</option>`)
-                .join('');
-            
-            form.innerHTML = `
-                <div class="form-group">
-                    <label>Nom Complet:</label>
-                    <input type="text" class="form-control" name="name" required>
-                </div>
-                <div class="form-group">
-                    <label>Email:</label>
-                    <input type="email" class="form-control" name="email" required>
-                </div>
-                <div class="form-group">
-                    <label>Téléphone:</label>
-                    <input type="tel" class="form-control" name="phone" required>
-                </div>
-                <div class="form-group">
-                    <label>Superviseur Assigné:</label>
-                    <select class="form-control" name="supervisorId" ${supervisors.length ? '' : 'disabled'}>
-                        <option value="">Sélectionner un superviseur</option>
-                        ${supervisorsOptions}
-                    </select>
-                    ${!supervisors.length ? '<p class="form-help">Aucun superviseur disponible</p>' : ''}
-                </div>
-                <div class="form-group">
-                    <label>Localisation:</label>
-                    <input type="text" class="form-control" name="location" placeholder="Ex: Port-au-Prince" required>
-                </div>
-                <div class="form-group">
-                    <label>Commission (%):</label>
-                    <input type="number" class="form-control" name="commission" value="5" min="1" max="20" required>
-                </div>
-                <div class="form-group">
-                    <label>Limite de vente quotidienne (Gdes):</label>
-                    <input type="number" class="form-control" name="dailyLimit" value="5000" min="0">
-                </div>
-                <div class="form-group">
-                    <label>Mot de passe:</label>
-                    <div class="password-input-group">
-                        <input type="password" class="form-control" name="password" id="agent-password-input" required>
-                        <button type="button" class="btn btn-secondary btn-small" 
-                                onclick="this.querySelector('i').classList.toggle('fa-eye');
-                                         this.querySelector('i').classList.toggle('fa-eye-slash');
-                                         const input = document.getElementById('agent-password-input');
-                                         input.type = input.type === 'password' ? 'text' : 'password'">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                    </div>
-                </div>
-                <div style="display: flex; gap: 10px; margin-top: 20px;">
-                    <button type="button" class="btn btn-secondary" onclick="ownerManager.closeModal()">Annuler</button>
-                    <button type="submit" class="btn btn-success">Créer l'Agent</button>
-                </div>
-                <input type="hidden" name="type" value="agent">
-            `;
+            form.innerHTML = this.getAgentFormHTML();
         }
         
         this.uiManager.showModal('create-user-modal');
     }
-
-    // Créer un utilisateur
+    
+    getSupervisorFormHTML() {
+        return `
+            <div class="form-group">
+                <label>Nom Complet:</label>
+                <input type="text" class="form-control" name="name" required 
+                       placeholder="Ex: Jean Dupont">
+            </div>
+            <div class="form-group">
+                <label>Email:</label>
+                <input type="email" class="form-control" name="email" required 
+                       placeholder="exemple@email.com">
+            </div>
+            <div class="form-group">
+                <label>Téléphone:</label>
+                <input type="tel" class="form-control" name="phone" required 
+                       placeholder="+509XXXXXXXX">
+            </div>
+            <div class="form-group">
+                <label>Mot de passe:</label>
+                <div class="password-input-group">
+                    <input type="password" class="form-control" name="password" 
+                           id="supervisor-password" required minlength="6">
+                    <button type="button" class="btn btn-secondary btn-small" 
+                            onclick="this.querySelector('i').classList.toggle('fa-eye');
+                                     this.querySelector('i').classList.toggle('fa-eye-slash');
+                                     const input = document.getElementById('supervisor-password');
+                                     input.type = input.type === 'password' ? 'text' : 'password'">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+                <small style="color: var(--text-dim); font-size: 12px;">
+                    Minimum 6 caractères
+                </small>
+            </div>
+            <div class="form-group">
+                <label>Commission par défaut (%):</label>
+                <input type="number" class="form-control" name="defaultCommission" 
+                       value="10" min="1" max="30" step="0.5">
+            </div>
+            <div class="form-group">
+                <label>Limite de vente quotidienne (Gdes):</label>
+                <input type="number" class="form-control" name="dailyLimit" 
+                       value="10000" min="0" step="100">
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button type="button" class="btn btn-secondary" onclick="ownerManager.closeModal()">
+                    Annuler
+                </button>
+                <button type="submit" class="btn btn-success">
+                    <i class="fas fa-save"></i> Créer le Superviseur
+                </button>
+            </div>
+            <input type="hidden" name="type" value="supervisor">
+        `;
+    }
+    
+    getAgentFormHTML() {
+        const users = this.stateManager.getData('users');
+        const supervisors = users?.supervisors || [];
+        const supervisorsOptions = supervisors
+            .filter(s => !s.blocked)
+            .map(s => `<option value="${s.id}">${s.name} (${s.email})</option>`)
+            .join('');
+        
+        return `
+            <div class="form-group">
+                <label>Nom Complet:</label>
+                <input type="text" class="form-control" name="name" required 
+                       placeholder="Ex: Marie Laurent">
+            </div>
+            <div class="form-group">
+                <label>Email:</label>
+                <input type="email" class="form-control" name="email" required 
+                       placeholder="exemple@email.com">
+            </div>
+            <div class="form-group">
+                <label>Téléphone:</label>
+                <input type="tel" class="form-control" name="phone" required 
+                       placeholder="+509XXXXXXXX">
+            </div>
+            <div class="form-group">
+                <label>Superviseur Assigné:</label>
+                <select class="form-control" name="supervisorId" ${supervisors.length ? '' : 'disabled'} required>
+                    <option value="">Sélectionner un superviseur</option>
+                    ${supervisorsOptions}
+                </select>
+                ${!supervisors.length ? 
+                    '<p class="form-help" style="color: var(--warning); font-size: 12px;">Aucun superviseur disponible. Créez d\'abord un superviseur.</p>' 
+                    : ''}
+            </div>
+            <div class="form-group">
+                <label>Localisation:</label>
+                <input type="text" class="form-control" name="location" 
+                       placeholder="Ex: Port-au-Prince, Delmas" required>
+            </div>
+            <div class="form-group">
+                <label>Commission (%):</label>
+                <input type="number" class="form-control" name="commission" 
+                       value="5" min="1" max="20" step="0.5" required>
+            </div>
+            <div class="form-group">
+                <label>Limite de vente quotidienne (Gdes):</label>
+                <input type="number" class="form-control" name="dailyLimit" 
+                       value="5000" min="0" step="100">
+            </div>
+            <div class="form-group">
+                <label>Mot de passe:</label>
+                <div class="password-input-group">
+                    <input type="password" class="form-control" name="password" 
+                           id="agent-password" required minlength="6">
+                    <button type="button" class="btn btn-secondary btn-small" 
+                            onclick="this.querySelector('i').classList.toggle('fa-eye');
+                                     this.querySelector('i').classList.toggle('fa-eye-slash');
+                                     const input = document.getElementById('agent-password');
+                                     input.type = input.type === 'password' ? 'text' : 'password'">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+                <small style="color: var(--text-dim); font-size: 12px;">
+                    Minimum 6 caractères
+                </small>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button type="button" class="btn btn-secondary" onclick="ownerManager.closeModal()">
+                    Annuler
+                </button>
+                <button type="submit" class="btn btn-success">
+                    <i class="fas fa-save"></i> Créer l'Agent
+                </button>
+            </div>
+            <input type="hidden" name="type" value="agent">
+        `;
+    }
+    
     async createUser(event) {
         event.preventDefault();
         const form = event.target;
@@ -135,11 +175,11 @@ class UserManager {
             };
             
             if (type === 'supervisor') {
-                userData.defaultCommission = parseInt(formData.get('defaultCommission')) || 10;
+                userData.defaultCommission = parseFloat(formData.get('defaultCommission')) || 10;
             } else {
                 userData.supervisorId = formData.get('supervisorId');
                 userData.location = formData.get('location');
-                userData.commission = parseInt(formData.get('commission')) || 5;
+                userData.commission = parseFloat(formData.get('commission')) || 5;
             }
             
             const result = await ApiService.createUser(userData);
@@ -163,8 +203,8 @@ class UserManager {
             );
         }
     }
-
-    // Blocage/Déblocage d'utilisateur
+    
+    // === GESTION DES UTILISATEURS ===
     async toggleUserBlock(userId, blocked) {
         try {
             await ApiService.toggleUserBlock(userId, blocked);
@@ -177,11 +217,10 @@ class UserManager {
             // Mettre à jour l'état local
             const users = this.stateManager.getData('users');
             
-            // Trouver et mettre à jour l'utilisateur
             const updateUserInList = (list) => {
                 return list.map(user => {
                     if (user.id === userId) {
-                        return { ...user, blocked };
+                        return { ...user, blocked, online: blocked ? false : user.online };
                     }
                     return user;
                 });
@@ -203,57 +242,19 @@ class UserManager {
             );
         }
     }
-
-    // Édition d'utilisateur
+    
     async editUser(userId) {
         try {
             const user = await ApiService.getUserById(userId);
             
-            // Ouvrir un modal d'édition
             const modal = document.getElementById('advanced-modal');
             const title = document.getElementById('advanced-modal-title');
             const content = document.getElementById('advanced-modal-content');
             
-            title.textContent = `Éditer ${user.name}`;
+            if (!modal || !title || !content) return;
             
-            content.innerHTML = `
-                <form id="edit-user-form" onsubmit="ownerManager.updateUser('${userId}', event)">
-                    <div class="form-group">
-                        <label>Nom Complet:</label>
-                        <input type="text" class="form-control" name="name" value="${user.name}" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Email:</label>
-                        <input type="email" class="form-control" name="email" value="${user.email}" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Téléphone:</label>
-                        <input type="tel" class="form-control" name="phone" value="${user.phone}" required>
-                    </div>
-                    ${user.role === 'agent' ? `
-                        <div class="form-group">
-                            <label>Commission (%):</label>
-                            <input type="number" class="form-control" name="commission" value="${user.commission || 5}" min="1" max="20" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Localisation:</label>
-                            <input type="text" class="form-control" name="location" value="${user.location || ''}" required>
-                        </div>
-                    ` : ''}
-                    <div class="form-group">
-                        <label>Limite de vente quotidienne (Gdes):</label>
-                        <input type="number" class="form-control" name="dailyLimit" value="${user.dailyLimit || 0}" min="0">
-                    </div>
-                    <div class="form-group">
-                        <label>Nouveau mot de passe (laisser vide pour ne pas changer):</label>
-                        <input type="password" class="form-control" name="newPassword">
-                    </div>
-                    <div style="display: flex; gap: 10px; margin-top: 20px;">
-                        <button type="button" class="btn btn-secondary" onclick="ownerManager.closeModal('advanced-modal')">Annuler</button>
-                        <button type="submit" class="btn btn-success">Enregistrer</button>
-                    </div>
-                </form>
-            `;
+            title.textContent = `Éditer ${user.name}`;
+            content.innerHTML = this.getEditUserFormHTML(user);
             
             this.uiManager.showModal('advanced-modal');
             
@@ -262,8 +263,75 @@ class UserManager {
             this.uiManager.showNotification('Erreur lors du chargement des données', 'error');
         }
     }
-
-    // Mettre à jour un utilisateur
+    
+    getEditUserFormHTML(user) {
+        const isAgent = user.role === 'agent';
+        
+        return `
+            <form id="edit-user-form" onsubmit="ownerManager.updateUser('${user.id}', event)">
+                <div class="form-group">
+                    <label>Nom Complet:</label>
+                    <input type="text" class="form-control" name="name" 
+                           value="${user.name}" required>
+                </div>
+                <div class="form-group">
+                    <label>Email:</label>
+                    <input type="email" class="form-control" name="email" 
+                           value="${user.email}" required>
+                </div>
+                <div class="form-group">
+                    <label>Téléphone:</label>
+                    <input type="tel" class="form-control" name="phone" 
+                           value="${user.phone}" required>
+                </div>
+                
+                ${isAgent ? `
+                    <div class="form-group">
+                        <label>Commission (%):</label>
+                        <input type="number" class="form-control" name="commission" 
+                               value="${user.commission || 5}" min="1" max="20" step="0.5" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Localisation:</label>
+                        <input type="text" class="form-control" name="location" 
+                               value="${user.location || ''}" required>
+                    </div>
+                ` : `
+                    <div class="form-group">
+                        <label>Commission par défaut (%):</label>
+                        <input type="number" class="form-control" name="defaultCommission" 
+                               value="${user.defaultCommission || 10}" min="1" max="30" step="0.5">
+                    </div>
+                `}
+                
+                <div class="form-group">
+                    <label>Limite de vente quotidienne (Gdes):</label>
+                    <input type="number" class="form-control" name="dailyLimit" 
+                           value="${user.dailyLimit || 0}" min="0" step="100">
+                </div>
+                
+                <div class="form-group">
+                    <label>Nouveau mot de passe (laisser vide pour ne pas changer):</label>
+                    <input type="password" class="form-control" name="newPassword" 
+                           minlength="6">
+                    <small style="color: var(--text-dim); font-size: 12px;">
+                        Minimum 6 caractères
+                    </small>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary" 
+                            onclick="ownerManager.closeModal('advanced-modal')">
+                        Annuler
+                    </button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-save"></i> Enregistrer
+                    </button>
+                </div>
+            </form>
+        `;
+    }
+    
     async updateUser(userId, event) {
         event.preventDefault();
         const form = event.target;
@@ -278,20 +346,25 @@ class UserManager {
             };
             
             const newPassword = formData.get('newPassword');
-            if (newPassword) {
+            if (newPassword && newPassword.length >= 6) {
                 updateData.password = newPassword;
             }
             
-            // Ajouter les champs spécifiques aux agents
+            // Champs spécifiques
             const commission = formData.get('commission');
             const location = formData.get('location');
+            const defaultCommission = formData.get('defaultCommission');
             
             if (commission !== null) {
-                updateData.commission = parseInt(commission);
+                updateData.commission = parseFloat(commission);
             }
             
             if (location !== null) {
                 updateData.location = location;
+            }
+            
+            if (defaultCommission !== null) {
+                updateData.defaultCommission = parseFloat(defaultCommission);
             }
             
             await ApiService.updateUser(userId, updateData);
@@ -307,10 +380,11 @@ class UserManager {
             this.uiManager.showNotification(error.message || 'Erreur lors de la mise à jour', 'error');
         }
     }
-
-    // Transférer un agent
+    
+    // === TRANSFERT D'AGENT ===
     async transferAgent(agentId) {
-        const supervisors = this.stateManager.getData('users').supervisors || [];
+        const users = this.stateManager.getData('users');
+        const supervisors = users?.supervisors || [];
         
         if (supervisors.length < 2) {
             this.uiManager.showNotification('Pas assez de superviseurs pour transférer', 'warning');
@@ -321,9 +395,12 @@ class UserManager {
         const title = document.getElementById('advanced-modal-title');
         const content = document.getElementById('advanced-modal-content');
         
+        if (!modal || !title || !content) return;
+        
         title.textContent = 'Transférer l\'agent';
         
         const supervisorsOptions = supervisors
+            .filter(s => !s.blocked)
             .map(s => `<option value="${s.id}">${s.name}</option>`)
             .join('');
         
@@ -350,15 +427,20 @@ class UserManager {
                     </div>
                 </div>
                 <div style="display: flex; gap: 10px; margin-top: 20px;">
-                    <button type="button" class="btn btn-secondary" onclick="ownerManager.closeModal('advanced-modal')">Annuler</button>
-                    <button type="submit" class="btn btn-primary">Transférer</button>
+                    <button type="button" class="btn btn-secondary" 
+                            onclick="ownerManager.closeModal('advanced-modal')">
+                        Annuler
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-exchange-alt"></i> Transférer
+                    </button>
                 </div>
             </form>
         `;
         
         this.uiManager.showModal('advanced-modal');
     }
-
+    
     async confirmTransfer(agentId, event) {
         event.preventDefault();
         const form = event.target;
@@ -371,8 +453,7 @@ class UserManager {
                 keepLimits: formData.get('keepLimits') === 'on'
             };
             
-            // Ici, vous implémenteriez l'appel API pour transférer l'agent
-            // await ApiService.transferAgent(agentId, transferData);
+            await ApiService.transferAgent(agentId, transferData.newSupervisorId);
             
             this.uiManager.showNotification('Agent transféré avec succès', 'success');
             this.uiManager.closeModal('advanced-modal');
@@ -385,18 +466,19 @@ class UserManager {
             this.uiManager.showNotification(error.message || 'Erreur lors du transfert', 'error');
         }
     }
-
-    // Voir les agents d'un superviseur
+    
+    // === VUE AGENTS SUPERVISEUR ===
     async viewSupervisorAgents(supervisorId) {
         try {
-            // Récupérer les agents du superviseur
             const users = this.stateManager.getData('users');
-            const supervisorAgents = users.agents.filter(agent => agent.supervisorId === supervisorId);
-            const supervisor = users.supervisors.find(s => s.id === supervisorId);
+            const supervisorAgents = users?.agents?.filter(agent => agent.supervisorId === supervisorId) || [];
+            const supervisor = users?.supervisors?.find(s => s.id === supervisorId);
             
             const modal = document.getElementById('advanced-modal');
             const title = document.getElementById('advanced-modal-title');
             const content = document.getElementById('advanced-modal-content');
+            
+            if (!modal || !title || !content) return;
             
             title.textContent = `Agents de ${supervisor?.name || 'Superviseur'}`;
             
@@ -406,7 +488,7 @@ class UserManager {
                 content.innerHTML = `
                     <div class="agents-list">
                         ${supervisorAgents.map(agent => `
-                            <div class="agent-item" style="padding: 15px; border-bottom: 1px solid var(--border);">
+                            <div class="agent-item">
                                 <div style="display: flex; justify-content: space-between; align-items: center;">
                                     <div>
                                         <strong>${agent.name}</strong>
@@ -421,7 +503,8 @@ class UserManager {
                                     </div>
                                 </div>
                                 <div style="display: flex; gap: 10px; margin-top: 10px;">
-                                    <button class="btn btn-small btn-warning" onclick="ownerManager.editUser('${agent.id}')">
+                                    <button class="btn btn-small btn-warning" 
+                                            onclick="ownerManager.editUser('${agent.id}')">
                                         Éditer
                                     </button>
                                     <button class="btn btn-small ${agent.blocked ? 'btn-success' : 'btn-danger'}" 
@@ -458,20 +541,8 @@ class UserManager {
             this.uiManager.showNotification('Erreur lors du chargement des agents', 'error');
         }
     }
-
-    // Exporter les données utilisateurs
-    async exportUsersData() {
-        try {
-            await ApiService.exportUsers('csv');
-            
-            this.uiManager.showNotification('Données exportées avec succès', 'success');
-        } catch (error) {
-            console.error('Erreur export données:', error);
-            this.uiManager.showNotification(error.message || 'Erreur lors de l\'export', 'error');
-        }
-    }
-
-    // Activité utilisateur
+    
+    // === ACTIVITÉ UTILISATEUR ===
     async getUserActivity(userId) {
         try {
             const activity = await ApiService.getUserActivity(userId);
@@ -480,11 +551,13 @@ class UserManager {
             const title = document.getElementById('advanced-modal-title');
             const content = document.getElementById('advanced-modal-content');
             
+            if (!modal || !title || !content) return;
+            
             // Trouver l'utilisateur
             const users = this.stateManager.getData('users');
             let userName = 'Utilisateur';
             
-            const allUsers = [...users.supervisors, ...users.agents];
+            const allUsers = [...(users.supervisors || []), ...(users.agents || [])];
             const user = allUsers.find(u => u.id === userId);
             if (user) {
                 userName = user.name;
@@ -492,7 +565,7 @@ class UserManager {
             
             title.textContent = `Activité de ${userName}`;
             
-            if (activity.length === 0) {
+            if (!activity || activity.length === 0) {
                 content.innerHTML = '<p class="no-data">Aucune activité enregistrée</p>';
             } else {
                 content.innerHTML = `
@@ -517,11 +590,11 @@ class UserManager {
             this.uiManager.showNotification('Erreur lors du chargement de l\'activité', 'error');
         }
     }
-
-    // Gestion des limites utilisateur
+    
+    // === LIMITES UTILISATEUR ===
     async updateUserLimits(userId) {
         const users = this.stateManager.getData('users');
-        const allUsers = [...users.supervisors, ...users.agents];
+        const allUsers = [...(users.supervisors || []), ...(users.agents || [])];
         const user = allUsers.find(u => u.id === userId);
         
         if (!user) return;
@@ -529,6 +602,8 @@ class UserManager {
         const modal = document.getElementById('advanced-modal');
         const title = document.getElementById('advanced-modal-title');
         const content = document.getElementById('advanced-modal-content');
+        
+        if (!modal || !title || !content) return;
         
         title.textContent = `Limites de ${user.name}`;
         
@@ -560,15 +635,20 @@ class UserManager {
                            value="${user.maxCommission || 20}" min="1" max="50" step="0.5">
                 </div>
                 <div style="display: flex; gap: 10px; margin-top: 20px;">
-                    <button type="button" class="btn btn-secondary" onclick="ownerManager.closeModal('advanced-modal')">Annuler</button>
-                    <button type="submit" class="btn btn-success">Enregistrer</button>
+                    <button type="button" class="btn btn-secondary" 
+                            onclick="ownerManager.closeModal('advanced-modal')">
+                        Annuler
+                    </button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-save"></i> Enregistrer
+                    </button>
                 </div>
             </form>
         `;
         
         this.uiManager.showModal('advanced-modal');
     }
-
+    
     async saveUserLimits(userId, event) {
         event.preventDefault();
         const form = event.target;
@@ -596,4 +676,50 @@ class UserManager {
             this.uiManager.showNotification(error.message || 'Erreur lors de la mise à jour', 'error');
         }
     }
+    
+    // === EXPORT DONNÉES ===
+    async exportUsersData() {
+        try {
+            const response = await ApiService.exportUsers('json');
+            
+            const dataStr = JSON.stringify(response, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', `lotato_users_${new Date().toISOString().split('T')[0]}.json`);
+            document.body.appendChild(linkElement);
+            linkElement.click();
+            document.body.removeChild(linkElement);
+            
+            this.uiManager.showNotification('Données exportées avec succès', 'success');
+        } catch (error) {
+            console.error('Erreur export données:', error);
+            this.uiManager.showNotification(error.message || 'Erreur lors de l\'export', 'error');
+        }
+    }
+    
+    // === SUPPRESSION UTILISATEUR ===
+    async deleteUser(userId) {
+        if (!confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ? Cette action est irréversible.')) {
+            return;
+        }
+        
+        try {
+            await ApiService.deleteUser(userId);
+            
+            this.uiManager.showNotification('Utilisateur supprimé avec succès', 'success');
+            
+            // Recharger les données
+            await this.uiManager.loadUsersData();
+            await this.uiManager.loadDashboardData();
+            
+        } catch (error) {
+            console.error('Erreur suppression utilisateur:', error);
+            this.uiManager.showNotification(error.message || 'Erreur lors de la suppression', 'error');
+        }
+    }
 }
+
+// Exporter pour usage global
+window.UserManager = UserManager;
