@@ -229,6 +229,21 @@
             width: 90%;
             border: 1px solid #ad00f1;
         }
+        .detail-stat {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+        }
+        .status-badge {
+            display: inline-block;
+            margin-left: 8px;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            background: rgba(255,255,255,0.1);
+        }
     </style>
 </head>
 <body>
@@ -288,11 +303,22 @@
         <!-- MODAL DÉTAILS AGENT -->
         <div id="agent-modal" class="modal">
             <div class="modal-content">
-                <h2 style="margin-bottom:20px;" id="modal-agent-name"></h2>
-                <div id="modal-agent-stats"></div>
-                <h3 style="margin:20px 0 10px;">Derniers tickets</h3>
-                <div id="modal-agent-tickets"></div>
-                <div style="display:flex; gap:15px; margin-top:25px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <h2 id="modal-agent-name" style="margin:0;"></h2>
+                    <span id="modal-agent-badge" class="badge"></span>
+                </div>
+                <!-- Statistiques détaillées -->
+                <div id="modal-agent-stats" style="background:rgba(0,0,0,0.2); padding:15px; border-radius:16px;"></div>
+                
+                <h3 style="margin:25px 0 10px;"><i class="fas fa-ticket"></i> Derniers tickets</h3>
+                <div id="modal-agent-tickets" style="max-height:250px; overflow-y:auto;"></div>
+                
+                <div style="display:flex; gap:15px; margin-top:25px; justify-content:space-between;">
+                    <div style="display:flex; gap:10px;">
+                        <button id="modal-toggle-block-btn" class="toggle-block" onclick="toggleBlockFromModal()">
+                            <i class="fas fa-lock"></i> Bloquer / Débloquer
+                        </button>
+                    </div>
                     <button class="btn-primary" onclick="closeModal()">Fermer</button>
                 </div>
             </div>
@@ -312,6 +338,7 @@
 
         const API_URL = 'https://lotata-islp.onrender.com/api';
         let agents = [];
+        let currentModalAgentId = null;  // pour le blocage depuis la modale
 
         // Charger données au démarrage
         async function loadDashboard() {
@@ -358,7 +385,14 @@
             container.innerHTML = list.map(agent => {
                 const blocked = agent.blocked || false;
                 const balance = (agent.totalBets || 0) - (agent.totalWins || 0);
-                const profitLoss = agent.balance || 0;
+                const profitLoss = agent.balance || 0; // wins - bets
+                // Statut Gain/Perte après tirage
+                let statusText = '';
+                let statusClass = '';
+                if (profitLoss > 0) { statusText = 'Gain'; statusClass = 'profit'; }
+                else if (profitLoss < 0) { statusText = 'Perte'; statusClass = 'loss'; }
+                else { statusText = 'Équilibre'; statusClass = ''; }
+                
                 return `
                     <div class="agent-card ${blocked ? 'blocked' : ''}" data-name="${agent.name.toLowerCase()}" data-status="${blocked ? 'blocked' : 'active'}">
                         <div class="agent-header">
@@ -372,7 +406,11 @@
                             <span>Gains:</span><span class="winning-amount">${(agent.totalWins||0).toLocaleString()} G</span>
                         </div>
                         <div style="display:flex; justify-content:space-between; margin:10px 0;">
-                            <span>Balance:</span><span class="${profitLoss>=0?'profit':'loss'}">${profitLoss.toLocaleString()} G</span>
+                            <span>Balance:</span>
+                            <span class="${profitLoss>=0?'profit':'loss'}">
+                                ${profitLoss.toLocaleString()} G
+                                ${statusText ? `<span class="status-badge ${statusClass}">${statusText}</span>` : ''}
+                            </span>
                         </div>
                         <div style="display:flex; justify-content:space-between; margin:10px 0;">
                             <span>À payer à l'agent:</span><span class="profit">${(agent.totalWins||0).toLocaleString()} G</span>
@@ -415,33 +453,65 @@
                 });
                 await loadAgents();
                 await loadGlobalReports();
+                // Si la modale est ouverte sur le même agent, rafraîchir son contenu
+                if (currentModalAgentId == agentId) {
+                    showAgentDetails(agentId);
+                }
             } catch(e) { alert('Erreur'); }
         }
 
-        // AFFICHER DÉTAILS AGENT (tickets récents, suppression)
+        // BLOQUER/DÉBLOQUER DEPUIS LA MODALE
+        function toggleBlockFromModal() {
+            if (!currentModalAgentId) return;
+            const agent = agents.find(a => a.id == currentModalAgentId);
+            if (!agent) return;
+            toggleBlockAgent(currentModalAgentId, !agent.blocked);
+        }
+
+        // AFFICHER DÉTAILS AGENT (avec rapports détaillés)
         async function showAgentDetails(agentId) {
             const agent = agents.find(a => a.id == agentId);
             if (!agent) return;
+            currentModalAgentId = agentId;
+            
+            // Nom et badge dans l'en-tête
             document.getElementById('modal-agent-name').innerText = agent.name;
-            // stats
-            const stats = `
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                    <div>Vendu: ${(agent.totalBets||0)} G</div>
-                    <div>Gains: ${(agent.totalWins||0)} G</div>
-                    <div>Balance: <span class="${(agent.balance||0)>=0?'profit':'loss'}">${(agent.balance||0)} G</span></div>
-                    <div>À payer: ${(agent.totalWins||0)} G</div>
-                </div>
-            `;
-            document.getElementById('modal-agent-stats').innerHTML = stats;
+            const badge = document.getElementById('modal-agent-badge');
+            badge.className = 'badge ' + (agent.blocked ? 'badge-blocked' : 'badge-active');
+            badge.innerText = agent.blocked ? 'BLOQUÉ' : 'ACTIF';
 
-            // tickets récents (suppression si <10min)
+            // Bouton de blocage dans la modale
+            const toggleBtn = document.getElementById('modal-toggle-block-btn');
+            toggleBtn.className = 'toggle-block ' + (agent.blocked ? 'unblock' : 'block');
+            toggleBtn.innerHTML = `<i class="fas ${agent.blocked ? 'fa-unlock' : 'fa-lock'}"></i> ${agent.blocked ? 'Débloquer' : 'Bloquer'}`;
+
+            // Statistiques détaillées
+            const totalBets = agent.totalBets || 0;
+            const totalWins = agent.totalWins || 0;
+            const totalTickets = agent.totalTickets || 0;
+            const avgBet = totalTickets > 0 ? (totalBets / totalTickets).toFixed(1) : '0';
+            const winRate = totalBets > 0 ? ((totalWins / totalBets) * 100).toFixed(1) : '0';
+            const profitLoss = agent.balance || 0;
+            
+            const statsHtml = `
+                <div class="detail-stat"><span>💰 Montant parié total :</span> <strong>${totalBets.toLocaleString()} G</strong></div>
+                <div class="detail-stat"><span>🏆 Gains générés :</span> <strong class="winning-amount">${totalWins.toLocaleString()} G</strong></div>
+                <div class="detail-stat"><span>📊 Balance (Gains - Paris) :</span> <strong class="${profitLoss>=0?'profit':'loss'}">${profitLoss.toLocaleString()} G</strong></div>
+                <div class="detail-stat"><span>🎫 Nombre de tickets :</span> <strong>${totalTickets}</strong></div>
+                <div class="detail-stat"><span>📉 Mise moyenne :</span> <strong>${avgBet} G</strong></div>
+                <div class="detail-stat"><span>📈 Taux de gain :</span> <strong>${winRate}%</strong></div>
+                <div class="detail-stat"><span>💸 À payer à l'agent :</span> <strong class="profit">${totalWins.toLocaleString()} G</strong></div>
+            `;
+            document.getElementById('modal-agent-stats').innerHTML = statsHtml;
+
+            // Tickets récents (suppression si <10min)
             try {
                 const res = await fetch(`${API_URL}/supervisor/tickets/recent?agentId=${agentId}`, {
                     headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
                 });
                 const tickets = await res.json();
                 let html = '';
-                if (!tickets.length) html = '<p>Aucun ticket récent.</p>';
+                if (!tickets.length) html = '<p style="color:#a0a0b8; text-align:center;">Aucun ticket récent.</p>';
                 else {
                     tickets.forEach(t => {
                         const date = new Date(t.date);
@@ -452,7 +522,7 @@
                         html += `
                             <div class="ticket-item">
                                 <div>
-                                    <div>#${t.ticket_id} - ${t.total_amount} G</div>
+                                    <div style="font-weight:500;">#${t.ticket_id} - ${t.total_amount} G</div>
                                     <div style="font-size:0.7rem; color:#a0a0b8;">${date.toLocaleTimeString()}</div>
                                 </div>
                                 <button class="delete-btn" onclick="deleteTicket(${t.id}, ${agentId})" ${deletable ? '' : 'disabled'}>
@@ -476,7 +546,7 @@
                     method: 'DELETE',
                     headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
                 });
-                await showAgentDetails(agentId);
+                await showAgentDetails(agentId); // rafraîchir la modale
                 await loadAgents();
                 await loadGlobalReports();
             } catch(e) { alert('Erreur'); }
@@ -484,6 +554,7 @@
 
         function closeModal() {
             document.getElementById('agent-modal').classList.remove('active');
+            currentModalAgentId = null;
         }
 
         function logout() {
