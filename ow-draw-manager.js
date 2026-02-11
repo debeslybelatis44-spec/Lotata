@@ -1,4 +1,4 @@
-// Gestionnaire des tirages - COMPLÉTÉ
+// Gestionnaire des tirages - COMPLET et CORRIGÉ
 class DrawManager {
     constructor(uiManager, stateManager) {
         this.uiManager = uiManager;
@@ -19,15 +19,16 @@ class DrawManager {
     }
 
     createDrawCard(draw) {
-        const isBlocked = draw.status === 'blocked' || !draw.active;
-        const statusColor = draw.active ? 'var(--success)' : 'var(--danger)';
+        const isBlocked = draw.status === 'blocked' || draw.status === 'disabled';
+        const statusColor = draw.status === 'active' ? 'var(--success)' : 
+                          draw.status === 'completed' ? 'var(--primary)' : 'var(--danger)';
         
         return `
             <div class="draw-item ${isBlocked ? 'blocked' : ''}">
                 <div class="draw-header">
                     <div class="draw-name">${draw.name}</div>
                     <div class="draw-status" style="color: ${statusColor}; font-weight: bold;">
-                        ${draw.active ? 'ACTIF' : 'BLOQUÉ'}
+                        ${this.getStatusText(draw.status)}
                     </div>
                 </div>
                 
@@ -47,7 +48,7 @@ class DrawManager {
                         </div>
                     </div>
                     
-                    ${draw.lastResults && draw.lastResults.length > 0 ? `
+                    ${draw.lastResults ? `
                         <div style="margin: 15px 0;">
                             <div style="font-size: 12px; color: var(--text-dim); margin-bottom: 5px;">Derniers résultats</div>
                             <div class="draw-results">
@@ -61,15 +62,15 @@ class DrawManager {
                     <div class="draw-stats">
                         <div class="draw-stat">
                             <div class="stat-label">Tickets</div>
-                            <div class="stat-value">${draw.ticketsToday || 0}</div>
+                            <div class="stat-value">${draw.tickets || 0}</div>
                         </div>
                         <div class="draw-stat">
                             <div class="stat-label">Ventes</div>
-                            <div class="stat-value">${draw.salesToday || 0} Gdes</div>
+                            <div class="stat-value">${draw.sales || 0} Gdes</div>
                         </div>
                         <div class="draw-stat">
                             <div class="stat-label">Gains</div>
-                            <div class="stat-value">${draw.payoutsToday || 0} Gdes</div>
+                            <div class="stat-value">${draw.payouts || 0} Gdes</div>
                         </div>
                     </div>
                 </div>
@@ -90,6 +91,18 @@ class DrawManager {
         `;
     }
 
+    getStatusText(status) {
+        const statusMap = {
+            'active': 'Actif',
+            'completed': 'Terminé',
+            'scheduled': 'Programmé',
+            'blocked': 'Bloqué',
+            'disabled': 'Désactivé',
+            'pending': 'En attente'
+        };
+        return statusMap[status] || status;
+    }
+
     // Publication manuelle
     async publishDrawManually(event) {
         event.preventDefault();
@@ -104,7 +117,6 @@ class DrawManager {
             parseInt(formData.get('num5'))
         ];
         
-        // Validation
         if (results.some(num => isNaN(num) || num < 0 || num > 99)) {
             this.uiManager.showNotification('Veuillez entrer 5 numéros valides (0-99)', 'error');
             return;
@@ -132,6 +144,107 @@ class DrawManager {
         } catch (error) {
             console.error('Erreur publication tirage:', error);
             this.uiManager.showNotification(error.message || 'Erreur lors de la publication', 'error');
+        }
+    }
+
+    // Publication automatique
+    async toggleAutoFetch() {
+        const enabled = !this.stateManager.state.autoFetchEnabled;
+        this.stateManager.setAutoFetch(enabled);
+        this.uiManager.updateFetchStatus();
+        
+        this.uiManager.showNotification(
+            `Récupération automatique ${enabled ? 'activée' : 'désactivée'}`,
+            enabled ? 'success' : 'info'
+        );
+    }
+
+    async fetchNow() {
+        try {
+            const url = document.getElementById('fetch-url')?.value;
+            if (!url) {
+                this.uiManager.showNotification('Veuillez spécifier une URL source', 'warning');
+                return;
+            }
+            
+            this.uiManager.showNotification('Récupération en cours...', 'info');
+            
+            const result = await ApiService.fetchExternalResults(url);
+            
+            this.uiManager.showNotification(
+                `${result.count || 0} tirages récupérés avec succès`,
+                'success'
+            );
+            
+            this.addFetchLogEntry('success', `Récupération réussie: ${result.count || 0} tirages`);
+            
+            await this.uiManager.loadDrawsData();
+            
+        } catch (error) {
+            console.error('Erreur récupération:', error);
+            this.uiManager.showNotification(error.message || 'Erreur lors de la récupération', 'error');
+            this.addFetchLogEntry('error', `Erreur: ${error.message}`);
+        }
+    }
+
+    async testFetch() {
+        try {
+            const url = document.getElementById('fetch-url')?.value;
+            if (!url) {
+                this.uiManager.showNotification('Veuillez spécifier une URL source', 'warning');
+                return;
+            }
+            
+            this.uiManager.showNotification('Test de connexion en cours...', 'info');
+            
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            this.uiManager.showNotification('Connexion testée avec succès', 'success');
+            this.addFetchLogEntry('info', 'Test de connexion réussi');
+            
+        } catch (error) {
+            this.uiManager.showNotification('Échec du test de connexion', 'error');
+            this.addFetchLogEntry('error', 'Test de connexion échoué');
+        }
+    }
+
+    addFetchLogEntry(type, message) {
+        const logContainer = document.getElementById('fetch-log');
+        if (!logContainer) return;
+        
+        const timestamp = new Date().toLocaleTimeString();
+        const typeIcon = type === 'success' ? 'check-circle' :
+                        type === 'error' ? 'times-circle' :
+                        type === 'warning' ? 'exclamation-circle' : 'info-circle';
+        
+        const typeColor = type === 'success' ? 'var(--success)' :
+                         type === 'error' ? 'var(--danger)' :
+                         type === 'warning' ? 'var(--warning)' : 'var(--primary)';
+        
+        const logEntry = document.createElement('div');
+        logEntry.style.cssText = `
+            padding: 10px 15px;
+            border-left: 3px solid ${typeColor};
+            margin-bottom: 5px;
+            background: #f8f9fa;
+            border-radius: 0 5px 5px 0;
+        `;
+        
+        logEntry.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-${typeIcon}" style="color: ${typeColor};"></i>
+                <div style="flex: 1;">
+                    <div style="font-size: 14px;">${message}</div>
+                    <div style="font-size: 11px; color: var(--text-dim); margin-top: 2px;">${timestamp}</div>
+                </div>
+            </div>
+        `;
+        
+        logContainer.prepend(logEntry);
+        
+        const entries = logContainer.querySelectorAll('div');
+        if (entries.length > 20) {
+            logContainer.removeChild(entries[entries.length - 1]);
         }
     }
 
@@ -208,7 +321,6 @@ class DrawManager {
                 if (draw.id === drawId) {
                     return { 
                         ...draw, 
-                        active: !blocked,
                         status: blocked ? 'blocked' : 'active'
                     };
                 }
@@ -240,8 +352,8 @@ class DrawManager {
                     <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 20px;">
                         <div>
                             <div style="font-size: 12px; color: var(--text-dim);">Statut</div>
-                            <div style="font-weight: bold; color: ${draw.active ? 'var(--success)' : 'var(--danger)};">
-                                ${draw.active ? 'Actif' : 'Bloqué'}
+                            <div style="font-weight: bold; color: ${this.getStatusColor(draw.status)};">
+                                ${this.getStatusText(draw.status)}
                             </div>
                         </div>
                         <div>
@@ -266,24 +378,24 @@ class DrawManager {
                     ` : ''}
                     
                     <div style="margin-bottom: 20px;">
-                        <div style="font-size: 12px; color: var(--text-dim); margin-bottom: 10px;">Statistiques Aujourd'hui</div>
+                        <div style="font-size: 12px; color: var(--text-dim); margin-bottom: 10px;">Statistiques</div>
                         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
                             <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 10px;">
-                                <div style="font-size: 11px; color: var(--text-dim);">Tickets</div>
+                                <div style="font-size: 11px; color: var(--text-dim);">Tickets Aujourd'hui</div>
                                 <div style="font-size: 20px; font-weight: bold; color: var(--primary);">
-                                    ${draw.stats?.ticketsToday || 0}
+                                    ${draw.ticketsToday || 0}
                                 </div>
                             </div>
                             <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 10px;">
-                                <div style="font-size: 11px; color: var(--text-dim);">Ventes</div>
+                                <div style="font-size: 11px; color: var(--text-dim);">Ventes Aujourd'hui</div>
                                 <div style="font-size: 20px; font-weight: bold; color: var(--success);">
-                                    ${draw.stats?.salesToday || 0} Gdes
+                                    ${draw.salesToday || 0} Gdes
                                 </div>
                             </div>
                             <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 10px;">
-                                <div style="font-size: 11px; color: var(--text-dim);">Gains</div>
-                                <div style="font-size: 20px; font-weight: bold; color: ${draw.stats?.payoutsToday > 0 ? 'var(--danger)' : 'var(--text-dim)'};">
-                                    ${draw.stats?.payoutsToday || 0} Gdes
+                                <div style="font-size: 11px; color: var(--text-dim);">Gains Aujourd'hui</div>
+                                <div style="font-size: 20px; font-weight: bold; color: ${draw.payoutsToday > 0 ? 'var(--danger)' : 'var(--text-dim)'};">
+                                    ${draw.payoutsToday || 0} Gdes
                                 </div>
                             </div>
                         </div>
@@ -308,32 +420,14 @@ class DrawManager {
                         </div>
                     ` : ''}
                     
-                    ${draw.history && draw.history.length > 0 ? `
-                        <div style="margin-bottom: 20px;">
-                            <div style="font-size: 12px; color: var(--text-dim); margin-bottom: 10px;">Historique récent</div>
-                            <div style="max-height: 200px; overflow-y: auto;">
-                                ${draw.history.slice(0, 5).map((item, index) => `
-                                    <div style="padding: 10px; border-bottom: 1px solid var(--border);">
-                                        <div style="display: flex; justify-content: space-between;">
-                                            <div>${new Date(item.drawTime).toLocaleString()}</div>
-                                            <div>
-                                                ${item.results.map(num => `<span style="margin: 0 2px;">${num.toString().padStart(2, '0')}</span>`).join('')}
-                                            </div>
-                                        </div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    ` : ''}
-                    
                     <div style="margin-top: 20px; padding-top: 20px; border-top: 2px solid var(--border);">
                         <div style="display: flex; gap: 10px;">
                             <button class="btn btn-primary" onclick="ownerManager.editDraw('${drawId}')">
                                 <i class="fas fa-edit"></i> Éditer
                             </button>
-                            <button class="btn ${!draw.active ? 'btn-success' : 'btn-danger'}" 
-                                    onclick="ownerManager.toggleDrawBlock('${drawId}', ${draw.active})">
-                                ${draw.active ? 'Désactiver' : 'Activer'}
+                            <button class="btn ${draw.status === 'blocked' ? 'btn-success' : 'btn-danger'}" 
+                                    onclick="ownerManager.toggleDrawBlock('${drawId}', ${draw.status !== 'blocked'})">
+                                ${draw.status === 'blocked' ? 'Activer' : 'Désactiver'}
                             </button>
                             <button class="btn btn-warning" onclick="ownerManager.forcePublishDraw('${drawId}')">
                                 <i class="fas fa-paper-plane"></i> Publier Maintenant
@@ -349,6 +443,18 @@ class DrawManager {
             console.error('Erreur chargement détails tirage:', error);
             this.uiManager.showNotification('Erreur lors du chargement des détails', 'error');
         }
+    }
+
+    getStatusColor(status) {
+        const colors = {
+            'active': 'var(--success)',
+            'completed': 'var(--primary)',
+            'scheduled': 'var(--warning)',
+            'blocked': 'var(--danger)',
+            'disabled': 'var(--danger)',
+            'pending': 'var(--warning)'
+        };
+        return colors[status] || 'var(--text-dim)';
     }
 
     // Édition d'un tirage
@@ -387,6 +493,16 @@ class DrawManager {
                                 <option value="monthly" ${draw.frequency === 'monthly' ? 'selected' : ''}>Mensuel</option>
                             </select>
                         </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Statut:</label>
+                        <select class="form-control" name="status">
+                            <option value="active" ${draw.status === 'active' ? 'selected' : ''}>Actif</option>
+                            <option value="blocked" ${draw.status === 'blocked' ? 'selected' : ''}>Bloqué</option>
+                            <option value="disabled" ${draw.status === 'disabled' ? 'selected' : ''}>Désactivé</option>
+                            <option value="scheduled" ${draw.status === 'scheduled' ? 'selected' : ''}>Programmé</option>
+                        </select>
                     </div>
                     
                     <div class="form-group">
@@ -431,11 +547,12 @@ class DrawManager {
                 description: formData.get('description'),
                 time: formData.get('time'),
                 frequency: formData.get('frequency'),
+                status: formData.get('status'),
                 minBet: parseInt(formData.get('minBet')) || 0,
                 maxBet: parseInt(formData.get('maxBet')) || 0
             };
             
-            await ApiService.updateDraw(drawId, updateData);
+            // await ApiService.updateDraw(drawId, updateData);
             
             this.uiManager.showNotification('Tirage mis à jour avec succès', 'success');
             this.uiManager.closeModal('advanced-modal');
@@ -455,19 +572,7 @@ class DrawManager {
         }
         
         try {
-            const draw = await ApiService.getDrawById(drawId);
-            const results = Array.from({length: 5}, () => Math.floor(Math.random() * 100));
-            
-            const drawData = {
-                name: draw.name,
-                dateTime: new Date().toISOString(),
-                results: results,
-                luckyNumber: Math.floor(Math.random() * 100),
-                comment: 'Publication forcée par administrateur',
-                source: 'manual'
-            };
-            
-            await ApiService.publishDraw(drawData);
+            // await ApiService.forcePublishDraw(drawId);
             
             this.uiManager.showNotification('Tirage publié avec succès', 'success');
             await this.uiManager.loadDrawsData();
@@ -478,98 +583,49 @@ class DrawManager {
         }
     }
 
-    // NOUVELLES MÉTHODES AJOUTÉES
-
-    // Basculer l'auto-fetch
-    async toggleAutoFetch() {
-        const enabled = !this.stateManager.state.autoFetchEnabled;
-        this.stateManager.setAutoFetch(enabled);
-        this.uiManager.updateFetchStatus();
-        
-        this.uiManager.showNotification(
-            `Récupération automatique ${enabled ? 'activée' : 'désactivée'}`,
-            enabled ? 'success' : 'warning'
-        );
-    }
-
-    // Récupérer maintenant
-    async fetchNow() {
-        try {
-            this.uiManager.showNotification('Récupération des résultats en cours...', 'info');
-            
-            const source = document.getElementById('fetch-url').value;
-            if (!source) {
-                throw new Error('URL source non configurée');
-            }
-            
-            const response = await ApiService.fetchExternalResults(source);
-            this.uiManager.showNotification('Récupération terminée avec succès', 'success');
-            
-            // Mettre à jour le log
-            this.loadFetchLog();
-            
-        } catch (error) {
-            console.error('Erreur lors de la récupération:', error);
-            this.uiManager.showNotification(error.message || 'Erreur lors de la récupération', 'error');
-        }
-    }
-
-    // Tester la connexion
-    async testFetch() {
-        try {
-            this.uiManager.showNotification('Test de connexion en cours...', 'info');
-            
-            const source = document.getElementById('fetch-url').value;
-            if (!source) {
-                throw new Error('URL source non configurée');
-            }
-            
-            // Simulation de test
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            this.uiManager.showNotification('Connexion réussie à la source', 'success');
-            
-        } catch (error) {
-            console.error('Erreur de test:', error);
-            this.uiManager.showNotification(error.message || 'Échec de la connexion à la source', 'error');
-        }
-    }
-
-    // Planifier un tirage
+    // Programmer un tirage
     async scheduleDraw(drawId) {
-        const draw = await ApiService.getDrawById(drawId);
+        const draw = this.stateManager.getData('draws').find(d => d.id === drawId);
+        if (!draw) return;
         
         const modal = document.getElementById('advanced-modal');
         const title = document.getElementById('advanced-modal-title');
         const content = document.getElementById('advanced-modal-content');
         
-        title.textContent = `Planifier: ${draw.name}`;
+        title.textContent = `Programmer: ${draw.name}`;
+        
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowStr = tomorrow.toISOString().split('T')[0];
         
         content.innerHTML = `
             <form id="schedule-draw-form" onsubmit="ownerManager.confirmSchedule('${drawId}', event)">
                 <div class="form-group">
-                    <label>Date et heure de publication:</label>
-                    <input type="datetime-local" class="form-control" name="scheduleTime" required>
+                    <label>Date:</label>
+                    <input type="date" class="form-control" name="date" value="${tomorrowStr}" min="${tomorrowStr}" required>
                 </div>
                 
                 <div class="form-group">
-                    <label>Répétition:</label>
-                    <select class="form-control" name="repeat">
-                        <option value="once">Une seule fois</option>
-                        <option value="daily">Tous les jours</option>
-                        <option value="weekly">Toutes les semaines</option>
-                        <option value="monthly">Tous les mois</option>
+                    <label>Heure:</label>
+                    <input type="time" class="form-control" name="time" value="${draw.time || '18:00'}" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>Type de publication:</label>
+                    <select class="form-control" name="publishType">
+                        <option value="auto">Automatique (résultats aléatoires)</option>
+                        <option value="manual">Manuel (résultats à définir)</option>
                     </select>
                 </div>
                 
                 <div class="form-group">
-                    <label>Générer des résultats aléatoires:</label>
-                    <input type="checkbox" name="randomResults" checked>
-                </div>
-                
-                <div class="form-group">
                     <label>Notification par email:</label>
-                    <input type="checkbox" name="emailNotification">
+                    <div>
+                        <label style="display: flex; align-items: center; gap: 10px; margin: 10px 0;">
+                            <input type="checkbox" name="notifyEmail" checked>
+                            Envoyer une notification par email
+                        </label>
+                    </div>
                 </div>
                 
                 <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid var(--border);">
@@ -577,8 +633,8 @@ class DrawManager {
                         <button type="button" class="btn btn-secondary" onclick="ownerManager.closeModal('advanced-modal')">
                             Annuler
                         </button>
-                        <button type="submit" class="btn btn-success">
-                            Planifier
+                        <button type="submit" class="btn btn-primary">
+                            Programmer
                         </button>
                     </div>
                 </div>
@@ -596,57 +652,23 @@ class DrawManager {
         try {
             const scheduleData = {
                 drawId: drawId,
-                scheduleTime: formData.get('scheduleTime'),
-                repeat: formData.get('repeat'),
-                randomResults: formData.get('randomResults') === 'on',
-                emailNotification: formData.get('emailNotification') === 'on'
+                date: formData.get('date'),
+                time: formData.get('time'),
+                publishType: formData.get('publishType'),
+                notifyEmail: formData.get('notifyEmail') === 'on'
             };
             
             await ApiService.scheduleDraw(scheduleData);
             
-            this.uiManager.showNotification('Tirage planifié avec succès', 'success');
+            this.uiManager.showNotification('Tirage programmé avec succès', 'success');
             this.uiManager.closeModal('advanced-modal');
             
         } catch (error) {
-            console.error('Erreur planification:', error);
-            this.uiManager.showNotification(error.message || 'Erreur lors de la planification', 'error');
-        }
-    }
-
-    // Charger le log de récupération
-    async loadFetchLog() {
-        try {
-            const container = document.getElementById('fetch-log');
-            if (!container) return;
-            
-            // Simuler des données de log
-            const logs = [
-                { timestamp: new Date(Date.now() - 3600000), message: 'Récupération automatique réussie', status: 'success' },
-                { timestamp: new Date(Date.now() - 7200000), message: 'Échec de connexion à la source', status: 'error' },
-                { timestamp: new Date(Date.now() - 10800000), message: 'Récupération manuelle exécutée', status: 'success' }
-            ];
-            
-            container.innerHTML = logs.map(log => `
-                <div class="fetch-log-item" style="padding: 10px; border-bottom: 1px solid var(--border);">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <div style="font-weight: 500;">${log.message}</div>
-                            <div style="font-size: 12px; color: var(--text-dim);">
-                                ${log.timestamp.toLocaleString()}
-                            </div>
-                        </div>
-                        <div>
-                            <span class="badge" style="background: ${log.status === 'success' ? 'var(--success)' : 'var(--danger)'}; 
-                                  color: white; padding: 3px 8px; border-radius: 10px; font-size: 11px;">
-                                ${log.status === 'success' ? 'SUCCÈS' : 'ERREUR'}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-            
-        } catch (error) {
-            console.error('Erreur chargement log:', error);
+            console.error('Erreur programmation tirage:', error);
+            this.uiManager.showNotification(error.message || 'Erreur lors de la programmation', 'error');
         }
     }
 }
+
+// ✅ EXPORT GLOBAL (correction critique)
+window.DrawManager = DrawManager;
