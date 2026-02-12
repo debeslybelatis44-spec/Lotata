@@ -38,7 +38,7 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// Database connection
+// Connexion PostgreSQL
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
@@ -76,7 +76,7 @@ async function initializeDatabase() {
   try {
     console.log('🔄 Initialisation de la base de données...');
 
-    // --- Tables existantes (inchangées) ---
+    // --- Tables existantes ---
     await pool.query(`
       CREATE TABLE IF NOT EXISTS draw_results (
         id SERIAL PRIMARY KEY,
@@ -93,10 +93,12 @@ async function initializeDatabase() {
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS number_limits (
-        number VARCHAR(2) PRIMARY KEY,
+        draw_id VARCHAR(50) DEFAULT 'global',
+        number VARCHAR(2),
         limit_amount DECIMAL(10,2),
         created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW()
+        updated_at TIMESTAMP DEFAULT NOW(),
+        PRIMARY KEY (draw_id, number)
       )
     `);
 
@@ -133,40 +135,51 @@ async function initializeDatabase() {
       )
     `);
 
+    // --- Superviseurs ---
     await pool.query(`
       CREATE TABLE IF NOT EXISTS supervisors (
         id SERIAL PRIMARY KEY,
         name VARCHAR(100),
         email VARCHAR(100) UNIQUE,
         phone VARCHAR(20),
+        username VARCHAR(100) UNIQUE,
+        cin VARCHAR(50),
+        zone VARCHAR(100),
         password VARCHAR(255),
         active BOOLEAN DEFAULT true,
+        blocked BOOLEAN DEFAULT false,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       )
     `);
 
+    // --- Agents ---
     await pool.query(`
       CREATE TABLE IF NOT EXISTS agents (
         id SERIAL PRIMARY KEY,
         name VARCHAR(100),
         email VARCHAR(100) UNIQUE,
         phone VARCHAR(20),
+        username VARCHAR(100) UNIQUE,
+        cin VARCHAR(50),
+        zone VARCHAR(100),
         password VARCHAR(255),
         supervisor_id INTEGER REFERENCES supervisors(id),
         location VARCHAR(100),
         commission DECIMAL(5,2) DEFAULT 5.00,
         active BOOLEAN DEFAULT true,
+        blocked BOOLEAN DEFAULT false,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       )
     `);
 
+    // --- Tickets (agent_id devient INTEGER) ---
     await pool.query(`
       CREATE TABLE IF NOT EXISTS tickets (
         id SERIAL PRIMARY KEY,
         ticket_id VARCHAR(50),
-        agent_id VARCHAR(50),
+        agent_id INTEGER REFERENCES agents(id),
         agent_name VARCHAR(100),
         draw_id VARCHAR(50),
         draw_name VARCHAR(100),
@@ -189,6 +202,7 @@ async function initializeDatabase() {
       )
     `);
 
+    // --- Tirages ---
     await pool.query(`
       CREATE TABLE IF NOT EXISTS draws (
         id VARCHAR(50) PRIMARY KEY,
@@ -200,13 +214,13 @@ async function initializeDatabase() {
         description TEXT,
         min_bet DECIMAL(10,2) DEFAULT 0,
         max_bet DECIMAL(10,2) DEFAULT 0,
-        last_draw TIMESTAMP
+        last_draw TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
       )
     `);
 
-    await addColumnIfNotExists('draws', 'created_at', 'TIMESTAMP DEFAULT NOW()');
-    await addColumnIfNotExists('draws', 'updated_at', 'TIMESTAMP DEFAULT NOW()');
-
+    // --- Numéros bloqués globaux ---
     await pool.query(`
       CREATE TABLE IF NOT EXISTS blocked_numbers (
         number VARCHAR(2) PRIMARY KEY,
@@ -214,18 +228,29 @@ async function initializeDatabase() {
       )
     `);
 
+    // --- Numéros bloqués par tirage ---
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS blocked_numbers_draw (
+        draw_id VARCHAR(50) REFERENCES draws(id),
+        number VARCHAR(2),
+        blocked_at TIMESTAMP DEFAULT NOW(),
+        PRIMARY KEY (draw_id, number)
+      )
+    `);
+
+    // --- Configuration loterie ---
     await pool.query(`
       CREATE TABLE IF NOT EXISTS lottery_config (
         id SERIAL PRIMARY KEY,
         name VARCHAR(100),
         logo TEXT,
         address TEXT,
-        phone VARCHAR(20)
+        phone VARCHAR(20),
+        updated_at TIMESTAMP DEFAULT NOW()
       )
     `);
 
-    await addColumnIfNotExists('lottery_config', 'updated_at', 'TIMESTAMP DEFAULT NOW()');
-
+    // --- Alertes ---
     await pool.query(`
       CREATE TABLE IF NOT EXISTS alerts (
         id SERIAL PRIMARY KEY,
@@ -239,6 +264,7 @@ async function initializeDatabase() {
       )
     `);
 
+    // --- Limites utilisateur ---
     await pool.query(`
       CREATE TABLE IF NOT EXISTS user_limits (
         user_id VARCHAR(50),
@@ -250,43 +276,7 @@ async function initializeDatabase() {
       )
     `);
 
-    // --- AJOUTS POUR LES NOUVELLES FONCTIONNALITÉS ---
-    console.log('🔄 Mise à jour des tables pour propriétaire/superviseur...');
-
-    // Colonnes supplémentaires pour supervisors
-    await addColumnIfNotExists('supervisors', 'blocked', 'BOOLEAN DEFAULT false');
-    await addColumnIfNotExists('supervisors', 'username', 'VARCHAR(100) UNIQUE');
-    await addColumnIfNotExists('supervisors', 'cin', 'VARCHAR(50)');
-    await addColumnIfNotExists('supervisors', 'zone', 'VARCHAR(100)');
-
-    // Colonnes supplémentaires pour agents
-    await addColumnIfNotExists('agents', 'blocked', 'BOOLEAN DEFAULT false');
-    await addColumnIfNotExists('agents', 'username', 'VARCHAR(100) UNIQUE');
-    await addColumnIfNotExists('agents', 'cin', 'VARCHAR(50)');
-    await addColumnIfNotExists('agents', 'zone', 'VARCHAR(100)');
-
-    // Table des numéros bloqués par tirage spécifique
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS blocked_numbers_draw (
-        draw_id VARCHAR(50) REFERENCES draws(id),
-        number VARCHAR(2),
-        blocked_at TIMESTAMP DEFAULT NOW(),
-        PRIMARY KEY (draw_id, number)
-      )
-    `);
-
-    // Ajout de draw_id dans number_limits et modification de la clé primaire
-    await addColumnIfNotExists('number_limits', 'draw_id', 'VARCHAR(50) DEFAULT \'global\'');
-    try {
-      await pool.query(`ALTER TABLE number_limits DROP CONSTRAINT number_limits_pkey CASCADE`);
-    } catch (e) { /* la contrainte n'existe pas encore */ }
-    await pool.query(`
-      ALTER TABLE number_limits ADD PRIMARY KEY (draw_id, number)
-    `);
-
-    console.log('✅ Mise à jour des tables terminée');
-
-    // --- Données par défaut ---
+    // === Insertion des tirages par défaut ===
     const draws = [
       { id: 'tn_matin', name: 'Tunisia Matin', time: '10:00' },
       { id: 'tn_soir', name: 'Tunisia Soir', time: '17:00' },
@@ -311,6 +301,7 @@ async function initializeDatabase() {
       }
     }
 
+    // === Configuration par défaut ===
     const configExists = await pool.query('SELECT id FROM lottery_config LIMIT 1');
     if (configExists.rows.length === 0) {
       await pool.query(`
@@ -320,10 +311,45 @@ async function initializeDatabase() {
       console.log('✅ Configuration loterie par défaut ajoutée');
     }
 
+    // === Création d'un superviseur par défaut (si aucun) ===
+    const supCount = await pool.query('SELECT COUNT(*) FROM supervisors');
+    if (parseInt(supCount.rows[0].count) === 0) {
+      const hashed = await bcrypt.hash('super123', 10);
+      await pool.query(`
+        INSERT INTO supervisors (name, username, password, email, cin, zone)
+        VALUES ('Superviseur Principal', 'supervisor1', $1, 'sup@lotato.com', 'CIN001', 'Zone A')
+      `, [hashed]);
+      console.log('✅ Superviseur par défaut créé (supervisor1 / super123)');
+    }
+
+    // === Création d'un agent par défaut (lié au superviseur) ===
+    const agentCount = await pool.query('SELECT COUNT(*) FROM agents');
+    if (parseInt(agentCount.rows[0].count) === 0) {
+      const supId = await pool.query('SELECT id FROM supervisors WHERE username = $1', ['supervisor1']);
+      if (supId.rows.length > 0) {
+        const hashed = await bcrypt.hash('agent123', 10);
+        await pool.query(`
+          INSERT INTO agents (name, username, password, supervisor_id, email, cin, zone)
+          VALUES ('Agent Exemple', 'agent01', $1, $2, 'agent@lotato.com', 'CIN002', 'Zone A')
+        `, [hashed, supId.rows[0].id]);
+        console.log('✅ Agent par défaut créé (agent01 / agent123)');
+      }
+    }
+
+    // === Création d'un propriétaire par défaut (admin) ===
+    const ownerExists = await pool.query("SELECT COUNT(*) FROM supervisors WHERE username = 'admin'");
+    if (parseInt(ownerExists.rows[0].count) === 0) {
+      const hashed = await bcrypt.hash('admin123', 10);
+      await pool.query(`
+        INSERT INTO supervisors (name, username, password, email, cin, zone)
+        VALUES ('Propriétaire', 'admin', $1, 'admin@lotato.com', 'CIN000', 'Toutes')
+      `, [hashed]);
+      console.log('✅ Propriétaire par défaut créé (admin / admin123)');
+    }
+
     console.log('✅ Base de données initialisée avec succès');
   } catch (error) {
     console.error('❌ Erreur initialisation base de données:', error.message);
-    console.error('Stack:', error.stack);
   }
 }
 
@@ -374,51 +400,60 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
+// ---- AUTHENTIFICATION RÉELLE AVEC BDD ----
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password, role } = req.body;
-    console.log('🔑 Tentative de connexion:', { username, role });
+    console.log(`🔑 Tentative de connexion: ${username} (${role})`);
 
-    // --- Simulation d'utilisateurs (à remplacer par requête BDD) ---
-    const validCredentials = (
-      (role === 'agent' && username === 'agent01' && password === 'agent123') ||
-      (role === 'supervisor' && username === 'supervisor1' && password === 'super123') ||
-      (role === 'owner' && username === 'admin' && password === 'admin123')
-    );
+    let user = null;
+    let table = '';
+    if (role === 'supervisor' || role === 'owner') {
+      table = 'supervisors';
+    } else if (role === 'agent') {
+      table = 'agents';
+    } else {
+      return res.status(400).json({ error: 'Rôle invalide' });
+    }
 
-    if (!validCredentials) {
+    const result = await pool.query(`SELECT * FROM ${table} WHERE username = $1`, [username]);
+    if (result.rows.length === 0) {
       return res.status(401).json({ error: 'Identifiants incorrects' });
     }
 
-    let userInfo = {};
-    if (role === 'agent') {
-      userInfo = { id: 'agent-01', name: 'Agent 01', username: 'agent01' };
-    } else if (role === 'supervisor') {
-      userInfo = { id: 'supervisor-01', name: 'Superviseur', username: 'supervisor1' };
-    } else if (role === 'owner') {
-      userInfo = { id: 'owner-01', name: 'Admin', username: 'admin' };
+    user = result.rows[0];
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Identifiants incorrects' });
     }
+
+    if (user.blocked) {
+      return res.status(403).json({ error: 'Ce compte est bloqué' });
+    }
+
+    // Pour le propriétaire, on force le rôle 'owner'
+    const effectiveRole = (role === 'owner' && username === 'admin') ? 'owner' : role;
 
     const token = jwt.sign(
       {
-        id: userInfo.id,
-        username: userInfo.username,
-        role: role,
-        name: userInfo.name
+        id: user.id,          // ID numérique
+        username: user.username,
+        role: effectiveRole,
+        name: user.name
       },
       process.env.JWT_SECRET || 'lotato-dev-secret',
       { expiresIn: '24h' }
     );
 
-    console.log(`✅ Connexion réussie pour ${userInfo.name} (${role})`);
+    console.log(`✅ Connexion réussie: ${user.name} (${effectiveRole})`);
     res.json({
       success: true,
       token,
-      name: userInfo.name,
-      role: role,
-      agentId: role === 'agent' ? userInfo.id : null,
-      supervisorId: role === 'supervisor' ? userInfo.id : null,
-      ownerId: role === 'owner' ? userInfo.id : null
+      name: user.name,
+      role: effectiveRole,
+      agentId: effectiveRole === 'agent' ? user.id : null,
+      supervisorId: effectiveRole === 'supervisor' ? user.id : null,
+      ownerId: effectiveRole === 'owner' ? user.id : null
     });
   } catch (error) {
     console.error('❌ Erreur login:', error);
@@ -462,10 +497,9 @@ app.get('/api/auth/verify', (req, res) => {
   });
 });
 
-// Appliquer l'authentification aux routes API (sauf publiques)
 app.use('/api', authenticateToken);
 
-// ============= ROUTES TICKETS (existantes) =============
+// ============= ROUTES TICKETS (agent) =============
 app.post('/api/tickets/save', async (req, res) => {
   try {
     console.log('📦 Requête ticket reçue:', JSON.stringify(req.body, null, 2));
@@ -554,7 +588,7 @@ app.delete('/api/tickets/delete/:ticketId', async (req, res) => {
   }
 });
 
-// ============= ROUTES GAGNANTS (existantes) =============
+// ============= ROUTES GAGNANTS =============
 app.get('/api/winners', async (req, res) => {
   try {
     const { agentId } = req.query;
@@ -624,7 +658,7 @@ app.get('/api/winners/results', async (req, res) => {
   }
 });
 
-// ============= ROUTES CONFIGURATION (existantes) =============
+// ============= ROUTES CONFIGURATION =============
 app.get('/api/lottery-config', async (req, res) => {
   try {
     console.log('⚙️ Récupération configuration loterie');
@@ -665,7 +699,7 @@ app.post('/api/lottery-config', async (req, res) => {
   }
 });
 
-// ============= ROUTES RAPPORTS (existantes) =============
+// ============= ROUTES RAPPORTS (agent) =============
 app.get('/api/reports', async (req, res) => {
   try {
     const { agentId } = req.query;
@@ -732,7 +766,7 @@ app.get('/api/reports/draw', async (req, res) => {
   }
 });
 
-// ============= ROUTES NUMÉROS BLOQUÉS (existantes) =============
+// ============= ROUTES NUMÉROS BLOQUÉS (global) =============
 app.get('/api/blocked-numbers', async (req, res) => {
   try {
     console.log('🚫 Récupération numéros bloqués');
@@ -743,6 +777,167 @@ app.get('/api/blocked-numbers', async (req, res) => {
   } catch (error) {
     console.error('❌ Erreur numéros bloqués:', error);
     res.json({ blockedNumbers: [] });
+  }
+});
+
+// ============= ROUTES SUPERVISEUR =============
+const isSupervisor = (req, res, next) => {
+  if (req.user.role !== 'supervisor') {
+    return res.status(403).json({ error: 'Accès réservé aux superviseurs' });
+  }
+  next();
+};
+
+app.use('/api/supervisor', authenticateToken, isSupervisor);
+
+// GET /api/supervisor/reports/overall
+app.get('/api/supervisor/reports/overall', async (req, res) => {
+  const supervisorId = req.user.id; // numérique
+  try {
+    const agents = await pool.query('SELECT id FROM agents WHERE supervisor_id = $1', [supervisorId]);
+    const agentIds = agents.rows.map(a => a.id);
+    if (agentIds.length === 0) {
+      return res.json({ totalTickets: 0, totalBets: 0, totalWins: 0, balance: 0 });
+    }
+
+    const stats = await pool.query(`
+      SELECT
+        COUNT(*) as total_tickets,
+        COALESCE(SUM(total_amount), 0) as total_bets,
+        COALESCE(SUM(win_amount), 0) as total_wins,
+        COALESCE(SUM(win_amount), 0) - COALESCE(SUM(total_amount), 0) as balance
+      FROM tickets
+      WHERE agent_id = ANY($1::int[]) AND DATE(date) = CURRENT_DATE
+    `, [agentIds]);
+
+    const row = stats.rows[0];
+    res.json({
+      totalTickets: parseInt(row.total_tickets) || 0,
+      totalBets: parseFloat(row.total_bets) || 0,
+      totalWins: parseFloat(row.total_wins) || 0,
+      balance: parseFloat(row.balance) || 0
+    });
+  } catch (error) {
+    console.error('Erreur supervisor/overall:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// GET /api/supervisor/agents
+app.get('/api/supervisor/agents', async (req, res) => {
+  const supervisorId = req.user.id;
+  try {
+    const result = await pool.query(`
+      SELECT a.id, a.name, a.blocked,
+             COALESCE(SUM(t.total_amount), 0) as total_bets,
+             COALESCE(SUM(t.win_amount), 0) as total_wins,
+             COUNT(DISTINCT t.id) as total_tickets,
+             COALESCE(SUM(t.win_amount), 0) - COALESCE(SUM(t.total_amount), 0) as balance
+      FROM agents a
+      LEFT JOIN tickets t ON a.id = t.agent_id AND DATE(t.date) = CURRENT_DATE
+      WHERE a.supervisor_id = $1
+      GROUP BY a.id, a.name, a.blocked
+      ORDER BY a.name
+    `, [supervisorId]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Erreur supervisor/agents:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// POST /api/supervisor/block-agent/:agentId
+app.post('/api/supervisor/block-agent/:agentId', async (req, res) => {
+  const agentId = req.params.agentId;
+  const supervisorId = req.user.id;
+  try {
+    const check = await pool.query(
+      'SELECT id FROM agents WHERE id = $1 AND supervisor_id = $2',
+      [agentId, supervisorId]
+    );
+    if (check.rows.length === 0) {
+      return res.status(403).json({ error: 'Agent non autorisé' });
+    }
+    await pool.query('UPDATE agents SET blocked = true WHERE id = $1', [agentId]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Erreur block-agent:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// POST /api/supervisor/unblock-agent/:agentId
+app.post('/api/supervisor/unblock-agent/:agentId', async (req, res) => {
+  const agentId = req.params.agentId;
+  const supervisorId = req.user.id;
+  try {
+    const check = await pool.query(
+      'SELECT id FROM agents WHERE id = $1 AND supervisor_id = $2',
+      [agentId, supervisorId]
+    );
+    if (check.rows.length === 0) {
+      return res.status(403).json({ error: 'Agent non autorisé' });
+    }
+    await pool.query('UPDATE agents SET blocked = false WHERE id = $1', [agentId]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Erreur unblock-agent:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// GET /api/supervisor/tickets/recent
+app.get('/api/supervisor/tickets/recent', async (req, res) => {
+  const { agentId } = req.query;
+  const supervisorId = req.user.id;
+  if (!agentId) return res.status(400).json({ error: 'agentId requis' });
+  try {
+    const check = await pool.query(
+      'SELECT id FROM agents WHERE id = $1 AND supervisor_id = $2',
+      [agentId, supervisorId]
+    );
+    if (check.rows.length === 0) {
+      return res.status(403).json({ error: 'Agent non autorisé' });
+    }
+    const tickets = await pool.query(`
+      SELECT id, ticket_id, total_amount, date
+      FROM tickets
+      WHERE agent_id = $1
+      ORDER BY date DESC
+      LIMIT 20
+    `, [agentId]);
+    res.json(tickets.rows);
+  } catch (error) {
+    console.error('Erreur supervisor/tickets/recent:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// DELETE /api/supervisor/tickets/:ticketId
+app.delete('/api/supervisor/tickets/:ticketId', async (req, res) => {
+  const ticketId = req.params.ticketId;
+  const supervisorId = req.user.id;
+  try {
+    const ticket = await pool.query(`
+      SELECT t.id, t.agent_id, t.date
+      FROM tickets t
+      JOIN agents a ON t.agent_id = a.id
+      WHERE t.id = $1 AND a.supervisor_id = $2
+    `, [ticketId, supervisorId]);
+    if (ticket.rows.length === 0) {
+      return res.status(404).json({ error: 'Ticket non trouvé ou non autorisé' });
+    }
+    const ticketDate = new Date(ticket.rows[0].date);
+    const now = new Date();
+    const diffMinutes = (now - ticketDate) / 60000;
+    if (diffMinutes > 10) {
+      return res.status(403).json({ error: 'Suppression impossible : plus de 10 minutes' });
+    }
+    await pool.query('DELETE FROM tickets WHERE id = $1', [ticketId]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Erreur delete ticket:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -1151,167 +1346,6 @@ app.get('/api/owner/reports', async (req, res) => {
     });
   } catch (error) {
     console.error('Erreur /owner/reports:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-// ============= ROUTES SUPERVISEUR =============
-const isSupervisor = (req, res, next) => {
-  if (req.user.role !== 'supervisor') {
-    return res.status(403).json({ error: 'Accès réservé aux superviseurs' });
-  }
-  next();
-};
-
-app.use('/api/supervisor', authenticateToken, isSupervisor);
-
-// GET /api/supervisor/reports/overall
-app.get('/api/supervisor/reports/overall', async (req, res) => {
-  const supervisorId = req.user.id;
-  try {
-    const agents = await pool.query('SELECT id FROM agents WHERE supervisor_id = $1', [supervisorId]);
-    const agentIds = agents.rows.map(a => a.id);
-    if (agentIds.length === 0) {
-      return res.json({ totalTickets: 0, totalBets: 0, totalWins: 0, balance: 0 });
-    }
-
-    const stats = await pool.query(`
-      SELECT
-        COUNT(*) as total_tickets,
-        COALESCE(SUM(total_amount), 0) as total_bets,
-        COALESCE(SUM(win_amount), 0) as total_wins,
-        COALESCE(SUM(win_amount), 0) - COALESCE(SUM(total_amount), 0) as balance
-      FROM tickets
-      WHERE agent_id = ANY($1::int[]) AND DATE(date) = CURRENT_DATE
-    `, [agentIds]);
-
-    const row = stats.rows[0];
-    res.json({
-      totalTickets: parseInt(row.total_tickets) || 0,
-      totalBets: parseFloat(row.total_bets) || 0,
-      totalWins: parseFloat(row.total_wins) || 0,
-      balance: parseFloat(row.balance) || 0
-    });
-  } catch (error) {
-    console.error('Erreur supervisor/overall:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-// GET /api/supervisor/agents
-app.get('/api/supervisor/agents', async (req, res) => {
-  const supervisorId = req.user.id;
-  try {
-    const result = await pool.query(`
-      SELECT a.id, a.name, a.blocked,
-             COALESCE(SUM(t.total_amount), 0) as total_bets,
-             COALESCE(SUM(t.win_amount), 0) as total_wins,
-             COUNT(DISTINCT t.id) as total_tickets,
-             COALESCE(SUM(t.win_amount), 0) - COALESCE(SUM(t.total_amount), 0) as balance
-      FROM agents a
-      LEFT JOIN tickets t ON a.id = t.agent_id AND DATE(t.date) = CURRENT_DATE
-      WHERE a.supervisor_id = $1
-      GROUP BY a.id, a.name, a.blocked
-      ORDER BY a.name
-    `, [supervisorId]);
-    res.json(result.rows);
-  } catch (error) {
-    console.error('Erreur supervisor/agents:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-// POST /api/supervisor/block-agent/:agentId
-app.post('/api/supervisor/block-agent/:agentId', async (req, res) => {
-  const agentId = req.params.agentId;
-  const supervisorId = req.user.id;
-  try {
-    const check = await pool.query(
-      'SELECT id FROM agents WHERE id = $1 AND supervisor_id = $2',
-      [agentId, supervisorId]
-    );
-    if (check.rows.length === 0) {
-      return res.status(403).json({ error: 'Agent non autorisé' });
-    }
-    await pool.query('UPDATE agents SET blocked = true WHERE id = $1', [agentId]);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Erreur block-agent:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-// POST /api/supervisor/unblock-agent/:agentId
-app.post('/api/supervisor/unblock-agent/:agentId', async (req, res) => {
-  const agentId = req.params.agentId;
-  const supervisorId = req.user.id;
-  try {
-    const check = await pool.query(
-      'SELECT id FROM agents WHERE id = $1 AND supervisor_id = $2',
-      [agentId, supervisorId]
-    );
-    if (check.rows.length === 0) {
-      return res.status(403).json({ error: 'Agent non autorisé' });
-    }
-    await pool.query('UPDATE agents SET blocked = false WHERE id = $1', [agentId]);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Erreur unblock-agent:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-// GET /api/supervisor/tickets/recent
-app.get('/api/supervisor/tickets/recent', async (req, res) => {
-  const { agentId } = req.query;
-  const supervisorId = req.user.id;
-  if (!agentId) return res.status(400).json({ error: 'agentId requis' });
-  try {
-    const check = await pool.query(
-      'SELECT id FROM agents WHERE id = $1 AND supervisor_id = $2',
-      [agentId, supervisorId]
-    );
-    if (check.rows.length === 0) {
-      return res.status(403).json({ error: 'Agent non autorisé' });
-    }
-    const tickets = await pool.query(`
-      SELECT id, ticket_id, total_amount, date
-      FROM tickets
-      WHERE agent_id = $1
-      ORDER BY date DESC
-      LIMIT 20
-    `, [agentId]);
-    res.json(tickets.rows);
-  } catch (error) {
-    console.error('Erreur supervisor/tickets/recent:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-// DELETE /api/supervisor/tickets/:ticketId
-app.delete('/api/supervisor/tickets/:ticketId', async (req, res) => {
-  const ticketId = req.params.ticketId;
-  const supervisorId = req.user.id;
-  try {
-    const ticket = await pool.query(`
-      SELECT t.id, t.agent_id, t.date
-      FROM tickets t
-      JOIN agents a ON t.agent_id = a.id
-      WHERE t.id = $1 AND a.supervisor_id = $2
-    `, [ticketId, supervisorId]);
-    if (ticket.rows.length === 0) {
-      return res.status(404).json({ error: 'Ticket non trouvé ou non autorisé' });
-    }
-    const ticketDate = new Date(ticket.rows[0].date);
-    const now = new Date();
-    const diffMinutes = (now - ticketDate) / 60000;
-    if (diffMinutes > 10) {
-      return res.status(403).json({ error: 'Suppression impossible : plus de 10 minutes' });
-    }
-    await pool.query('DELETE FROM tickets WHERE id = $1', [ticketId]);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Erreur delete ticket:', error);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });

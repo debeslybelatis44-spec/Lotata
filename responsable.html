@@ -244,6 +244,15 @@
             font-weight: 600;
             background: rgba(255,255,255,0.1);
         }
+        .error-message {
+            background: rgba(255,77,77,0.2);
+            border: 1px solid #ff4d4d;
+            color: #ff4d4d;
+            padding: 15px;
+            border-radius: 12px;
+            margin: 20px 0;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -260,6 +269,7 @@
 
         <!-- RAPPORTS GLOBAUX -->
         <div class="section-title"><i class="fas fa-chart-pie"></i> Rapport global – Aujourd'hui</div>
+        <div id="global-error" style="display:none;" class="error-message"></div>
         <div class="stats-grid" id="global-stats">
             <div class="stat-card">
                 <i class="fas fa-ticket-alt" style="color: #00d4ff;"></i>
@@ -288,8 +298,9 @@
             </div>
         </div>
 
-        <!-- LISTE DES AGENTS SOUS RESPONSABILITÉ -->
+        <!-- LISTE DES AGENTS -->
         <div class="section-title"><i class="fas fa-users"></i> Mes agents</div>
+        <div id="agents-error" style="display:none;" class="error-message"></div>
         <div class="filter-bar">
             <input type="text" id="search-agent" placeholder="Rechercher un agent..." onkeyup="filterAgents()">
             <select id="agent-filter-status" onchange="filterAgents()">
@@ -307,7 +318,6 @@
                     <h2 id="modal-agent-name" style="margin:0;"></h2>
                     <span id="modal-agent-badge" class="badge"></span>
                 </div>
-                <!-- Statistiques détaillées -->
                 <div id="modal-agent-stats" style="background:rgba(0,0,0,0.2); padding:15px; border-radius:16px;"></div>
                 
                 <h3 style="margin:25px 0 10px;"><i class="fas fa-ticket"></i> Derniers tickets</h3>
@@ -326,6 +336,10 @@
     </div>
 
     <script>
+        // === CONFIGURATION API ===
+        // Utilisation de l'URL relative pour fonctionner sur le même serveur
+        const API_URL = window.location.origin + '/api';
+
         // Vérification authentification
         (function() {
             const token = localStorage.getItem('auth_token');
@@ -336,11 +350,10 @@
             document.getElementById('supervisor-name').innerHTML = `<i class="fas fa-user-tie"></i> ${localStorage.getItem('user_name') || 'Superviseur'}`;
         })();
 
-        const API_URL = 'https://lotata-islp.onrender.com/api';
         let agents = [];
-        let currentModalAgentId = null;  // pour le blocage depuis la modale
+        let currentModalAgentId = null;
 
-        // Charger données au démarrage
+        // Chargement initial
         async function loadDashboard() {
             await loadGlobalReports();
             await loadAgents();
@@ -352,17 +365,23 @@
                 const res = await fetch(`${API_URL}/supervisor/reports/overall`, {
                     headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
                 });
+                if (!res.ok) throw new Error(`Erreur ${res.status}`);
                 const data = await res.json();
                 document.getElementById('total-tickets').innerText = data.totalTickets || 0;
                 document.getElementById('total-bets').innerText = (data.totalBets || 0).toLocaleString() + ' G';
                 document.getElementById('total-wins').innerText = (data.totalWins || 0).toLocaleString() + ' G';
                 const balance = data.totalBets - data.totalWins;
                 document.getElementById('balance').innerText = (balance || 0).toLocaleString() + ' G';
-                const profitLoss = data.balance; // balance = wins - bets (perte si négatif)
+                const profitLoss = data.balance; // balance = wins - bets
                 const plEl = document.getElementById('profit-loss');
                 plEl.innerText = (profitLoss || 0).toLocaleString() + ' G';
                 plEl.className = 'stat-value ' + (profitLoss >= 0 ? 'profit' : 'loss');
-            } catch(e) { console.error(e); }
+                document.getElementById('global-error').style.display = 'none';
+            } catch(e) {
+                console.error(e);
+                document.getElementById('global-error').innerText = 'Impossible de charger les rapports. Vérifiez votre connexion.';
+                document.getElementById('global-error').style.display = 'block';
+            }
         }
 
         // CHARGER AGENTS
@@ -371,9 +390,17 @@
                 const res = await fetch(`${API_URL}/supervisor/agents`, {
                     headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
                 });
+                if (!res.ok) throw new Error(`Erreur ${res.status}`);
                 agents = await res.json();
                 renderAgents(agents);
-            } catch(e) { console.error(e); }
+                document.getElementById('agents-error').style.display = 'none';
+            } catch(e) {
+                console.error(e);
+                document.getElementById('agents-error').innerText = 'Impossible de charger les agents.';
+                document.getElementById('agents-error').style.display = 'block';
+                agents = [];
+                renderAgents([]);
+            }
         }
 
         function renderAgents(list) {
@@ -385,8 +412,7 @@
             container.innerHTML = list.map(agent => {
                 const blocked = agent.blocked || false;
                 const balance = (agent.totalBets || 0) - (agent.totalWins || 0);
-                const profitLoss = agent.balance || 0; // wins - bets
-                // Statut Gain/Perte après tirage
+                const profitLoss = agent.balance || 0;
                 let statusText = '';
                 let statusClass = '';
                 if (profitLoss > 0) { statusText = 'Gain'; statusClass = 'profit'; }
@@ -411,9 +437,6 @@
                                 ${profitLoss.toLocaleString()} G
                                 ${statusText ? `<span class="status-badge ${statusClass}">${statusText}</span>` : ''}
                             </span>
-                        </div>
-                        <div style="display:flex; justify-content:space-between; margin:10px 0;">
-                            <span>À payer à l'agent:</span><span class="profit">${(agent.totalWins||0).toLocaleString()} G</span>
                         </div>
                         <div style="display:flex; gap:10px; margin-top:15px;">
                             <button class="toggle-block ${blocked ? 'unblock' : 'block'}" onclick="toggleBlockAgent('${agent.id}', ${!blocked})">
@@ -444,23 +467,25 @@
         async function toggleBlockAgent(agentId, block) {
             const endpoint = block ? 'block-agent' : 'unblock-agent';
             try {
-                await fetch(`${API_URL}/supervisor/${endpoint}/${agentId}`, {
+                const res = await fetch(`${API_URL}/supervisor/${endpoint}/${agentId}`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
                         'Content-Type': 'application/json'
                     }
                 });
+                if (!res.ok) throw new Error('Erreur lors du blocage');
                 await loadAgents();
                 await loadGlobalReports();
-                // Si la modale est ouverte sur le même agent, rafraîchir son contenu
                 if (currentModalAgentId == agentId) {
                     showAgentDetails(agentId);
                 }
-            } catch(e) { alert('Erreur'); }
+            } catch(e) { 
+                console.error(e);
+                alert('Impossible de modifier le statut de l\'agent.');
+            }
         }
 
-        // BLOQUER/DÉBLOQUER DEPUIS LA MODALE
         function toggleBlockFromModal() {
             if (!currentModalAgentId) return;
             const agent = agents.find(a => a.id == currentModalAgentId);
@@ -468,24 +493,21 @@
             toggleBlockAgent(currentModalAgentId, !agent.blocked);
         }
 
-        // AFFICHER DÉTAILS AGENT (avec rapports détaillés)
+        // AFFICHER DÉTAILS AGENT
         async function showAgentDetails(agentId) {
             const agent = agents.find(a => a.id == agentId);
             if (!agent) return;
             currentModalAgentId = agentId;
             
-            // Nom et badge dans l'en-tête
             document.getElementById('modal-agent-name').innerText = agent.name;
             const badge = document.getElementById('modal-agent-badge');
             badge.className = 'badge ' + (agent.blocked ? 'badge-blocked' : 'badge-active');
             badge.innerText = agent.blocked ? 'BLOQUÉ' : 'ACTIF';
 
-            // Bouton de blocage dans la modale
             const toggleBtn = document.getElementById('modal-toggle-block-btn');
             toggleBtn.className = 'toggle-block ' + (agent.blocked ? 'unblock' : 'block');
             toggleBtn.innerHTML = `<i class="fas ${agent.blocked ? 'fa-unlock' : 'fa-lock'}"></i> ${agent.blocked ? 'Débloquer' : 'Bloquer'}`;
 
-            // Statistiques détaillées
             const totalBets = agent.totalBets || 0;
             const totalWins = agent.totalWins || 0;
             const totalTickets = agent.totalTickets || 0;
@@ -509,6 +531,7 @@
                 const res = await fetch(`${API_URL}/supervisor/tickets/recent?agentId=${agentId}`, {
                     headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
                 });
+                if (!res.ok) throw new Error('Erreur chargement tickets');
                 const tickets = await res.json();
                 let html = '';
                 if (!tickets.length) html = '<p style="color:#a0a0b8; text-align:center;">Aucun ticket récent.</p>';
@@ -533,23 +556,30 @@
                     });
                 }
                 document.getElementById('modal-agent-tickets').innerHTML = html;
-            } catch(e) { console.error(e); }
+            } catch(e) { 
+                console.error(e);
+                document.getElementById('modal-agent-tickets').innerHTML = '<p class="error-message">Erreur chargement des tickets.</p>';
+            }
 
             document.getElementById('agent-modal').classList.add('active');
         }
 
-        // SUPPRIMER TICKET (agent)
+        // SUPPRIMER TICKET
         async function deleteTicket(ticketId, agentId) {
             if (!confirm('Supprimer ce ticket ?')) return;
             try {
-                await fetch(`${API_URL}/supervisor/tickets/${ticketId}`, {
+                const res = await fetch(`${API_URL}/supervisor/tickets/${ticketId}`, {
                     method: 'DELETE',
                     headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
                 });
-                await showAgentDetails(agentId); // rafraîchir la modale
+                if (!res.ok) throw new Error('Erreur suppression');
+                await showAgentDetails(agentId);
                 await loadAgents();
                 await loadGlobalReports();
-            } catch(e) { alert('Erreur'); }
+            } catch(e) { 
+                console.error(e);
+                alert('Impossible de supprimer le ticket.');
+            }
         }
 
         function closeModal() {
