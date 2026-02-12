@@ -14,10 +14,7 @@ const app = express();
 const PORT = process.env.PORT || 10000;
 
 // Middleware
-app.use(helmet({
-  contentSecurityPolicy: false,
-  crossOriginEmbedderPolicy: false
-}));
+app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
 
 app.use(cors({
   origin: '*',
@@ -38,7 +35,7 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// Database connection
+// Base de données PostgreSQL
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
@@ -47,9 +44,7 @@ const pool = new Pool({
 pool.on('connect', () => console.log('✅ Connecté à PostgreSQL'));
 pool.on('error', (err) => console.error('❌ Erreur PostgreSQL:', err));
 
-// --------------------------
-// Utilitaires BDD
-// --------------------------
+// -------------------------- UTILITAIRES BDD --------------------------
 async function columnExists(tableName, columnName) {
   try {
     const res = await pool.query(`
@@ -71,56 +66,128 @@ async function addColumnIfNotExists(tableName, columnName, columnDefinition) {
   }
 }
 
-// --------------------------
-// Initialisation des tables
-// --------------------------
+// -------------------------- INITIALISATION BDD --------------------------
 async function initializeDatabase() {
   try {
     console.log('🔄 Initialisation de la base de données...');
 
-    // ---- Tables existantes (conservées) ----
-    await pool.query(`CREATE TABLE IF NOT EXISTS draw_results ( id SERIAL PRIMARY KEY, draw_id VARCHAR(50), name VARCHAR(100), draw_time TIMESTAMP, results JSONB, lucky_number INTEGER, comment TEXT, source VARCHAR(50), published_at TIMESTAMP DEFAULT NOW() )`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS number_limits ( number VARCHAR(2) PRIMARY KEY, limit_amount DECIMAL(10,2), created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW() )`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS game_rules ( id SERIAL PRIMARY KEY, rule_key VARCHAR(100) UNIQUE, rule_value TEXT, description TEXT, updated_at TIMESTAMP DEFAULT NOW() )`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS system_settings ( id SERIAL PRIMARY KEY, setting_key VARCHAR(100) UNIQUE, setting_value TEXT, category VARCHAR(50), updated_at TIMESTAMP DEFAULT NOW() )`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS activity_log ( id SERIAL PRIMARY KEY, user_id VARCHAR(50), user_role VARCHAR(20), action VARCHAR(100), details TEXT, ip_address VARCHAR(45), user_agent TEXT, timestamp TIMESTAMP DEFAULT NOW() )`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS tickets ( id SERIAL PRIMARY KEY, ticket_id VARCHAR(50), agent_id VARCHAR(50), agent_name VARCHAR(100), draw_id VARCHAR(50), draw_name VARCHAR(100), bets JSONB, total_amount DECIMAL(10,2), win_amount DECIMAL(10,2) DEFAULT 0, paid BOOLEAN DEFAULT false, date TIMESTAMP DEFAULT NOW(), checked BOOLEAN DEFAULT false )`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS payments ( id SERIAL PRIMARY KEY, ticket_id INTEGER REFERENCES tickets(id), amount DECIMAL(10,2), paid_at TIMESTAMP DEFAULT NOW(), confirmed_by VARCHAR(100) )`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS lottery_config ( id SERIAL PRIMARY KEY, name VARCHAR(100), logo TEXT, address TEXT, phone VARCHAR(20), updated_at TIMESTAMP DEFAULT NOW() )`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS alerts ( id SERIAL PRIMARY KEY, title VARCHAR(100), message TEXT, type VARCHAR(20), priority VARCHAR(20) DEFAULT 'medium', active BOOLEAN DEFAULT true, created_at TIMESTAMP DEFAULT NOW(), expires_at TIMESTAMP )`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS user_limits ( user_id VARCHAR(50), limit_type VARCHAR(50), limit_value DECIMAL(10,2), created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW(), PRIMARY KEY (user_id, limit_type) )`);
+    // Tables existantes
+    await pool.query(`CREATE TABLE IF NOT EXISTS draw_results (
+      id SERIAL PRIMARY KEY, draw_id VARCHAR(50), name VARCHAR(100),
+      draw_time TIMESTAMP, results JSONB, lucky_number INTEGER,
+      comment TEXT, source VARCHAR(50), published_at TIMESTAMP DEFAULT NOW()
+    )`);
 
-    // ---- Tables superviseurs et agents (avec ajout des colonnes manquantes) ----
-    await pool.query(`CREATE TABLE IF NOT EXISTS supervisors ( id SERIAL PRIMARY KEY, name VARCHAR(100), email VARCHAR(100) UNIQUE, phone VARCHAR(20), password VARCHAR(255), active BOOLEAN DEFAULT true, created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW() )`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS number_limits (
+      number VARCHAR(2) PRIMARY KEY, limit_amount DECIMAL(10,2),
+      created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW()
+    )`);
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS game_rules (
+      id SERIAL PRIMARY KEY, rule_key VARCHAR(100) UNIQUE,
+      rule_value TEXT, description TEXT, updated_at TIMESTAMP DEFAULT NOW()
+    )`);
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS system_settings (
+      id SERIAL PRIMARY KEY, setting_key VARCHAR(100) UNIQUE,
+      setting_value TEXT, category VARCHAR(50), updated_at TIMESTAMP DEFAULT NOW()
+    )`);
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS activity_log (
+      id SERIAL PRIMARY KEY, user_id VARCHAR(50), user_role VARCHAR(20),
+      action VARCHAR(100), details TEXT, ip_address VARCHAR(45),
+      user_agent TEXT, timestamp TIMESTAMP DEFAULT NOW()
+    )`);
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS tickets (
+      id SERIAL PRIMARY KEY, ticket_id VARCHAR(50), agent_id VARCHAR(50),
+      agent_name VARCHAR(100), draw_id VARCHAR(50), draw_name VARCHAR(100),
+      bets JSONB, total_amount DECIMAL(10,2), win_amount DECIMAL(10,2) DEFAULT 0,
+      paid BOOLEAN DEFAULT false, date TIMESTAMP DEFAULT NOW(), checked BOOLEAN DEFAULT false
+    )`);
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS payments (
+      id SERIAL PRIMARY KEY, ticket_id INTEGER REFERENCES tickets(id),
+      amount DECIMAL(10,2), paid_at TIMESTAMP DEFAULT NOW(), confirmed_by VARCHAR(100)
+    )`);
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS lottery_config (
+      id SERIAL PRIMARY KEY, name VARCHAR(100), logo TEXT,
+      address TEXT, phone VARCHAR(20), updated_at TIMESTAMP DEFAULT NOW()
+    )`);
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS alerts (
+      id SERIAL PRIMARY KEY, title VARCHAR(100), message TEXT,
+      type VARCHAR(20), priority VARCHAR(20) DEFAULT 'medium',
+      active BOOLEAN DEFAULT true, created_at TIMESTAMP DEFAULT NOW(),
+      expires_at TIMESTAMP
+    )`);
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS user_limits (
+      user_id VARCHAR(50), limit_type VARCHAR(50), limit_value DECIMAL(10,2),
+      created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW(),
+      PRIMARY KEY (user_id, limit_type)
+    )`);
+
+    // Superviseurs et agents (avec colonnes supplémentaires)
+    await pool.query(`CREATE TABLE IF NOT EXISTS supervisors (
+      id SERIAL PRIMARY KEY, name VARCHAR(100), email VARCHAR(100) UNIQUE,
+      phone VARCHAR(20), password VARCHAR(255), active BOOLEAN DEFAULT true,
+      created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW()
+    )`);
     await addColumnIfNotExists('supervisors', 'username', 'VARCHAR(100) UNIQUE');
-    await addColumnIfNotExists('supervisors', 'blocked', 'BOOLEAN DEFAULT false'); // on utilise blocked pour uniformiser
+    await addColumnIfNotExists('supervisors', 'blocked', 'BOOLEAN DEFAULT false');
     await addColumnIfNotExists('supervisors', 'zone', 'VARCHAR(100)');
     await addColumnIfNotExists('supervisors', 'cin', 'VARCHAR(20)');
 
-    await pool.query(`CREATE TABLE IF NOT EXISTS agents ( id SERIAL PRIMARY KEY, name VARCHAR(100), email VARCHAR(100) UNIQUE, phone VARCHAR(20), password VARCHAR(255), supervisor_id INTEGER REFERENCES supervisors(id), location VARCHAR(100), commission DECIMAL(5,2) DEFAULT 5.00, active BOOLEAN DEFAULT true, created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW() )`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS agents (
+      id SERIAL PRIMARY KEY, name VARCHAR(100), email VARCHAR(100) UNIQUE,
+      phone VARCHAR(20), password VARCHAR(255),
+      supervisor_id INTEGER REFERENCES supervisors(id),
+      location VARCHAR(100), commission DECIMAL(5,2) DEFAULT 5.00,
+      active BOOLEAN DEFAULT true,
+      created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW()
+    )`);
     await addColumnIfNotExists('agents', 'username', 'VARCHAR(100) UNIQUE');
     await addColumnIfNotExists('agents', 'blocked', 'BOOLEAN DEFAULT false');
     await addColumnIfNotExists('agents', 'zone', 'VARCHAR(100)');
     await addColumnIfNotExists('agents', 'cin', 'VARCHAR(20)');
 
-    // ---- Tables des tirages (ajout colonnes) ----
-    await pool.query(`CREATE TABLE IF NOT EXISTS draws ( id VARCHAR(50) PRIMARY KEY, name VARCHAR(100), time VARCHAR(10), frequency VARCHAR(20) DEFAULT 'daily', status VARCHAR(20) DEFAULT 'active', active BOOLEAN DEFAULT true, description TEXT, min_bet DECIMAL(10,2) DEFAULT 0, max_bet DECIMAL(10,2) DEFAULT 0, last_draw TIMESTAMP )`);
+    // Tirages
+    await pool.query(`CREATE TABLE IF NOT EXISTS draws (
+      id VARCHAR(50) PRIMARY KEY, name VARCHAR(100), time VARCHAR(10),
+      frequency VARCHAR(20) DEFAULT 'daily', status VARCHAR(20) DEFAULT 'active',
+      active BOOLEAN DEFAULT true, description TEXT,
+      min_bet DECIMAL(10,2) DEFAULT 0, max_bet DECIMAL(10,2) DEFAULT 0,
+      last_draw TIMESTAMP
+    )`);
     await addColumnIfNotExists('draws', 'blocked', 'BOOLEAN DEFAULT false');
     await addColumnIfNotExists('draws', 'created_at', 'TIMESTAMP DEFAULT NOW()');
     await addColumnIfNotExists('draws', 'updated_at', 'TIMESTAMP DEFAULT NOW()');
 
-    // ---- Numéros bloqués globalement ----
-    await pool.query(`CREATE TABLE IF NOT EXISTS blocked_numbers ( number VARCHAR(2) PRIMARY KEY, blocked_at TIMESTAMP DEFAULT NOW() )`);
+    // Numéros bloqués globalement
+    await pool.query(`CREATE TABLE IF NOT EXISTS blocked_numbers (
+      number VARCHAR(2) PRIMARY KEY, blocked_at TIMESTAMP DEFAULT NOW()
+    )`);
 
-    // ---- Numéros bloqués par tirage ----
-    await pool.query(`CREATE TABLE IF NOT EXISTS draw_blocked_numbers ( draw_id VARCHAR(50) REFERENCES draws(id) ON DELETE CASCADE, number VARCHAR(2), blocked_at TIMESTAMP DEFAULT NOW(), PRIMARY KEY (draw_id, number) )`);
+    // Numéros bloqués par tirage
+    await pool.query(`CREATE TABLE IF NOT EXISTS draw_blocked_numbers (
+      draw_id VARCHAR(50) REFERENCES draws(id) ON DELETE CASCADE,
+      number VARCHAR(2), blocked_at TIMESTAMP DEFAULT NOW(),
+      PRIMARY KEY (draw_id, number)
+    )`);
 
-    // ---- Limites de montant par numéro et par tirage ----
-    await pool.query(`CREATE TABLE IF NOT EXISTS draw_number_limits ( draw_id VARCHAR(50) REFERENCES draws(id) ON DELETE CASCADE, number VARCHAR(2), limit_amount DECIMAL(10,2), created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW(), PRIMARY KEY (draw_id, number) )`);
+    // Limites de montant par numéro et tirage
+    await pool.query(`CREATE TABLE IF NOT EXISTS draw_number_limits (
+      draw_id VARCHAR(50) REFERENCES draws(id) ON DELETE CASCADE,
+      number VARCHAR(2), limit_amount DECIMAL(10,2),
+      created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW(),
+      PRIMARY KEY (draw_id, number)
+    )`);
 
     console.log('✅ Tables créées / vérifiées');
 
-    // ---- Insérer les tirages par défaut ----
+    // Insérer les tirages par défaut
     const draws = [
       { id: 'tn_matin', name: 'Tunisia Matin', time: '10:00' },
       { id: 'tn_soir', name: 'Tunisia Soir', time: '17:00' },
@@ -134,14 +201,14 @@ async function initializeDatabase() {
       { id: 'tx_soir', name: 'Texas Soir', time: '18:30' }
     ];
     for (const draw of draws) {
-      const existing = await pool.query('SELECT id FROM draws WHERE id = $1', [draw.id]);
-      if (existing.rows.length === 0) {
+      const exists = await pool.query('SELECT id FROM draws WHERE id = $1', [draw.id]);
+      if (exists.rows.length === 0) {
         await pool.query('INSERT INTO draws (id, name, time, active) VALUES ($1, $2, $3, true)', [draw.id, draw.name, draw.time]);
         console.log(`➕ Tirage ${draw.name} ajouté`);
       }
     }
 
-    // ---- Configuration loterie par défaut ----
+    // Configuration loterie par défaut
     const configExists = await pool.query('SELECT id FROM lottery_config LIMIT 1');
     if (configExists.rows.length === 0) {
       await pool.query(`INSERT INTO lottery_config (name, logo, address, phone) VALUES ('LOTATO PRO', '', '', '')`);
@@ -154,9 +221,7 @@ async function initializeDatabase() {
   }
 }
 
-// --------------------------
-// Middleware d'authentification simplifié (à adapter en production)
-// --------------------------
+// -------------------------- MIDDLEWARE AUTH --------------------------
 const authenticateToken = (req, res, next) => {
   const publicRoutes = [
     '/api/health', '/api/auth/login', '/api/auth/refresh', '/api/auth/logout',
@@ -166,14 +231,13 @@ const authenticateToken = (req, res, next) => {
   ];
   if (publicRoutes.includes(req.path)) return next();
 
-  // En développement : on simule un utilisateur selon le rôle demandé
-  // Pour les routes propriétaire/superviseur, on peut déduire le rôle depuis le préfixe
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) {
-    // Fallback pour le développement : on attribue un rôle par défaut
+    // En développement, on assigne un rôle par défaut (à désactiver en production)
     req.user = { id: 'owner-01', username: 'admin', role: 'owner', name: 'Propriétaire' };
     return next();
   }
+
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'lotato-dev-secret');
     req.user = decoded;
@@ -184,9 +248,10 @@ const authenticateToken = (req, res, next) => {
 };
 app.use('/api', authenticateToken);
 
-// --------------------------
-// ROUTES PUBLIQUES (existantes)
-// --------------------------
+// =====================================================================
+// ==================== ROUTES PUBLIQUES (AUTH, HEALTH) ================
+// =====================================================================
+
 app.get('/api/health', async (req, res) => {
   try {
     await pool.query('SELECT NOW()');
@@ -201,7 +266,7 @@ app.post('/api/auth/login', async (req, res) => {
     const { username, password, role } = req.body;
     console.log('🔑 Tentative de connexion:', { username, role });
 
-    // Validation simplifiée – à remplacer par une vraie vérification en BDD
+    // Validation simplifiée – à remplacer par une vraie requête BDD
     let user = null;
     if (role === 'agent' && username === 'agent01' && password === 'agent123') {
       user = { id: 'agent-01', name: 'Agent 01', username: 'agent01', role: 'agent' };
@@ -265,63 +330,318 @@ app.get('/api/auth/verify', (req, res) => {
   });
 });
 
-// --------------------------
-// ROUTES AGENTS (existantes, inchangées)
-// --------------------------
-app.post('/api/tickets/save', async (req, res) => { /* ... */ });
-app.get('/api/tickets', async (req, res) => { /* ... */ });
-app.delete('/api/tickets/delete/:ticketId', async (req, res) => { /* ... */ });
-app.get('/api/winners', async (req, res) => { /* ... */ });
-app.post('/api/tickets/check-winners', async (req, res) => { /* ... */ });
-app.get('/api/winners/results', async (req, res) => { /* ... */ });
-app.get('/api/lottery-config', async (req, res) => { /* ... */ });
-app.post('/api/lottery-config', async (req, res) => { /* ... */ });
-app.get('/api/reports', async (req, res) => { /* ... */ });
-app.get('/api/reports/draw', async (req, res) => { /* ... */ });
-app.get('/api/blocked-numbers', async (req, res) => { /* ... */ });
+// =====================================================================
+// ==================== ROUTES AGENTS (EXISTANTES) =====================
+// =====================================================================
 
-// (Les implémentations existantes sont conservées, je ne les recopie pas par souci de concision)
+// ----- Sauvegarde d'un ticket -----
+app.post('/api/tickets/save', async (req, res) => {
+  try {
+    console.log('📦 Requête ticket reçue:', JSON.stringify(req.body, null, 2));
+
+    const { agentId, agentName, drawId, drawName, bets, total } = req.body;
+
+    if (!agentId || !drawId || !bets || !Array.isArray(bets)) {
+      return res.status(400).json({ error: 'Données invalides' });
+    }
+
+    const ticketId = `T${Date.now()}${Math.floor(Math.random() * 1000)}`;
+    const now = new Date().toISOString();
+    const betsJson = JSON.stringify(bets);
+
+    const ticketQuery = `
+      INSERT INTO tickets (ticket_id, agent_id, agent_name, draw_id, draw_name, bets, total_amount, date)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING *
+    `;
+    const ticketResult = await pool.query(ticketQuery, [
+      ticketId,
+      agentId,
+      agentName || 'Agent Inconnu',
+      drawId,
+      drawName || drawId,
+      betsJson,
+      parseFloat(total) || 0,
+      now
+    ]);
+
+    const savedTicket = ticketResult.rows[0];
+
+    res.json({
+      success: true,
+      ticket: {
+        id: savedTicket.id,
+        ticket_id: savedTicket.ticket_id,
+        agentId: savedTicket.agent_id,
+        agentName: savedTicket.agent_name,
+        drawId: savedTicket.draw_id,
+        drawName: savedTicket.draw_name,
+        bets: bets,
+        total_amount: savedTicket.total_amount,
+        total: savedTicket.total_amount,
+        date: savedTicket.date,
+        checked: false
+      }
+    });
+  } catch (error) {
+    console.error('❌ Erreur sauvegarde ticket:', error);
+    res.status(500).json({ success: false, error: 'Erreur lors de la sauvegarde du ticket', details: error.message });
+  }
+});
+
+// ----- Récupération des tickets (agent spécifique ou tous) -----
+app.get('/api/tickets', async (req, res) => {
+  try {
+    const { agentId } = req.query;
+    let query = 'SELECT * FROM tickets WHERE 1=1';
+    const params = [];
+    if (agentId) {
+      params.push(agentId);
+      query += ` AND agent_id = $${params.length}`;
+    }
+    query += ' ORDER BY date DESC LIMIT 50';
+    const result = await pool.query(query, params);
+
+    const tickets = result.rows.map(ticket => ({
+      id: ticket.id,
+      ticket_id: ticket.ticket_id,
+      agent_id: ticket.agent_id,
+      agent_name: ticket.agent_name,
+      draw_id: ticket.draw_id,
+      draw_name: ticket.draw_name,
+      bets: typeof ticket.bets === 'string' ? JSON.parse(ticket.bets) : ticket.bets || [],
+      total_amount: ticket.total_amount,
+      win_amount: ticket.win_amount,
+      paid: ticket.paid,
+      date: ticket.date,
+      checked: ticket.checked
+    }));
+
+    res.json({ tickets });
+  } catch (error) {
+    console.error('❌ Erreur récupération tickets:', error);
+    res.json({ tickets: [] });
+  }
+});
+
+// ----- Suppression d'un ticket -----
+app.delete('/api/tickets/delete/:ticketId', async (req, res) => {
+  try {
+    const { ticketId } = req.params;
+    await pool.query('DELETE FROM tickets WHERE id = $1', [parseInt(ticketId)]);
+    res.json({ success: true, message: 'Ticket supprimé' });
+  } catch (error) {
+    console.error('❌ Erreur suppression ticket:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// ----- Liste des gagnants (win_amount > 0) -----
+app.get('/api/winners', async (req, res) => {
+  try {
+    const { agentId } = req.query;
+    let query = 'SELECT * FROM tickets WHERE win_amount > 0';
+    const params = [];
+    if (agentId) {
+      params.push(agentId);
+      query += ` AND agent_id = $${params.length}`;
+    }
+    query += ' ORDER BY date DESC LIMIT 20';
+    const result = await pool.query(query, params);
+    res.json({ winners: result.rows });
+  } catch (error) {
+    console.error('❌ Erreur gagnants:', error);
+    res.json({ winners: [] });
+  }
+});
+
+// ----- Vérifier les tickets gagnants non vérifiés -----
+app.post('/api/tickets/check-winners', async (req, res) => {
+  try {
+    const { agentId } = req.query;
+    const query = agentId
+      ? 'SELECT * FROM tickets WHERE agent_id = $1 AND win_amount > 0 AND checked = false'
+      : 'SELECT * FROM tickets WHERE win_amount > 0 AND checked = false';
+    const params = agentId ? [agentId] : [];
+    const result = await pool.query(query, params);
+
+    for (const ticket of result.rows) {
+      await pool.query('UPDATE tickets SET checked = true WHERE id = $1', [ticket.id]);
+    }
+
+    res.json({ success: true, count: result.rows.length, tickets: result.rows });
+  } catch (error) {
+    console.error('❌ Erreur vérification tickets gagnants:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// ----- Résultats des tirages (derniers) -----
+app.get('/api/winners/results', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT * FROM draw_results 
+      ORDER BY published_at DESC 
+      LIMIT 10
+    `);
+    const results = result.rows.map(row => ({
+      drawId: row.draw_id,
+      name: row.name,
+      numbers: typeof row.results === 'string' ? JSON.parse(row.results) : row.results,
+      drawTime: row.draw_time,
+      publishedAt: row.published_at
+    }));
+    res.json({ results });
+  } catch (error) {
+    console.error('❌ Erreur résultats gagnants:', error);
+    res.json({ results: [] });
+  }
+});
+
+// ----- Configuration de la loterie -----
+app.get('/api/lottery-config', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM lottery_config LIMIT 1');
+    if (result.rows.length > 0) {
+      res.json(result.rows[0]);
+    } else {
+      res.json({ name: 'LOTATO PRO', logo: '', address: '', phone: '' });
+    }
+  } catch (error) {
+    console.error('❌ Erreur config:', error);
+    res.json({ name: 'LOTATO PRO', logo: '', address: '', phone: '' });
+  }
+});
+
+app.post('/api/lottery-config', async (req, res) => {
+  try {
+    const { name, logo, address, phone } = req.body;
+    const check = await pool.query('SELECT * FROM lottery_config LIMIT 1');
+    if (check.rows.length === 0) {
+      await pool.query('INSERT INTO lottery_config (name, logo, address, phone) VALUES ($1, $2, $3, $4)', [name, logo, address, phone]);
+    } else {
+      await pool.query('UPDATE lottery_config SET name = $1, logo = $2, address = $3, phone = $4', [name, logo, address, phone]);
+    }
+    res.json({ success: true, message: 'Configuration sauvegardée' });
+  } catch (error) {
+    console.error('❌ Erreur sauvegarde config:', error);
+    res.status(500).json({ error: 'Erreur sauvegarde' });
+  }
+});
+
+// ----- Rapports journaliers pour un agent -----
+app.get('/api/reports', async (req, res) => {
+  try {
+    const { agentId } = req.query;
+    if (!agentId) return res.status(400).json({ error: 'Agent ID requis' });
+
+    const todayStats = await pool.query(`
+      SELECT 
+        COUNT(*) as total_tickets,
+        COALESCE(SUM(total_amount), 0) as total_bets,
+        COALESCE(SUM(win_amount), 0) as total_wins,
+        COALESCE(SUM(total_amount) - SUM(win_amount), 0) as total_loss,
+        COALESCE(SUM(win_amount) - SUM(total_amount), 0) as balance
+      FROM tickets 
+      WHERE agent_id = $1 AND DATE(date) = CURRENT_DATE
+    `, [agentId]);
+
+    const stats = todayStats.rows[0];
+    res.json({
+      totalTickets: parseInt(stats.total_tickets) || 0,
+      totalBets: parseFloat(stats.total_bets) || 0,
+      totalWins: parseFloat(stats.total_wins) || 0,
+      totalLoss: parseFloat(stats.total_loss) || 0,
+      balance: parseFloat(stats.balance) || 0
+    });
+  } catch (error) {
+    console.error('❌ Erreur rapports agent:', error);
+    res.json({ totalTickets: 0, totalBets: 0, totalWins: 0, totalLoss: 0, balance: 0 });
+  }
+});
+
+// ----- Rapport par tirage pour un agent -----
+app.get('/api/reports/draw', async (req, res) => {
+  try {
+    const { agentId, drawId } = req.query;
+    if (!agentId || !drawId) return res.status(400).json({ error: 'Agent ID et Draw ID requis' });
+
+    const stats = await pool.query(`
+      SELECT 
+        COUNT(*) as total_tickets,
+        COALESCE(SUM(total_amount), 0) as total_bets,
+        COALESCE(SUM(win_amount), 0) as total_wins,
+        COALESCE(SUM(total_amount) - SUM(win_amount), 0) as total_loss,
+        COALESCE(SUM(win_amount) - SUM(total_amount), 0) as balance
+      FROM tickets 
+      WHERE agent_id = $1 AND draw_id = $2 AND DATE(date) = CURRENT_DATE
+    `, [agentId, drawId]);
+
+    const data = stats.rows[0];
+    res.json({
+      totalTickets: parseInt(data.total_tickets) || 0,
+      totalBets: parseFloat(data.total_bets) || 0,
+      totalWins: parseFloat(data.total_wins) || 0,
+      totalLoss: parseFloat(data.total_loss) || 0,
+      balance: parseFloat(data.balance) || 0
+    });
+  } catch (error) {
+    console.error('❌ Erreur rapport tirage:', error);
+    res.json({ totalTickets: 0, totalBets: 0, totalWins: 0, totalLoss: 0, balance: 0 });
+  }
+});
+
+// ----- Numéros bloqués globalement -----
+app.get('/api/blocked-numbers', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT number FROM blocked_numbers');
+    const blocked = result.rows.map(row => row.number);
+    res.json({ blockedNumbers: blocked });
+  } catch (error) {
+    console.error('❌ Erreur numéros bloqués:', error);
+    res.json({ blockedNumbers: [] });
+  }
+});
 
 // =====================================================================
 // ==================== ROUTES PROPRIÉTAIRE (OWNER) ====================
 // =====================================================================
 
-// ---------------------- Dashboard ----------------------
+// ----- Dashboard propriétaire -----
 app.get('/api/owner/dashboard', async (req, res) => {
   try {
-    // Connexions : ici nous simulons des compteurs (à remplacer par des logs réels)
-    const supervisorsCount = (await pool.query('SELECT COUNT(*) FROM supervisors WHERE active = true')).rows[0].count;
-    const agentsCount = (await pool.query('SELECT COUNT(*) FROM agents WHERE active = true')).rows[0].count;
-    const connectedSupervisors = []; // à implémenter avec une table de sessions
-    const connectedAgents = [];
+    const today = moment().format('YYYY-MM-DD');
+
+    // Connexions (simulées, à améliorer avec table de sessions)
+    const supCount = (await pool.query('SELECT COUNT(*) FROM supervisors WHERE active = true')).rows[0].count;
+    const agentCount = (await pool.query('SELECT COUNT(*) FROM agents WHERE active = true')).rows[0].count;
 
     // Ventes du jour
-    const today = moment().format('YYYY-MM-DD');
-    const salesRes = await pool.query(`
+    const sales = await pool.query(`
       SELECT COALESCE(SUM(total_amount), 0) as total 
       FROM tickets 
       WHERE DATE(date) = $1
     `, [today]);
-    const salesToday = parseFloat(salesRes.rows[0].total);
+    const salesToday = parseFloat(sales.rows[0].total);
 
-    // Progression des limites (draw_number_limits)
-    const limitsProgress = await pool.query(`
+    // Progression des limites
+    const limits = await pool.query(`
       SELECT dnl.draw_id, d.name as draw_name, dnl.number, dnl.limit_amount,
-             COALESCE(SUM(tb.amount), 0) as current_bets,
+             COALESCE(SUM((bets->>'amount')::numeric), 0) as current_bets,
              CASE 
-               WHEN dnl.limit_amount > 0 THEN ROUND((COALESCE(SUM(tb.amount), 0) / dnl.limit_amount * 100)::numeric, 1)
+               WHEN dnl.limit_amount > 0 THEN ROUND((COALESCE(SUM((bets->>'amount')::numeric), 0) / dnl.limit_amount * 100)::numeric, 1)
                ELSE 0 
              END as progress_percent
       FROM draw_number_limits dnl
       JOIN draws d ON d.id = dnl.draw_id
       LEFT JOIN tickets t ON t.draw_id = dnl.draw_id AND DATE(t.date) = $1
-      LEFT JOIN jsonb_to_recordset(t.bets) AS tb(amount numeric) ON true
+      LEFT JOIN LATERAL jsonb_array_elements(t.bets) AS bets ON true
       GROUP BY dnl.draw_id, d.name, dnl.number, dnl.limit_amount
       ORDER BY progress_percent DESC
     `, [today]);
 
-    // Agents gains/pertes aujourd'hui
-    const agentsGainLoss = await pool.query(`
+    // Gains/pertes des agents aujourd'hui
+    const agentsGL = await pool.query(`
       SELECT a.id, a.name, 
              COALESCE(SUM(t.total_amount), 0) as total_bets,
              COALESCE(SUM(t.win_amount), 0) as total_wins,
@@ -335,14 +655,14 @@ app.get('/api/owner/dashboard', async (req, res) => {
 
     res.json({
       connected: {
-        supervisors_count: parseInt(supervisorsCount),
-        agents_count: parseInt(agentsCount),
-        supervisors: connectedSupervisors,
-        agents: connectedAgents
+        supervisors_count: parseInt(supCount),
+        agents_count: parseInt(agentCount),
+        supervisors: [], // à remplir avec les superviseurs connectés si on a une table de sessions
+        agents: []
       },
       sales_today: salesToday,
-      limits_progress: limitsProgress.rows,
-      agents_gain_loss: agentsGainLoss.rows
+      limits_progress: limits.rows,
+      agents_gain_loss: agentsGL.rows
     });
   } catch (error) {
     console.error('❌ Erreur /owner/dashboard:', error);
@@ -350,37 +670,38 @@ app.get('/api/owner/dashboard', async (req, res) => {
   }
 });
 
-// ---------------------- Gestion utilisateurs ----------------------
+// ----- Liste des superviseurs -----
 app.get('/api/owner/supervisors', async (req, res) => {
   try {
-    const supervisors = await pool.query(`
+    const result = await pool.query(`
       SELECT id, name, username, email, phone, active as blocked, zone, cin 
-      FROM supervisors 
-      ORDER BY name
+      FROM supervisors ORDER BY name
     `);
-    res.json(supervisors.rows);
+    res.json(result.rows);
   } catch (error) {
     console.error('❌ Erreur /owner/supervisors:', error);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
+// ----- Liste des agents -----
 app.get('/api/owner/agents', async (req, res) => {
   try {
-    const agents = await pool.query(`
+    const result = await pool.query(`
       SELECT a.id, a.name, a.username, a.email, a.phone, a.active as blocked, a.zone, a.cin,
              a.supervisor_id, s.name as supervisor_name
       FROM agents a
       LEFT JOIN supervisors s ON s.id = a.supervisor_id
       ORDER BY a.name
     `);
-    res.json(agents.rows);
+    res.json(result.rows);
   } catch (error) {
     console.error('❌ Erreur /owner/agents:', error);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
+// ----- Création d'un utilisateur -----
 app.post('/api/owner/create-user', async (req, res) => {
   try {
     const { name, cin, username, password, role, supervisorId, zone } = req.body;
@@ -391,20 +712,15 @@ app.post('/api/owner/create-user', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     if (role === 'supervisor') {
-      // Vérifier unicité du username
       const existing = await pool.query('SELECT id FROM supervisors WHERE username = $1', [username]);
-      if (existing.rows.length > 0) {
-        return res.status(400).json({ error: 'Nom d’utilisateur déjà pris' });
-      }
+      if (existing.rows.length > 0) return res.status(400).json({ error: 'Nom d’utilisateur déjà pris' });
       await pool.query(`
         INSERT INTO supervisors (name, cin, username, password, zone, active, email)
         VALUES ($1, $2, $3, $4, $5, true, $6)
       `, [name, cin || null, username, hashedPassword, zone || null, `${username}@exemple.com`]);
     } else if (role === 'agent') {
       const existing = await pool.query('SELECT id FROM agents WHERE username = $1', [username]);
-      if (existing.rows.length > 0) {
-        return res.status(400).json({ error: 'Nom d’utilisateur déjà pris' });
-      }
+      if (existing.rows.length > 0) return res.status(400).json({ error: 'Nom d’utilisateur déjà pris' });
       await pool.query(`
         INSERT INTO agents (name, cin, username, password, supervisor_id, zone, active, email)
         VALUES ($1, $2, $3, $4, $5, $6, true, $7)
@@ -420,11 +736,11 @@ app.post('/api/owner/create-user', async (req, res) => {
   }
 });
 
+// ----- Bloquer / débloquer un utilisateur -----
 app.post('/api/owner/block-user', async (req, res) => {
   try {
-    const { userId, type, block = true } = req.body; // block = true pour bloquer, false pour débloquer
+    const { userId, type, block = true } = req.body;
     const table = type === 'supervisor' ? 'supervisors' : 'agents';
-    const idColumn = type === 'supervisor' ? 'id' : 'id';
     await pool.query(`UPDATE ${table} SET active = $1 WHERE id = $2`, [!block, userId]);
     res.json({ success: true });
   } catch (error) {
@@ -433,6 +749,7 @@ app.post('/api/owner/block-user', async (req, res) => {
   }
 });
 
+// ----- Changer le superviseur d'un agent -----
 app.put('/api/owner/change-supervisor', async (req, res) => {
   try {
     const { agentId, supervisorId } = req.body;
@@ -444,7 +761,7 @@ app.put('/api/owner/change-supervisor', async (req, res) => {
   }
 });
 
-// ---------------------- Gestion des tirages ----------------------
+// ----- Liste des tirages -----
 app.get('/api/owner/draws', async (req, res) => {
   try {
     const draws = await pool.query('SELECT id, name, time, blocked FROM draws ORDER BY id');
@@ -455,16 +772,16 @@ app.get('/api/owner/draws', async (req, res) => {
   }
 });
 
+// ----- Publier les résultats d'un tirage -----
 app.post('/api/owner/publish-results', async (req, res) => {
   try {
-    const { drawId, numbers } = req.body; // numbers: [lot1, lot2, lot3]
+    const { drawId, numbers } = req.body;
     if (!drawId || !numbers || numbers.length !== 3) {
       return res.status(400).json({ error: 'Données invalides' });
     }
-    // Insérer dans draw_results
     await pool.query(`
-      INSERT INTO draw_results (draw_id, name, draw_time, results, lucky_number, source)
-      VALUES ($1, (SELECT name FROM draws WHERE id = $1), NOW(), $2, null, 'owner')
+      INSERT INTO draw_results (draw_id, name, draw_time, results, source)
+      VALUES ($1, (SELECT name FROM draws WHERE id = $1), NOW(), $2, 'owner')
     `, [drawId, JSON.stringify(numbers)]);
     res.json({ success: true });
   } catch (error) {
@@ -473,9 +790,10 @@ app.post('/api/owner/publish-results', async (req, res) => {
   }
 });
 
+// ----- Bloquer / débloquer un tirage -----
 app.post('/api/owner/block-draw', async (req, res) => {
   try {
-    const { drawId, block } = req.body; // block = true/false
+    const { drawId, block } = req.body;
     await pool.query('UPDATE draws SET blocked = $1 WHERE id = $2', [block, drawId]);
     res.json({ success: true });
   } catch (error) {
@@ -484,7 +802,7 @@ app.post('/api/owner/block-draw', async (req, res) => {
   }
 });
 
-// ---------------------- Numéros bloqués (global) ----------------------
+// ----- Numéros bloqués globalement -----
 app.get('/api/owner/blocked-numbers', async (req, res) => {
   try {
     const result = await pool.query('SELECT number FROM blocked_numbers');
@@ -517,7 +835,7 @@ app.post('/api/owner/unblock-number', async (req, res) => {
   }
 });
 
-// ---------------------- Numéros bloqués par tirage ----------------------
+// ----- Numéros bloqués par tirage -----
 app.post('/api/owner/block-number-draw', async (req, res) => {
   try {
     const { drawId, number } = req.body;
@@ -540,7 +858,7 @@ app.post('/api/owner/unblock-number-draw', async (req, res) => {
   }
 });
 
-// ---------------------- Limites de montant par tirage ----------------------
+// ----- Définir une limite de montant par numéro et tirage -----
 app.post('/api/owner/number-limit', async (req, res) => {
   try {
     const { drawId, number, limitAmount } = req.body;
@@ -556,29 +874,25 @@ app.post('/api/owner/number-limit', async (req, res) => {
   }
 });
 
-// ---------------------- Rapports (owner) ----------------------
+// ----- Rapports propriétaire avec filtres -----
 app.get('/api/owner/reports', async (req, res) => {
   try {
     const { supervisorId, agentId, drawId, period, fromDate, toDate, gainLoss } = req.query;
+
     let dateFilter = '';
     let params = [];
     let paramIdx = 1;
 
-    // Gestion de la période
-    if (period === 'today') {
-      dateFilter = `DATE(date) = CURRENT_DATE`;
-    } else if (period === 'yesterday') {
-      dateFilter = `DATE(date) = CURRENT_DATE - 1`;
-    } else if (period === 'week') {
-      dateFilter = `date >= CURRENT_DATE - INTERVAL '7 days'`;
-    } else if (period === 'month') {
-      dateFilter = `date >= CURRENT_DATE - INTERVAL '30 days'`;
-    } else if (period === 'custom' && fromDate && toDate) {
+    if (period === 'today') dateFilter = `DATE(date) = CURRENT_DATE`;
+    else if (period === 'yesterday') dateFilter = `DATE(date) = CURRENT_DATE - 1`;
+    else if (period === 'week') dateFilter = `date >= CURRENT_DATE - INTERVAL '7 days'`;
+    else if (period === 'month') dateFilter = `date >= CURRENT_DATE - INTERVAL '30 days'`;
+    else if (period === 'custom' && fromDate && toDate) {
       dateFilter = `DATE(date) BETWEEN $${paramIdx} AND $${paramIdx+1}`;
       params.push(fromDate, toDate);
       paramIdx += 2;
     } else {
-      dateFilter = `DATE(date) = CURRENT_DATE`; // défaut
+      dateFilter = `DATE(date) = CURRENT_DATE`;
     }
 
     let query = `
@@ -608,16 +922,13 @@ app.get('/api/owner/reports', async (req, res) => {
       params.push(drawId);
       paramIdx++;
     }
-    if (gainLoss === 'gain') {
-      query += ` AND win_amount > 0`;
-    } else if (gainLoss === 'loss') {
-      query += ` AND win_amount <= 0`;
-    }
+    if (gainLoss === 'gain') query += ` AND win_amount > 0`;
+    else if (gainLoss === 'loss') query += ` AND win_amount <= 0`;
 
     const summaryRes = await pool.query(query, params);
     const summary = summaryRes.rows[0];
 
-    // Détail (par agent ou par tirage)
+    // Détail (par agent)
     let detailQuery = `
       SELECT 
         COALESCE(a.name, 'Inconnu') as agent_name,
@@ -629,16 +940,9 @@ app.get('/api/owner/reports', async (req, res) => {
       LEFT JOIN agents a ON a.id::text = t.agent_id
       WHERE ${dateFilter}
     `;
-    // on réutilise les mêmes paramètres
-    if (supervisorId && supervisorId !== 'all') {
-      detailQuery += ` AND a.supervisor_id = $${paramIdx}`;
-    }
-    if (agentId && agentId !== 'all') {
-      detailQuery += ` AND t.agent_id = $${paramIdx}`;
-    }
-    if (drawId && drawId !== 'all') {
-      detailQuery += ` AND t.draw_id = $${paramIdx}`;
-    }
+    if (supervisorId && supervisorId !== 'all') detailQuery += ` AND a.supervisor_id = $${paramIdx}`;
+    if (agentId && agentId !== 'all') detailQuery += ` AND t.agent_id = $${paramIdx}`;
+    if (drawId && drawId !== 'all') detailQuery += ` AND t.draw_id = $${paramIdx}`;
     detailQuery += ` GROUP BY a.name ORDER BY result DESC`;
 
     const detailRes = await pool.query(detailQuery, params);
@@ -664,11 +968,10 @@ app.get('/api/owner/reports', async (req, res) => {
 // ==================== ROUTES SUPERVISEUR (RESPONSABLE) ===============
 // =====================================================================
 
-// ---------------------- Rapports globaux du superviseur ----------------------
+// ----- Rapport global du superviseur -----
 app.get('/api/supervisor/reports/overall', async (req, res) => {
   try {
-    const supervisorId = req.user.id; // en production, récupéré depuis le token
-    // On suppose que le superviseur a un id numérique
+    const supervisorId = req.user.id; // À adapter selon votre token
     const today = moment().format('YYYY-MM-DD');
     const result = await pool.query(`
       SELECT 
@@ -694,7 +997,7 @@ app.get('/api/supervisor/reports/overall', async (req, res) => {
   }
 });
 
-// ---------------------- Liste des agents du superviseur ----------------------
+// ----- Liste des agents du superviseur avec stats du jour -----
 app.get('/api/supervisor/agents', async (req, res) => {
   try {
     const supervisorId = req.user.id;
@@ -719,7 +1022,7 @@ app.get('/api/supervisor/agents', async (req, res) => {
   }
 });
 
-// ---------------------- Bloquer / Débloquer un agent ----------------------
+// ----- Bloquer un agent -----
 app.post('/api/supervisor/block-agent/:agentId', async (req, res) => {
   try {
     const { agentId } = req.params;
@@ -731,6 +1034,7 @@ app.post('/api/supervisor/block-agent/:agentId', async (req, res) => {
   }
 });
 
+// ----- Débloquer un agent -----
 app.post('/api/supervisor/unblock-agent/:agentId', async (req, res) => {
   try {
     const { agentId } = req.params;
@@ -742,7 +1046,7 @@ app.post('/api/supervisor/unblock-agent/:agentId', async (req, res) => {
   }
 });
 
-// ---------------------- Tickets récents d'un agent ----------------------
+// ----- Tickets récents d'un agent (max 20) -----
 app.get('/api/supervisor/tickets/recent', async (req, res) => {
   try {
     const { agentId } = req.query;
@@ -761,11 +1065,10 @@ app.get('/api/supervisor/tickets/recent', async (req, res) => {
   }
 });
 
-// ---------------------- Supprimer un ticket (si < 10 min) ----------------------
+// ----- Supprimer un ticket (moins de 10 minutes) -----
 app.delete('/api/supervisor/tickets/:ticketId', async (req, res) => {
   try {
     const { ticketId } = req.params;
-    // Vérifier que le ticket date de moins de 10 minutes
     const ticket = await pool.query('SELECT date FROM tickets WHERE id = $1', [ticketId]);
     if (ticket.rows.length === 0) return res.status(404).json({ error: 'Ticket non trouvé' });
 
@@ -785,8 +1088,9 @@ app.delete('/api/supervisor/tickets/:ticketId', async (req, res) => {
 });
 
 // =====================================================================
-// ==================== ROUTES STATIQUES (inchangées) ==================
+// ==================== ROUTES STATIQUES ==============================
 // =====================================================================
+
 app.use(express.static(__dirname));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/agent1.html', (req, res) => res.sendFile(path.join(__dirname, 'agent1.html')));
@@ -805,13 +1109,13 @@ app.use('*', (req, res) => {
   res.status(404).send('Page non trouvée');
 });
 
-// Gestion des erreurs
+// Gestion des erreurs globales
 app.use((err, req, res, next) => {
   console.error('🔥 Erreur serveur:', err.stack);
   res.status(500).json({ error: 'Erreur serveur interne', message: err.message });
 });
 
-// Démarrage
+// Démarrage du serveur
 initializeDatabase().then(() => {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Serveur LOTATO démarré sur http://0.0.0.0:${PORT}`);
