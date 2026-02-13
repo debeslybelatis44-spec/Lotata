@@ -301,13 +301,8 @@ async function processFinalTicket() {
         return;
     }
 
-    // Vérifier l'authentification
-    const token = localStorage.getItem('auth_token');
-    if (!token) {
-        alert("Ou pa konekte! Tanpri rekonekte.");
-        window.location.href = 'index.html';
-        return;
-    }
+    // Vérifier si on est en mode édition
+    const isEditing = APP_STATE.editingTicketId ? true : false;
 
     const betsByDraw = {};
     APP_STATE.currentCart.forEach(bet => {
@@ -342,19 +337,49 @@ async function processFinalTicket() {
                 total: drawBets.reduce((sum, b) => sum + (parseFloat(b.amount) || 0), 0)
             };
 
-            console.log('📤 Envoi ticket vers API:', ticketData);
+            let response;
+            if (isEditing && drawIds.length === 1) {
+                // Mise à jour du ticket existant
+                response = await APIService.updateTicket(APP_STATE.editingTicketId, ticketData);
+            } else {
+                // Création normale
+                response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.SAVE_TICKET}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(ticketData)
+                });
+            }
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Erreur serveur: ${response.status} - ${errorText}`);
+            }
+
+            const savedTicket = await response.json();
+            console.log('Ticket sauvegardé:', savedTicket);
+            tickets.push(savedTicket.ticket);
             
-            // Utiliser APIService.saveTicket qui gère déjà l'authentification
-            const responseData = await APIService.saveTicket(ticketData);
+            if (savedTicket.ticket) {
+                // Mettre à jour l'historique : remplacer l'ancien ou ajouter le nouveau
+                if (isEditing) {
+                    // Remplacer l'ancien ticket par le nouveau
+                    const index = APP_STATE.ticketsHistory.findIndex(t => 
+                        t.id === APP_STATE.editingTicketId || t.ticket_id === APP_STATE.editingTicketId
+                    );
+                    if (index !== -1) {
+                        APP_STATE.ticketsHistory[index] = savedTicket.ticket;
+                    } else {
+                        APP_STATE.ticketsHistory.unshift(savedTicket.ticket);
+                    }
+                } else {
+                    APP_STATE.ticketsHistory.unshift(savedTicket.ticket);
+                }
+            }
             
-            console.log('✅ Ticket sauvegardé:', responseData);
-            
-            if (responseData.ticket) {
-                tickets.push(responseData.ticket);
-                APP_STATE.ticketsHistory.unshift(responseData.ticket);
-                
-                // Imprimer le ticket
-                printThermalTicket(responseData.ticket);
+            if (savedTicket.ticket) {
+                printThermalTicket(savedTicket.ticket);
             }
         }
         
@@ -364,19 +389,10 @@ async function processFinalTicket() {
             alert(`✅ ${tickets.length} fich sove ak siksè epi enprime!`);
         }
         
-        // Vider le panier
+        // Réinitialiser l'état
         APP_STATE.currentCart = [];
+        APP_STATE.editingTicketId = null;  // Effacer le mode édition
         CartManager.renderCart();
-        
-        // Rafraîchir l'historique
-        if (APP_STATE.currentTab === 'history') {
-            loadHistory();
-        }
-        
-        // Rafraîchir les rapports
-        if (APP_STATE.currentTab === 'reports') {
-            loadReports();
-        }
         
     } catch (error) {
         console.error('❌ Erreur sauvegarde:', error);
@@ -561,16 +577,196 @@ function fallbackPrintTicket(ticket) {
     printWindow.document.close();
 }
 
-function closeWinnerModal() {
-    const overlay = document.getElementById('winner-overlay');
-    if (overlay) {
-        overlay.style.display = 'none';
+function printDailyReport() {
+    if (!APP_STATE.ticketsHistory || APP_STATE.ticketsHistory.length === 0) {
+        alert("Pa gen tikè nan istorik la!");
+        return;
     }
+    
+    const today = new Date().toLocaleDateString('fr-FR');
+    const todayTickets = APP_STATE.ticketsHistory.filter(ticket => 
+        new Date(ticket.date).toLocaleDateString('fr-FR') === today
+    );
+    
+    if (todayTickets.length === 0) {
+        alert("Pa gen tikè pou jodi a!");
+        return;
+    }
+    
+    const totalAmount = todayTickets.reduce((sum, ticket) => 
+        sum + (parseFloat(ticket.total_amount) || 0), 0
+    );
+    
+    const reportContent = generateReportHTML(todayTickets, today, totalAmount);
+    
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.width = '0px';
+    iframe.style.height = '0px';
+    iframe.style.border = 'none';
+    iframe.style.left = '-1000px';
+    iframe.style.top = '-1000px';
+    
+    document.body.appendChild(iframe);
+    
+    let iframeDoc = iframe.contentWindow || iframe.contentDocument;
+    if (iframeDoc.document) {
+        iframeDoc = iframeDoc.document;
+    }
+    
+    iframeDoc.open();
+    iframeDoc.write(reportContent);
+    iframeDoc.close();
+    
+    setTimeout(() => {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+        
+        setTimeout(() => {
+            document.body.removeChild(iframe);
+        }, 1000);
+    }, 500);
 }
 
-// Fonctions pour l'interface agent uniquement
-window.CartManager = CartManager;
-window.processFinalTicket = processFinalTicket;
-window.printThermalTicket = printThermalTicket;
-window.fallbackPrintTicket = fallbackPrintTicket;
-window.closeWinnerModal = closeWinnerModal;
+function generateReportHTML(tickets, date, totalAmount) {
+    const lotteryConfig = APP_STATE.lotteryConfig || CONFIG;
+    const lotteryName = lotteryConfig.LOTTERY_NAME || 'LOTTERIE';
+    const agentName = APP_STATE.agentName || 'Agent';
+    
+    let ticketsHtml = tickets.map(ticket => `
+        <tr>
+            <td>${ticket.ticket_id || ticket.id}</td>
+            <td>${ticket.draw_name || ''}</td>
+            <td>${new Date(ticket.date).toLocaleTimeString('fr-FR')}</td>
+            <td style="text-align:right;">${ticket.total_amount || ticket.total}</td>
+        </tr>
+    `).join('');
+    
+    return `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Rapò Jounalye - ${date}</title>
+            <style>
+                @media print {
+                    @page {
+                        size: A4;
+                        margin: 15mm;
+                    }
+                    body {
+                        font-family: Arial, sans-serif;
+                        font-size: 12px;
+                        line-height: 1.4;
+                    }
+                    .report-header {
+                        text-align: center;
+                        margin-bottom: 20px;
+                        border-bottom: 2px solid #000;
+                        padding-bottom: 10px;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin: 15px 0;
+                    }
+                    th, td {
+                        border: 1px solid #000;
+                        padding: 6px;
+                        text-align: left;
+                    }
+                    th {
+                        background-color: #f0f0f0;
+                        font-weight: bold;
+                    }
+                    .total-row {
+                        font-weight: bold;
+                        background-color: #e0e0e0;
+                    }
+                    .summary {
+                        margin-top: 20px;
+                        padding: 10px;
+                        border: 1px solid #000;
+                        background-color: #f9f9f9;
+                    }
+                }
+            </style>
+        </head>
+        <body onload="window.print(); setTimeout(() => window.close(), 1000);">
+            <div class="report-header">
+                <h1>${lotteryName}</h1>
+                <h2>Rapò Vann Jounalye</h2>
+                <p>Dat: ${date} | Ajan: ${agentName}</p>
+            </div>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>N° Tikè</th>
+                        <th>Tiraj</th>
+                        <th>Lè</th>
+                        <th>Montan (Gdes)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${ticketsHtml}
+                </tbody>
+                <tfoot>
+                    <tr class="total-row">
+                        <td colspan="3">TOTAL JENERAL:</td>
+                        <td style="text-align:right;">${totalAmount} Gdes</td>
+                    </tr>
+                </tfoot>
+            </table>
+            
+            <div class="summary">
+                <h3>Rezime</h3>
+                <p>Total Tikè: ${tickets.length}</p>
+                <p>Total Vann: ${totalAmount} Gdes</p>
+                <p>Mwayèn pa Tikè: ${(totalAmount / tickets.length).toFixed(2)} Gdes</p>
+                <p>Dènye tikè: ${tickets[0] ? new Date(tickets[0].date).toLocaleTimeString('fr-FR') : 'N/A'}</p>
+            </div>
+            
+            <div style="margin-top: 30px; text-align: center; font-size: 10px;">
+                <p>Rapò jenere le: ${new Date().toLocaleString('fr-FR')}</p>
+                <p>© ${lotteryName} - Tout dwa rezève</p>
+            </div>
+        </body>
+        </html>
+    `;
+}
+
+function exportPDFReport() {
+    if (!APP_STATE.ticketsHistory || APP_STATE.ticketsHistory.length === 0) {
+        alert("Pa gen tikè nan istorik la!");
+        return;
+    }
+    
+    const today = new Date().toLocaleDateString('fr-FR');
+    const todayTickets = APP_STATE.ticketsHistory.filter(ticket => 
+        new Date(ticket.date).toLocaleDateString('fr-FR') === today
+    );
+    
+    if (todayTickets.length === 0) {
+        alert("Pa gen tikè pou jodi a!");
+        return;
+    }
+    
+    const content = generateReportHTML(todayTickets, today, 
+        todayTickets.reduce((sum, t) => sum + (parseFloat(t.total_amount) || 0), 0)
+    );
+    
+    const win = window.open('', '_blank');
+    win.document.write(content);
+    win.document.close();
+    
+    setTimeout(() => {
+        win.print();
+    }, 500);
+}
+
+window.printDailyReport = printDailyReport;
+window.exportPDFReport = exportPDFReport;
+
+function closeWinnerModal() {
+    document.getElementById('winner-overlay').style.display = 'none';
+}

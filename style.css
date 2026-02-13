@@ -890,3 +890,63 @@ input:checked + .slider:before {
     opacity: 0.5;
     cursor: not-allowed;
 }
+.logout-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    font-size: 1.2rem;
+    cursor: pointer;
+    margin-left: 10px;
+    transition: color 0.2s;
+}
+.logout-btn:hover {
+    color: var(--danger);
+}
+
+.action-buttons {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.edit-history-btn, .delete-history-btn {
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 15px;
+    padding: 5px 10px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.edit-history-btn {
+    color: var(--warning);
+    border-color: var(--warning);
+}
+.edit-history-btn:hover {
+    background: var(--warning);
+    color: white;
+}
+.edit-history-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.delete-history-btn {
+    color: var(--danger);
+    border-color: var(--danger);
+}
+.delete-history-btn:hover {
+    background: var(--danger);
+    color: white;
+}
+.delete-history-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    pointer-events: none;
+}
