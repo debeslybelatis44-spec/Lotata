@@ -27,35 +27,6 @@ const APIService = {
         }
     },
 
-    // Nouvelle méthode pour mettre à jour un ticket existant
-    async updateTicket(ticketId, ticketData) {
-        try {
-            const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.UPDATE_TICKET}/${ticketId}`, {
-                method: 'PUT',  // ou POST selon votre API
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    ...ticketData,
-                    agentId: APP_STATE.agentId,
-                    agentName: APP_STATE.agentName,
-                    updatedAt: new Date().toISOString()
-                })
-            });
-            
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Erreur serveur: ${response.status} - ${errorText}`);
-            }
-            
-            const data = await response.json();
-            return data;
-        } catch (error) {
-            console.error('Erreur mise à jour ticket:', error);
-            throw error;
-        }
-    },
-
     async getTickets() {
         try {
             const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.GET_TICKETS}?agentId=${APP_STATE.agentId}`);

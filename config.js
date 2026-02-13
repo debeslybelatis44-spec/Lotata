@@ -13,8 +13,7 @@ const API_CONFIG = {
         DELETE_TICKET: '/tickets/delete',
         GET_DRAW_REPORT: '/reports/draw',
         GET_LOTTERY_CONFIG: '/lottery-config',
-        CHECK_WINNING_TICKETS: '/tickets/check-winners',
-        UPDATE_TICKET: '/tickets/update'   // Nouvel endpoint pour modification
+        CHECK_WINNING_TICKETS: '/tickets/check-winners'
     }
 };
 
@@ -67,6 +66,5 @@ let APP_STATE = {
     isDrawBlocked: false,
     agentId: 'agent-01',
     agentName: 'Agent-01',
-    lotteryConfig: null,
-    editingTicketId: null  // Nouvelle variable pour le mode édition
+    lotteryConfig: null
 };
