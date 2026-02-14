@@ -59,11 +59,9 @@ async function loadHistory() {
             tickets = ticketsData.tickets;
         } else {
             console.warn('Format de données inattendu, tentative de normalisation...', ticketsData);
-            // Essayer de créer un tableau à partir de l'objet
             tickets = [ticketsData];
         }
         
-        // Stocker dans APP_STATE
         APP_STATE.ticketsHistory = tickets || [];
         
         console.log('Tickets normalisés pour historique:', APP_STATE.ticketsHistory);
@@ -97,10 +95,7 @@ function renderHistory() {
         console.log(`Ticket ${index + 1}:`, ticket);
         console.log(`Propriétés ticket ${index + 1}:`, Object.keys(ticket));
         
-        // Obtenir l'ID du ticket (priorité: ticket_id, puis id)
         const ticketId = ticket.ticket_id || ticket.id || `temp_${Date.now()}_${index}`;
-        
-        // Extraire les propriétés avec toutes les variantes possibles
         const drawName = ticket.draw_name || ticket.drawName || ticket.draw_name_fr || 'Tiraj Inkonu';
         const totalAmount = ticket.total_amount || ticket.totalAmount || ticket.amount || 0;
         const date = ticket.date || ticket.created_at || ticket.created_date || new Date().toISOString();
@@ -109,14 +104,12 @@ function renderHistory() {
         const winAmount = ticket.win_amount || ticket.winAmount || ticket.prize_amount || 0;
         const drawId = ticket.draw_id || ticket.drawId || '';
         
-        // Obtenir le nombre de paris
         let numberOfBets = 0;
         if (Array.isArray(bets)) {
             numberOfBets = bets.length;
         } else if (typeof bets === 'object' && bets !== null) {
             numberOfBets = Object.keys(bets).length;
         } else if (typeof bets === 'string') {
-            // Si bets est une chaîne JSON
             try {
                 const parsedBets = JSON.parse(bets);
                 numberOfBets = Array.isArray(parsedBets) ? parsedBets.length : 1;
@@ -125,7 +118,6 @@ function renderHistory() {
             }
         }
         
-        // Déterminer le statut
         let status = '';
         let statusClass = '';
         
@@ -142,13 +134,11 @@ function renderHistory() {
             statusClass = 'badge-wait';
         }
         
-        // Vérifier si on peut supprimer (dans les 5 minutes)
         const ticketDate = new Date(date);
         const now = new Date();
         const minutesDiff = (now - ticketDate) / (1000 * 60);
         const canDelete = minutesDiff <= 5;
         
-        // Formatage de la date
         let formattedDate = 'Date inkonu';
         let formattedTime = '';
         
@@ -160,7 +150,6 @@ function renderHistory() {
             formattedTime = '';
         }
         
-        // Créer le HTML de la carte
         return `
             <div class="history-card" data-ticket-id="${ticketId}">
                 <div class="card-header">
@@ -194,7 +183,6 @@ async function deleteTicket(ticketId) {
     try {
         await APIService.deleteTicket(ticketId);
         
-        // Supprimer le ticket de APP_STATE
         APP_STATE.ticketsHistory = APP_STATE.ticketsHistory.filter(t => 
             (t.id !== ticketId && t.ticket_id !== ticketId)
         );
@@ -209,10 +197,8 @@ async function deleteTicket(ticketId) {
 
 async function loadReports() {
     try {
-        // Charger les tickets et rapports depuis l'API
         const ticketsData = await APIService.getTickets();
         
-        // Normaliser les tickets comme dans loadHistory()
         let tickets = [];
         if (Array.isArray(ticketsData)) {
             tickets = ticketsData;
@@ -230,20 +216,17 @@ async function loadReports() {
         
         console.log('Données rapport API:', reports);
         
-        // CALCULS
         let totalTickets = 0;
         let totalBets = 0;
         let totalWins = 0;
         let totalLoss = 0;
         
-        // Si l'API retourne des rapports, utiliser ces données
         if (reports && reports.total_tickets !== undefined) {
             totalTickets = reports.total_tickets || 0;
             totalBets = reports.total_bets || 0;
             totalWins = reports.total_wins || 0;
             totalLoss = reports.total_loss || 0;
         } else {
-            // Sinon calculer à partir des tickets
             totalTickets = APP_STATE.ticketsHistory.length;
             
             APP_STATE.ticketsHistory.forEach(ticket => {
@@ -263,7 +246,6 @@ async function loadReports() {
         
         const totalProfit = totalBets - totalWins;
         
-        // Afficher les statistiques
         document.getElementById('total-tickets').textContent = totalTickets;
         document.getElementById('total-bets').textContent = totalBets.toLocaleString('fr-FR') + ' Gdes';
         document.getElementById('total-wins').textContent = totalWins.toLocaleString('fr-FR') + ' Gdes';
@@ -271,7 +253,6 @@ async function loadReports() {
         document.getElementById('balance').textContent = totalProfit.toLocaleString('fr-FR') + ' Gdes';
         document.getElementById('balance').style.color = (totalProfit >= 0) ? 'var(--success)' : 'var(--danger)';
         
-        // Remplir le sélecteur de tirage
         const drawSelector = document.getElementById('draw-report-selector');
         drawSelector.innerHTML = '<option value="all">Tout Tiraj</option>';
         
@@ -282,7 +263,6 @@ async function loadReports() {
             drawSelector.appendChild(option);
         });
         
-        // Charger le rapport pour "Tout Tiraj" par défaut
         await loadDrawReport('all');
         
     } catch (error) {
@@ -301,7 +281,6 @@ async function loadDrawReport(drawId = null) {
         const selectedDrawId = drawId || document.getElementById('draw-report-selector').value;
         
         if (selectedDrawId === 'all') {
-            // Copier les valeurs générales
             const totalTickets = parseInt(document.getElementById('total-tickets').textContent) || 0;
             const totalBetsText = document.getElementById('total-bets').textContent;
             const totalWinsText = document.getElementById('total-wins').textContent;
@@ -320,7 +299,6 @@ async function loadDrawReport(drawId = null) {
             document.getElementById('draw-balance').textContent = balance.toLocaleString('fr-FR') + ' Gdes';
             document.getElementById('draw-balance').style.color = (balance >= 0) ? 'var(--success)' : 'var(--danger)';
         } else {
-            // Calculer pour un tirage spécifique
             const drawTickets = APP_STATE.ticketsHistory.filter(t => 
                 t.draw_id === selectedDrawId || t.drawId === selectedDrawId
             );
@@ -575,6 +553,7 @@ async function markAsPaid(ticketId) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
             }
         });
         
@@ -595,7 +574,6 @@ function viewTicketDetails(ticketId) {
     console.log('Recherche ticket avec ID:', ticketId);
     console.log('Tickets disponibles:', APP_STATE.ticketsHistory);
     
-    // Recherche par id ou ticket_id
     const ticket = APP_STATE.ticketsHistory.find(t => 
         t.id === ticketId || t.ticket_id === ticketId
     );
@@ -607,7 +585,6 @@ function viewTicketDetails(ticketId) {
     
     console.log('Ticket trouvé pour détails:', ticket);
     
-    // Extraire les propriétés avec toutes les variantes possibles
     const drawName = ticket.draw_name || ticket.drawName || ticket.draw_name_fr || 'Tiraj Inkonu';
     const totalAmount = ticket.total_amount || ticket.totalAmount || ticket.amount || 0;
     const date = ticket.date || ticket.created_at || ticket.created_date || new Date().toISOString();
@@ -628,7 +605,6 @@ function viewTicketDetails(ticketId) {
         <h4>Paray yo:</h4>
     `;
     
-    // Traiter les paris
     let bets = [];
     
     if (Array.isArray(ticket.bets)) {
@@ -642,7 +618,6 @@ function viewTicketDetails(ticketId) {
             bets = [{ number: ticket.bets, amount: totalAmount }];
         }
     } else if (ticket.bets && typeof ticket.bets === 'object') {
-        // Convertir l'objet en tableau
         bets = Object.entries(ticket.bets).map(([key, value]) => {
             return { number: key, amount: value };
         });

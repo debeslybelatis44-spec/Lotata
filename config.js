@@ -10,7 +10,7 @@ const API_CONFIG = {
         GET_WINNING_RESULTS: '/winners/results',
         PAY_WINNER: '/winners/pay',
         GET_AGENTS: '/agents',
-        DELETE_TICKET: '/tickets/delete',
+        DELETE_TICKET: '/tickets',          // Changé : correspond à la route du serveur
         GET_DRAW_REPORT: '/reports/draw',
         GET_LOTTERY_CONFIG: '/lottery-config',
         CHECK_WINNING_TICKETS: '/tickets/check-winners'
@@ -48,6 +48,7 @@ const CONFIG = {
     LOTTERY_PHONE: ''
 };
 
+// État initial – valeurs lues depuis localStorage
 let APP_STATE = {
     selectedDraw: 'tn_matin',
     selectedDraws: ['tn_matin'],
@@ -64,7 +65,7 @@ let APP_STATE = {
     showSpecialGames: false,
     currentTab: 'home',
     isDrawBlocked: false,
-    agentId: 'agent-01',
-    agentName: 'Agent-01',
+    agentId: localStorage.getItem('agent_id') || null,
+    agentName: localStorage.getItem('agent_name') || 'Agent',
     lotteryConfig: null
 };

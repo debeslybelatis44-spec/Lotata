@@ -1,26 +1,34 @@
 async function initApp() {
+    // Vérifier si l'utilisateur est connecté
+    const token = localStorage.getItem('auth_token');
+    const agentId = localStorage.getItem('agent_id');
+    const agentName = localStorage.getItem('agent_name');
+
+    if (!token || !agentId) {
+        // Rediriger vers la page de connexion
+        window.location.href = 'index.html';
+        return;
+    }
+
+    // Mettre à jour APP_STATE avec les valeurs du localStorage
+    APP_STATE.agentId = agentId;
+    APP_STATE.agentName = agentName;
+
     await loadLotteryConfig();
-    
     await APIService.getTickets();
-    
     await APIService.getWinningTickets();
-    
     await APIService.getWinningResults();
     
     renderDraws();
     updateClock();
-    
     checkSelectedDrawStatus();
-    
-    console.log("LOTATO PRO Ready - MongoDB Mode");
-
     setupInputAutoMove();
     
     document.getElementById('add-bet-btn').addEventListener('click', () => CartManager.addBet());
-    
     updateGameSelector();
-    
     updateSyncStatus();
+    
+    console.log("LOTATO PRO Ready - Authentification OK");
 }
 
 document.addEventListener('DOMContentLoaded', initApp);
