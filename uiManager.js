@@ -142,14 +142,11 @@ function renderHistory() {
             statusClass = 'badge-wait';
         }
         
-        // Vérifier si on peut supprimer (dans les 2 minutes)
+        // Vérifier si on peut supprimer (dans les 5 minutes)
         const ticketDate = new Date(date);
         const now = new Date();
         const minutesDiff = (now - ticketDate) / (1000 * 60);
-        const canDelete = minutesDiff <= 2;  // MODIFIÉ : 2 minutes au lieu de 5
-        
-        // Vérifier si on peut modifier (dans les 4 minutes)
-        const canEdit = minutesDiff <= 4;
+        const canDelete = minutesDiff <= 5;
         
         // Formatage de la date
         let formattedDate = 'Date inkonu';
@@ -181,10 +178,6 @@ function renderHistory() {
                         <button class="btn-small view-details-btn" onclick="viewTicketDetails('${ticketId}')">
                             <i class="fas fa-eye"></i> Detay
                         </button>
-                        <!-- Bouton Modifier -->
-                        <button class="edit-history-btn" onclick="editTicket('${ticketId}')" ${canEdit ? '' : 'disabled'}>
-                            <i class="fas fa-edit"></i> Modifye
-                        </button>
                         <button class="delete-history-btn" onclick="deleteTicket('${ticketId}')" ${canDelete ? '' : 'disabled'}>
                             <i class="fas fa-trash"></i> Efase
                         </button>
@@ -211,98 +204,6 @@ async function deleteTicket(ticketId) {
     } catch (error) {
         console.error('Erreur suppression:', error);
         alert('Erè nan efasman tikè a: ' + error.message);
-    }
-}
-
-// Fonction pour modifier un ticket
-async function editTicket(ticketId) {
-    // Recherche du ticket
-    const ticket = APP_STATE.ticketsHistory.find(t => 
-        t.id === ticketId || t.ticket_id === ticketId
-    );
-    
-    if (!ticket) {
-        alert('Tikè pa jwenn!');
-        return;
-    }
-    
-    // Vérifier le délai de modification (4 minutes)
-    const ticketDate = new Date(ticket.date || ticket.created_at || ticket.created_date);
-    const now = new Date();
-    const minutesDiff = (now - ticketDate) / (1000 * 60);
-    
-    if (minutesDiff > 4) {
-        alert('Tikè sa a pa ka modifye paske li gen plis pase 4 minit.');
-        return;
-    }
-    
-    // Vérifier si le tirage est bloqué
-    const draw = CONFIG.DRAWS.find(d => d.id === (ticket.draw_id || ticket.drawId));
-    if (draw && isDrawBlocked(draw.time)) {
-        alert('Tiraj sa a ap rantre nan 3 minit. Ou pa ka modifye tikè sa a.');
-        return;
-    }
-    
-    // Vider le panier actuel
-    APP_STATE.currentCart = [];
-    
-    // Charger les paris du ticket dans le panier
-    let bets = ticket.bets || ticket.numbers || [];
-    if (typeof bets === 'string') {
-        try {
-            bets = JSON.parse(bets);
-        } catch (e) {
-            bets = [];
-        }
-    }
-    
-    if (Array.isArray(bets)) {
-        bets.forEach(bet => {
-            // Reconstruire l'objet pari avec les informations nécessaires
-            const cartItem = {
-                ...bet,
-                id: Date.now() + Math.random(), // Nouvel ID pour éviter les conflits
-                drawId: ticket.draw_id || ticket.drawId,
-                drawName: ticket.draw_name || ticket.drawName,
-                timestamp: new Date().toISOString()
-            };
-            APP_STATE.currentCart.push(cartItem);
-        });
-    }
-    
-    // Mettre à jour le tirage sélectionné
-    APP_STATE.selectedDraw = ticket.draw_id || ticket.drawId;
-    APP_STATE.selectedDraws = [APP_STATE.selectedDraw];
-    APP_STATE.multiDrawMode = false;
-    
-    // Mettre à jour le titre de l'écran de pari
-    const drawName = ticket.draw_name || ticket.drawName || 'Tiraj';
-    document.getElementById('current-draw-title').textContent = drawName;
-    
-    // Indiquer qu'on est en mode édition
-    APP_STATE.editingTicketId = ticketId;
-    
-    // Basculer vers l'écran de pari
-    document.getElementById('draw-selection-screen').classList.remove('active');
-    document.getElementById('betting-screen').classList.add('active');
-    document.querySelector('.back-button').style.display = 'flex';
-    
-    // Mettre à jour le sélecteur de jeu et vérifier le statut du tirage
-    updateGameSelector();
-    checkSelectedDrawStatus();
-    
-    // Afficher le panier
-    CartManager.renderCart();
-    
-    // Optionnel : message pour indiquer le mode édition
-    alert('Ou ap modifye tikè #' + ticketId + '. Ajoute oubyen retire paray, epi klike sou "Enprime Fich" pou sove modifikasyon yo.');
-}
-
-// Fonction de déconnexion
-function logout() {
-    if (confirm('Èske ou vreman vle dekonekte?')) {
-        // Rediriger vers la page de login (ou recharger l'application)
-        window.location.href = 'login.html'; // À adapter selon votre structure
     }
 }
 
