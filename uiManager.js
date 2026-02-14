@@ -1,3 +1,18 @@
+// Fonction utilitaire pour récupérer les tickets depuis l'API
+async function fetchTickets() {
+    const token = localStorage.getItem('auth_token');
+    if (!token) throw new Error('Non authentifié');
+
+    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.GET_TICKETS}`, {
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    });
+    if (!response.ok) throw new Error('Erreur réseau');
+    const data = await response.json();
+    return data.tickets || [];
+}
+
 function switchTab(tabName) {
     APP_STATE.currentTab = tabName;
     
@@ -42,35 +57,8 @@ async function loadHistory() {
         const container = document.getElementById('history-container');
         container.innerHTML = '<div class="empty-msg">Chajman...</div>';
         
-        console.log('Début du chargement historique...');
-        
-        // Récupérer les tickets
-        const ticketsData = await APIService.getTickets();
-        console.log('Données reçues de getTickets():', ticketsData);
-        
-        // Normaliser les données
-        let tickets = [];
-        
-        if (Array.isArray(ticketsData)) {
-            tickets = ticketsData;
-        } else if (ticketsData && Array.isArray(ticketsData.data)) {
-            tickets = ticketsData.data;
-        } else if (ticketsData && Array.isArray(ticketsData.tickets)) {
-            tickets = ticketsData.tickets;
-        } else {
-            console.warn('Format de données inattendu, tentative de normalisation...', ticketsData);
-            tickets = [ticketsData];
-        }
-        
-        APP_STATE.ticketsHistory = tickets || [];
-        
-        console.log('Tickets normalisés pour historique:', APP_STATE.ticketsHistory);
-        console.log('Nombre de tickets:', APP_STATE.ticketsHistory.length);
-        
-        if (APP_STATE.ticketsHistory.length > 0) {
-            console.log('Exemple de ticket (premier):', APP_STATE.ticketsHistory[0]);
-            console.log('Propriétés du premier ticket:', Object.keys(APP_STATE.ticketsHistory[0]));
-        }
+        const tickets = await fetchTickets();
+        APP_STATE.ticketsHistory = tickets;
         
         renderHistory();
     } catch (error) {
@@ -137,7 +125,8 @@ function renderHistory() {
         const ticketDate = new Date(date);
         const now = new Date();
         const minutesDiff = (now - ticketDate) / (1000 * 60);
-        const canDelete = minutesDiff <= 5;
+        const canDelete = minutesDiff <= 2;      // Changé de 5 à 2 minutes
+        const canEdit = minutesDiff <= 3;        // 3 minutes pour modifier
         
         let formattedDate = 'Date inkonu';
         let formattedTime = '';
@@ -167,6 +156,11 @@ function renderHistory() {
                         <button class="btn-small view-details-btn" onclick="viewTicketDetails('${ticketId}')">
                             <i class="fas fa-eye"></i> Detay
                         </button>
+                        ${canEdit ? `
+                            <button class="btn-small edit-btn" onclick="editTicket('${ticketId}')">
+                                <i class="fas fa-edit"></i> Modifye
+                            </button>
+                        ` : ''}
                         <button class="delete-history-btn" onclick="deleteTicket('${ticketId}')" ${canDelete ? '' : 'disabled'}>
                             <i class="fas fa-trash"></i> Efase
                         </button>
@@ -195,21 +189,55 @@ async function deleteTicket(ticketId) {
     }
 }
 
+function editTicket(ticketId) {
+    const ticket = APP_STATE.ticketsHistory.find(t => t.id === ticketId || t.ticket_id === ticketId);
+    if (!ticket) {
+        alert("Tikè pa jwenn!");
+        return;
+    }
+
+    // Vérifier la limite de 3 minutes
+    const ticketDate = new Date(ticket.date || ticket.created_at);
+    const now = new Date();
+    const minutesDiff = (now - ticketDate) / (1000 * 60);
+    if (minutesDiff > 3) {
+        alert("Tikè sa a gen plis pase 3 minit, ou pa ka modifye li.");
+        return;
+    }
+
+    // Vider le panier actuel
+    APP_STATE.currentCart = [];
+
+    // Reconstruire les paris
+    let bets = [];
+    if (Array.isArray(ticket.bets)) {
+        bets = ticket.bets;
+    } else if (typeof ticket.bets === 'string') {
+        try {
+            bets = JSON.parse(ticket.bets);
+        } catch (e) {
+            bets = [];
+        }
+    }
+
+    bets.forEach(bet => {
+        const newBet = {
+            ...bet,
+            id: Date.now() + Math.random(), // nouvel ID pour éviter les conflits
+            drawId: bet.drawId || ticket.draw_id,
+            drawName: bet.drawName || ticket.draw_name
+        };
+        APP_STATE.currentCart.push(newBet);
+    });
+
+    CartManager.renderCart();
+    switchTab('home'); // Retour à l'écran de jeu
+    alert(`Tikè #${ticket.ticket_id || ticket.id} charge nan panye. Ou kapab modifye l.`);
+}
+
 async function loadReports() {
     try {
-        const ticketsData = await APIService.getTickets();
-        
-        let tickets = [];
-        if (Array.isArray(ticketsData)) {
-            tickets = ticketsData;
-        } else if (ticketsData && Array.isArray(ticketsData.data)) {
-            tickets = ticketsData.data;
-        } else if (ticketsData && Array.isArray(ticketsData.tickets)) {
-            tickets = ticketsData.tickets;
-        } else {
-            tickets = ticketsData ? [ticketsData] : [];
-        }
-        
+        const tickets = await fetchTickets();
         APP_STATE.ticketsHistory = tickets;
         
         const reports = await APIService.getReports();
@@ -739,3 +767,6 @@ async function loadLotteryConfig() {
         console.error('Erreur chargement configuration:', error);
     }
 }
+
+// Exposer la fonction editTicket globalement
+window.editTicket = editTicket;

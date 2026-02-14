@@ -413,6 +413,24 @@ input:focus { border-color: var(--secondary); background: rgba(0,0,0,0.4); }
 .card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
 .btn-small { background: rgba(255,255,255,0.1); border: none; color: white; padding: 5px 10px; border-radius: 8px; cursor: pointer; }
 
+/* Nouveau style pour le bouton Modifye */
+.edit-btn {
+    background: rgba(255, 165, 2, 0.1);
+    border: 1px solid var(--warning);
+    color: var(--warning);
+    padding: 5px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    transition: all 0.3s;
+}
+
+.edit-btn:hover {
+    background: var(--warning);
+    color: black;
+    transform: scale(1.05);
+}
+
 .badge { padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; }
 .badge-wait { background: #555; color: white; }
 .badge-win { background: var(--success); color: black; box-shadow: 0 0 10px var(--success); }
