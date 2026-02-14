@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LOTATO PRO · Superviseur</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js pour les graphiques -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -253,6 +255,33 @@
             margin: 20px 0;
             text-align: center;
         }
+        /* Styles pour les graphiques */
+        .charts-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin: 30px 0;
+        }
+        .chart-container {
+            background: rgba(255,255,255,0.03);
+            border-radius: 24px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .chart-container canvas {
+            max-height: 250px;
+            width: 100% !important;
+            height: auto !important;
+        }
+        .percentage-badge {
+            background: rgba(0,212,255,0.15);
+            border-radius: 30px;
+            padding: 4px 12px;
+            font-size: 0.85rem;
+            border: 1px solid #00d4ff;
+            color: #00d4ff;
+            margin-left: 10px;
+        }
     </style>
 </head>
 <body>
@@ -298,6 +327,21 @@
             </div>
         </div>
 
+        <!-- RAPPORTS GRAPHIQUES (POURCENTAGES ET IMAGES) -->
+        <div class="section-title"><i class="fas fa-chart-simple"></i> Rapports graphiques & pourcentages</div>
+        <div class="charts-row">
+            <div class="chart-container">
+                <h3 style="margin-bottom:15px; font-size:1.1rem;"><i class="fas fa-chart-pie" style="color:#ad00f1;"></i> Répartition des mises par agent</h3>
+                <canvas id="pieChartBets"></canvas>
+                <p style="text-align:center; margin-top:10px; color:#a0a0b8;" id="pie-percent"></p>
+            </div>
+            <div class="chart-container">
+                <h3 style="margin-bottom:15px; font-size:1.1rem;"><i class="fas fa-chart-bar" style="color:#00d4ff;"></i> Gains / Pertes par agent</h3>
+                <canvas id="barChartProfit"></canvas>
+                <p style="text-align:center; margin-top:10px; color:#a0a0b8;" id="bar-percent"></p>
+            </div>
+        </div>
+
         <!-- LISTE DES AGENTS -->
         <div class="section-title"><i class="fas fa-users"></i> Mes agents</div>
         <div id="agents-error" style="display:none;" class="error-message"></div>
@@ -337,7 +381,6 @@
 
     <script>
         // === CONFIGURATION API ===
-        // Utilisation de l'URL relative pour fonctionner sur le même serveur
         const API_URL = window.location.origin + '/api';
 
         // Vérification authentification
@@ -352,6 +395,7 @@
 
         let agents = [];
         let currentModalAgentId = null;
+        let charts = {}; // stocker les instances des graphiques
 
         // Chargement initial
         async function loadDashboard() {
@@ -393,6 +437,7 @@
                 if (!res.ok) throw new Error(`Erreur ${res.status}`);
                 agents = await res.json();
                 renderAgents(agents);
+                updateCharts(agents); // Mettre à jour les graphiques
                 document.getElementById('agents-error').style.display = 'none';
             } catch(e) {
                 console.error(e);
@@ -401,6 +446,77 @@
                 agents = [];
                 renderAgents([]);
             }
+        }
+
+        // Mise à jour des graphiques (pourcentages et images)
+        function updateCharts(agentsList) {
+            // Préparer les données
+            const labels = agentsList.map(a => a.name);
+            const betsData = agentsList.map(a => a.totalBets || 0);
+            const profitData = agentsList.map(a => (a.balance || 0)); // gains - pertes
+
+            // Camembert (répartition des mises)
+            const pieCtx = document.getElementById('pieChartBets').getContext('2d');
+            if (charts.pie) charts.pie.destroy();
+            charts.pie = new Chart(pieCtx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: betsData,
+                        backgroundColor: ['#00d4ff', '#ad00f1', '#f1c40f', '#e67e22', '#2ecc71', '#e74c3c'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { labels: { color: '#fff' } },
+                        tooltip: { callbacks: { label: (ctx) => `${ctx.raw.toLocaleString()} G` } }
+                    }
+                }
+            });
+
+            // Diagramme en barres (gains/pertes)
+            const barCtx = document.getElementById('barChartProfit').getContext('2d');
+            if (charts.bar) charts.bar.destroy();
+            charts.bar = new Chart(barCtx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Gain / Perte (G)',
+                        data: profitData,
+                        backgroundColor: profitData.map(v => v >= 0 ? '#00f190' : '#ff4d4d'),
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: (ctx) => `${ctx.raw.toLocaleString()} G` } }
+                    },
+                    scales: {
+                        y: { grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#a0a0b8' } },
+                        x: { ticks: { color: '#fff' } }
+                    }
+                }
+            });
+
+            // Ajouter des pourcentages textuels
+            const totalBets = betsData.reduce((a, b) => a + b, 0);
+            if (totalBets > 0) {
+                const percentages = betsData.map(v => ((v / totalBets) * 100).toFixed(1) + '%').join(' · ');
+                document.getElementById('pie-percent').innerHTML = `<i class="fas fa-percent"></i> Parts : ${percentages}`;
+            } else {
+                document.getElementById('pie-percent').innerText = 'Aucune mise enregistrée';
+            }
+
+            // Pourcentage global de gain
+            const totalWins = agentsList.reduce((acc, a) => acc + (a.totalWins || 0), 0);
+            const globalWinRate = totalBets > 0 ? ((totalWins / totalBets) * 100).toFixed(1) : '0';
+            document.getElementById('bar-percent').innerHTML = `<i class="fas fa-chart-line"></i> Taux de gain global : ${globalWinRate}%`;
         }
 
         function renderAgents(list) {
