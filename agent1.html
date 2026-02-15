@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>LOTATO PRO | Nova System</title>
+    <title>LOTATO PRO |  System</title>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -25,6 +25,10 @@
             <div class="user-profile">
                 <i class="fas fa-user-circle"></i>
                 <span id="agent-name">Agent-01</span>
+                <!-- Bouton Déconnexion ajouté ici -->
+                <button onclick="logout()" class="logout-btn" title="Dekonekte">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
             </div>
         </header>
 
@@ -66,7 +70,7 @@
                 
                 <div id="draw-blocked-warning" class="warning-message">
                     <i class="fas fa-exclamation-triangle"></i>
-                    <span>Tiraj sa a ap femen nan 3 minit. Ou pa ka ajoute plis pari.</span>
+                    <span>Tiraj sa a ap femen nan 3 minit. Ou pa ka ajoute pari .</span>
                 </div>
 
                 <div id="multi-draw-indicator" class="multi-draw-indicator" style="display: none;">
@@ -262,15 +266,15 @@
                     <div class="winners-summary">
                         <h3 style="margin-bottom: 15px;">Rekapitilatif Jodi a</h3>
                         <div class="summary-row">
-                            <span>Total Tikè Ganyen:</span>
+                            <span>Total Tikè Genyen:</span>
                             <span class="val" id="total-winners-today">0</span>
                         </div>
                         <div class="summary-row">
-                            <span>Total Ganyen:</span>
+                            <span>Total Genyen:</span>
                             <span class="val" id="total-winning-amount">0 Gdes</span>
                         </div>
                         <div class="summary-row total">
-                            <span>Mwayèn Ganyen:</span>
+                            <span>Mwayèn Genyen:</span>
                             <span class="val" id="average-winning">0 Gdes</span>
                         </div>
                     </div>
@@ -303,7 +307,7 @@
                 <i class="fas fa-chart-line"></i><span>Rapò</span>
             </a>
             <a href="#" class="nav-item" onclick="switchTab('winners')">
-                <i class="fas fa-trophy"></i><span>Ganyen</span>
+                <i class="fas fa-trophy"></i><span>Genyen</span>
             </a>
         </nav>
     </div>

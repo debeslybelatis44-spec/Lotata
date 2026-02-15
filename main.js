@@ -15,9 +15,6 @@ async function initApp() {
     APP_STATE.agentName = agentName;
 
     await loadLotteryConfig();
-    await loadDrawsFromServer();
-    await loadBlockedNumbers();
-    await loadNumberLimits(); // NOUVEAU : charger les limites
     await APIService.getTickets();
     await APIService.getWinningTickets();
     await APIService.getWinningResults();
@@ -34,30 +31,6 @@ async function initApp() {
     console.log("LOTATO PRO Ready - Authentification OK");
 }
 
-// NOUVEAU : charger les limites de mise pour chaque tirage
-async function loadNumberLimits() {
-    try {
-        const draws = APP_STATE.draws || CONFIG.DRAWS;
-        APP_STATE.numberLimits = {}; // dictionnaire : drawId -> Map(numéro -> limite)
-        for (const draw of draws) {
-            // Note : cette route doit être ajoutée dans server.js (ownerRouter) pour fonctionner
-            const res = await fetch(`${API_CONFIG.BASE_URL}/owner/number-limit?drawId=${draw.id}`, {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
-            });
-            if (res.ok) {
-                const data = await res.json();
-                APP_STATE.numberLimits[draw.id] = new Map(data.limits.map(l => [l.number, l.limit_amount]));
-            } else {
-                APP_STATE.numberLimits[draw.id] = new Map();
-            }
-        }
-        console.log('✅ Limites chargées:', APP_STATE.numberLimits);
-    } catch (error) {
-        console.error('❌ Erreur chargement limites:', error);
-        APP_STATE.numberLimits = {};
-    }
-}
-
 document.addEventListener('DOMContentLoaded', initApp);
 setInterval(updateClock, 1000);
 setInterval(checkSelectedDrawStatus, 30000);
@@ -68,3 +41,36 @@ if ('serviceWorker' in navigator) {
         .then(reg => console.log('PWA: Service Worker actif'))
         .catch(err => console.error('PWA: Erreur', err));
 }
+
+// ========== FONCTION DE DÉCONNEXION ==========
+async function logout() {
+    // Demander confirmation (optionnel)
+    if (!confirm('Èske ou sèten ou vle dekonekte?')) return;
+
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+        try {
+            // Informer le serveur de la déconnexion (optionnel)
+            await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.LOGOUT}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+        } catch (error) {
+            console.error('Erreur lors de la déconnexion côté serveur :', error);
+        }
+    }
+
+    // Nettoyer le stockage local
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('agent_id');
+    localStorage.removeItem('agent_name');
+
+    // Rediriger vers la page de connexion
+    window.location.href = 'index.html';
+}
+
+// Rendre la fonction accessible depuis le HTML
+window.logout = logout;
