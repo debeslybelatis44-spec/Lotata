@@ -13,6 +13,18 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 10000;
 
+// ==================== Règles de gain (copie de CONFIG.GAMING_RULES) ====================
+const GAMING_RULES = {
+  BORLETTE: { lot1: 60, lot2: 20, lot3: 10 },
+  LOTTO3: 500,
+  LOTTO4: 1000,
+  LOTTO5: 5000,
+  MARIAGE: 1000,
+  AUTO_MARIAGE: 1000,
+  AUTO_LOTTO4: 1000,
+  AUTO_LOTTO5: 5000
+};
+
 // ==================== Middlewares ====================
 app.use(helmet({
   contentSecurityPolicy: false,
@@ -49,7 +61,6 @@ pool.on('error', (err) => console.error('❌ Erreur PostgreSQL:', err));
 async function columnExists(table, column) { /* ... identique à avant ... */ }
 async function addColumnIfNotExists(table, column, definition) { /* ... */ }
 
-// Initialisation des tables (on suppose que le script SQL a été exécuté, mais on garde une création sécurisée)
 async function initializeDatabase() {
   try {
     console.log('🔄 Vérification de la base de données...');
@@ -211,7 +222,6 @@ app.get('/api/auth/verify', authenticateToken, (req, res) => {
 app.use('/api', authenticateToken);
 
 // --- Tirages (état actif) ---
-// NOUVEAU : Récupérer tous les tirages avec leur statut actif
 app.get('/api/draws', async (req, res) => {
   try {
     const result = await pool.query('SELECT id, name, time, active FROM draws ORDER BY name');
@@ -223,7 +233,6 @@ app.get('/api/draws', async (req, res) => {
 });
 
 // --- Numéros bloqués globaux ---
-// NOUVEAU : Récupérer les numéros globalement bloqués
 app.get('/api/blocked-numbers/global', async (req, res) => {
   try {
     const result = await pool.query('SELECT number FROM blocked_numbers');
@@ -235,7 +244,6 @@ app.get('/api/blocked-numbers/global', async (req, res) => {
 });
 
 // --- Numéros bloqués par tirage ---
-// NOUVEAU : Récupérer les numéros bloqués pour un tirage donné
 app.get('/api/blocked-numbers/draw/:drawId', async (req, res) => {
   try {
     const { drawId } = req.params;
@@ -260,23 +268,22 @@ app.post('/api/tickets/save', async (req, res) => {
       return res.status(403).json({ error: 'Vous ne pouvez enregistrer que vos propres tickets' });
     }
 
-    // MODIFICATION : Vérifier que le tirage est actif
+    // Vérifier que le tirage est actif
     const drawCheck = await pool.query('SELECT active FROM draws WHERE id = $1', [drawId]);
     if (drawCheck.rows.length === 0 || !drawCheck.rows[0].active) {
       return res.status(400).json({ error: 'Ce tirage est bloqué par l\'administrateur.' });
     }
 
-    // MODIFICATION : Récupérer les numéros bloqués
+    // Récupérer les numéros bloqués
     const globalBlocked = await pool.query('SELECT number FROM blocked_numbers');
     const globalSet = new Set(globalBlocked.rows.map(r => r.number));
     const drawBlocked = await pool.query('SELECT number FROM draw_blocked_numbers WHERE draw_id = $1', [drawId]);
     const drawSet = new Set(drawBlocked.rows.map(r => r.number));
 
-    // Vérifier chaque pari
+    // Vérifier chaque pari (numéros bloqués)
     for (const bet of bets) {
       let cleanNumber = bet.cleanNumber || bet.number;
       if (cleanNumber) {
-        // Nettoyer le numéro (enlever tirets, esperluettes)
         cleanNumber = cleanNumber.toString().replace(/[-&]/g, '');
         if (globalSet.has(cleanNumber) || drawSet.has(cleanNumber)) {
           return res.status(400).json({ error: `Le numéro ${cleanNumber} est bloqué et ne peut pas être joué.` });
@@ -284,6 +291,54 @@ app.post('/api/tickets/save', async (req, res) => {
       }
     }
 
+    // --- NOUVEAU : Vérification des limites ---
+    const today = new Date().toISOString().split('T')[0];
+
+    // Récupérer les limites définies pour ce tirage
+    const limits = await pool.query(
+      'SELECT number, limit_amount FROM draw_number_limits WHERE draw_id = $1',
+      [drawId]
+    );
+    const limitMap = new Map(limits.rows.map(l => [l.number, l.limit_amount]));
+
+    // Récupérer tous les tickets du jour pour ce tirage (sauf celui en cours)
+    const existingTickets = await pool.query(
+      `SELECT bets FROM tickets WHERE draw_id = $1 AND DATE(date) = $2`,
+      [drawId, today]
+    );
+
+    // Agréger les montants déjà misés par numéro
+    const dailyTotals = new Map();
+    existingTickets.rows.forEach(row => {
+      const ticketBets = typeof row.bets === 'string' ? JSON.parse(row.bets) : row.bets;
+      ticketBets.forEach(b => {
+        const num = b.cleanNumber || (b.number ? b.number.replace(/[-&]/g, '') : '');
+        const amt = parseFloat(b.amount) || 0;
+        if (num) dailyTotals.set(num, (dailyTotals.get(num) || 0) + amt);
+      });
+    });
+
+    // Vérifier pour chaque pari du nouveau ticket
+    for (const bet of bets) {
+      let cleanNumber = bet.cleanNumber || bet.number;
+      cleanNumber = cleanNumber ? cleanNumber.toString().replace(/[-&]/g, '') : '';
+      if (!cleanNumber) continue;
+
+      const limit = limitMap.get(cleanNumber);
+      if (limit) {
+        const currentTotal = dailyTotals.get(cleanNumber) || 0;
+        const betAmount = parseFloat(bet.amount) || 0;
+        if (currentTotal + betAmount > limit) {
+          return res.status(400).json({
+            error: `Limite dépassée pour le numéro ${cleanNumber} : maximum ${limit} G, déjà ${currentTotal} G`
+          });
+        }
+      }
+      // Ajouter ce pari au total quotidien pour les prochaines vérifications (optionnel)
+      dailyTotals.set(cleanNumber, (dailyTotals.get(cleanNumber) || 0) + (parseFloat(bet.amount) || 0));
+    }
+
+    // Générer un ID de ticket
     const ticketId = `T${Date.now()}${Math.floor(Math.random() * 1000)}`;
     const betsJson = JSON.stringify(bets);
     const totalAmount = parseFloat(total) || 0;
@@ -792,7 +847,51 @@ ownerRouter.get('/draws', async (req, res) => {
   }
 });
 
-// Publier les résultats d'un tirage
+// ==================== NOUVELLE FONCTION : Calcul des gagnants ====================
+async function calculateWinnersForDraw(drawId, results) {
+  // results = [lot1, lot2, lot3] (ex: ['123','45','67'])
+  const tickets = await pool.query(
+    'SELECT * FROM tickets WHERE draw_id = $1 AND (checked = false OR win_amount = 0)',
+    [drawId]
+  );
+
+  for (const ticket of tickets.rows) {
+    const bets = typeof ticket.bets === 'string' ? JSON.parse(ticket.bets) : ticket.bets;
+    let totalWin = 0;
+
+    for (const bet of bets) {
+      const cleanNum = bet.cleanNumber || (bet.number ? bet.number.replace(/[-&]/g, '') : '');
+      const amount = parseFloat(bet.amount) || 0;
+      const game = bet.game || '';
+
+      // Règles simplifiées (à adapter selon vos règles exactes)
+      if (game === 'borlette') {
+        if (cleanNum === results[1] || cleanNum === results[2]) {
+          totalWin += amount * GAMING_RULES.BORLETTE.lot2; // 20 pour lot2
+        }
+      } else if (game === 'lotto3') {
+        if (cleanNum === results[0]) {
+          totalWin += amount * GAMING_RULES.LOTTO3;
+        }
+      } else if (game === 'lotto4') {
+        // À implémenter selon les options
+      } else if (game === 'lotto5') {
+        // ...
+      } else if (game === 'mariage') {
+        // mariage : deux borlettes, gagne si les deux sortent dans lot2 et lot3 ?
+      }
+      // Ajouter les jeux spéciaux (auto_marriage, auto_lotto4, etc.)
+    }
+
+    // Mettre à jour le ticket
+    await pool.query(
+      'UPDATE tickets SET win_amount = $1, checked = true WHERE id = $2',
+      [totalWin, ticket.id]
+    );
+  }
+}
+
+// --- Publier les résultats d'un tirage (modifié) ---
 ownerRouter.post('/publish-results', async (req, res) => {
   try {
     const { drawId, numbers } = req.body; // numbers = [lot1, lot2, lot3]
@@ -812,7 +911,9 @@ ownerRouter.post('/publish-results', async (req, res) => {
     // Mettre à jour last_draw dans draws
     await pool.query('UPDATE draws SET last_draw = NOW() WHERE id = $1', [drawId]);
 
-    // Ici on pourrait déclencher le calcul des gagnants en comparant avec les tickets
+    // === NOUVEAU : Calculer les gagnants pour ce tirage ===
+    await calculateWinnersForDraw(drawId, numbers);
+
     res.json({ success: true });
   } catch (error) {
     console.error('❌ Erreur publication résultats:', error);
@@ -966,12 +1067,12 @@ ownerRouter.get('/reports', async (req, res) => {
     // Requête de résumé
     const summaryQuery = `
       SELECT 
-        COUNT(DISTINCT t.id) as total_tickets,
-        COALESCE(SUM(t.total_amount), 0) as total_bets,
-        COALESCE(SUM(t.win_amount), 0) as total_wins,
-        COALESCE(SUM(t.win_amount) - SUM(t.total_amount), 0) as net_result,
-        COUNT(DISTINCT CASE WHEN t.win_amount > t.total_amount THEN t.agent_id END) as gain_count,
-        COUNT(DISTINCT CASE WHEN t.win_amount < t.total_amount THEN t.agent_id END) as loss_count
+        COUNT(DISTINCT t.id) as totalTickets,
+        COALESCE(SUM(t.total_amount), 0) as totalBets,
+        COALESCE(SUM(t.win_amount), 0) as totalWins,
+        COALESCE(SUM(t.win_amount) - SUM(t.total_amount), 0) as netResult,
+        COUNT(DISTINCT CASE WHEN t.win_amount > t.total_amount THEN t.agent_id END) as gainCount,
+        COUNT(DISTINCT CASE WHEN t.win_amount < t.total_amount THEN t.agent_id END) as lossCount
       FROM tickets t
       LEFT JOIN agents a ON t.agent_id = a.id
       ${whereClause}
