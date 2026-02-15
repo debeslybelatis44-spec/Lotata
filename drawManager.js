@@ -1,3 +1,4 @@
+// MODIFICATION : utiliser APP_STATE.draws et vérifier active
 function isDrawBlocked(drawTime) {
     const now = new Date();
     const [hours, minutes] = drawTime.split(':').map(Number);
@@ -15,10 +16,12 @@ function isDrawBlocked(drawTime) {
 }
 
 function checkSelectedDrawStatus() {
-    const selectedDraw = CONFIG.DRAWS.find(d => d.id === APP_STATE.selectedDraw);
+    const draws = APP_STATE.draws || CONFIG.DRAWS;
+    const selectedDraw = draws.find(d => d.id === APP_STATE.selectedDraw);
     if (!selectedDraw) return false;
     
-    const blocked = isDrawBlocked(selectedDraw.time);
+    // Blocage si tirage désactivé par admin OU dans la fenêtre 3 min
+    const blocked = !selectedDraw.active || isDrawBlocked(selectedDraw.time);
     APP_STATE.isDrawBlocked = blocked;
     
     const warningEl = document.getElementById('draw-blocked-warning');
@@ -43,9 +46,16 @@ function checkSelectedDrawStatus() {
 
 function renderDraws() {
     const container = document.getElementById('draws-container');
-    container.innerHTML = CONFIG.DRAWS.map(draw => {
-        const blocked = isDrawBlocked(draw.time);
+    const draws = APP_STATE.draws || CONFIG.DRAWS;
+    container.innerHTML = draws.map(draw => {
+        const timeBlocked = isDrawBlocked(draw.time);
+        const adminBlocked = draw.active === false;
+        const blocked = timeBlocked || adminBlocked;
         const isActive = APP_STATE.selectedDraw === draw.id && !blocked;
+        
+        let blockReason = '';
+        if (adminBlocked) blockReason = 'BLOKÉ (admin)';
+        else if (timeBlocked) blockReason = 'BLOKÉ (3 min)';
         
         return `
             <div class="draw-card ${isActive ? 'active' : ''} ${blocked ? 'blocked' : ''}" 
@@ -53,7 +63,7 @@ function renderDraws() {
                  style="--draw-color: ${draw.color}">
                 <span class="draw-name">${draw.name}</span>
                 <span class="draw-time"><i class="far fa-clock"></i> ${draw.time}</span>
-                ${blocked ? '<span class="blocked-badge">BLOKÉ</span>' : ''}
+                ${blocked ? `<span class="blocked-badge">${blockReason}</span>` : ''}
             </div>
         `;
     }).join('');
@@ -62,7 +72,12 @@ function renderDraws() {
 function selectDraw(id) {
     if (APP_STATE.multiDrawMode) return;
     
-    const draw = CONFIG.DRAWS.find(d => d.id === id);
+    const draws = APP_STATE.draws || CONFIG.DRAWS;
+    const draw = draws.find(d => d.id === id);
+    if (!draw.active) {
+        alert("Tiraj sa a bloke pa administratè a. Ou pa ka jwe li.");
+        return;
+    }
     if (isDrawBlocked(draw.time)) {
         alert("Tiraj sa a ap rantre nan 3 minit. Ou pa ka ajoute paray.");
         return;
@@ -130,8 +145,11 @@ function toggleMultiDrawMode() {
 
 function renderMultiDrawSelector() {
     const container = document.getElementById('multi-draw-container');
-    container.innerHTML = CONFIG.DRAWS.map(draw => {
-        const blocked = isDrawBlocked(draw.time);
+    const draws = APP_STATE.draws || CONFIG.DRAWS;
+    container.innerHTML = draws.map(draw => {
+        const timeBlocked = isDrawBlocked(draw.time);
+        const adminBlocked = draw.active === false;
+        const blocked = timeBlocked || adminBlocked;
         const isSelected = APP_STATE.selectedDraws.includes(draw.id);
         return `
             <input type="checkbox" class="multi-draw-checkbox" id="multi-${draw.id}" 
@@ -167,8 +185,18 @@ function continueToBettingWithMultiDraw() {
         return;
     }
     
+    // Vérifier qu'aucun tirage sélectionné n'est bloqué
+    const draws = APP_STATE.draws || CONFIG.DRAWS;
+    for (const drawId of APP_STATE.selectedDraws) {
+        const draw = draws.find(d => d.id === drawId);
+        if (!draw.active || isDrawBlocked(draw.time)) {
+            alert(`Tiraj ${draw.name} bloke, retire li anvan ou kontinye.`);
+            return;
+        }
+    }
+    
     APP_STATE.selectedDraw = APP_STATE.selectedDraws[0];
-    const draw = CONFIG.DRAWS.find(d => d.id === APP_STATE.selectedDraw);
+    const draw = draws.find(d => d.id === APP_STATE.selectedDraw);
     document.getElementById('current-draw-title').textContent = draw.name;
     
     const indicator = document.getElementById('multi-draw-indicator');

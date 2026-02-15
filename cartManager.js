@@ -1,3 +1,12 @@
+// cartManager.js
+
+// NOUVEAU : fonction utilitaire pour vérifier si un numéro est bloqué
+function isNumberBlocked(number, drawId) {
+    if (APP_STATE.globalBlockedNumbers.includes(number)) return true;
+    const drawBlocked = APP_STATE.drawBlockedNumbers[drawId] || [];
+    return drawBlocked.includes(number);
+}
+
 const CartManager = {
     addBet() {
         if (APP_STATE.isDrawBlocked) {
@@ -15,6 +24,7 @@ const CartManager = {
             return;
         }
 
+        // Pour les jeux qui génèrent automatiquement plusieurs numéros, on vérifie chaque numéro
         if (APP_STATE.selectedGame === 'bo') {
             const boBets = SpecialGames.generateBOBets(amt);
             
@@ -24,6 +34,16 @@ const CartManager = {
             }
 
             const draws = APP_STATE.multiDrawMode ? APP_STATE.selectedDraws : [APP_STATE.selectedDraw];
+            
+            // Vérifier que tous les numéros générés ne sont pas bloqués
+            for (const drawId of draws) {
+                for (const bet of boBets) {
+                    if (isNumberBlocked(bet.cleanNumber, drawId)) {
+                        alert(`Nimewo ${bet.cleanNumber} bloke, pa ka ajoute.`);
+                        return;
+                    }
+                }
+            }
             
             draws.forEach(drawId => {
                 boBets.forEach(bet => {
@@ -54,6 +74,16 @@ const CartManager = {
 
             const draws = APP_STATE.multiDrawMode ? APP_STATE.selectedDraws : [APP_STATE.selectedDraw];
             
+            // Vérifier chaque numéro
+            for (const drawId of draws) {
+                for (const bet of nBets) {
+                    if (isNumberBlocked(bet.cleanNumber, drawId)) {
+                        alert(`Nimewo ${bet.cleanNumber} bloke, pa ka ajoute.`);
+                        return;
+                    }
+                }
+            }
+            
             draws.forEach(drawId => {
                 nBets.forEach(bet => {
                     const newBet = {
@@ -81,6 +111,16 @@ const CartManager = {
             }
 
             const draws = APP_STATE.multiDrawMode ? APP_STATE.selectedDraws : [APP_STATE.selectedDraw];
+            
+            // Vérifier
+            for (const drawId of draws) {
+                for (const bet of grapBets) {
+                    if (isNumberBlocked(bet.cleanNumber, drawId)) {
+                        alert(`Nimewo ${bet.cleanNumber} bloke, pa ka ajoute.`);
+                        return;
+                    }
+                }
+            }
             
             draws.forEach(drawId => {
                 grapBets.forEach(bet => {
@@ -121,6 +161,16 @@ const CartManager = {
             }
 
             const draws = APP_STATE.multiDrawMode ? APP_STATE.selectedDraws : [APP_STATE.selectedDraw];
+            
+            // Vérifier chaque numéro généré
+            for (const drawId of draws) {
+                for (const bet of autoBets) {
+                    if (isNumberBlocked(bet.cleanNumber, drawId)) {
+                        alert(`Nimewo ${bet.cleanNumber} bloke, pa ka ajoute.`);
+                        return;
+                    }
+                }
+            }
             
             draws.forEach(drawId => {
                 autoBets.forEach(bet => {
@@ -163,6 +213,15 @@ const CartManager = {
 
             const draws = APP_STATE.multiDrawMode ? APP_STATE.selectedDraws : [APP_STATE.selectedDraw];
             
+            // Vérifier le numéro nettoyé (premier bet suffit car même numéro)
+            const cleanNum = GameEngine.getCleanNumber(num);
+            for (const drawId of draws) {
+                if (isNumberBlocked(cleanNum, drawId)) {
+                    alert(`Nimewo ${cleanNum} bloke, pa ka ajoute.`);
+                    return;
+                }
+            }
+            
             draws.forEach(drawId => {
                 bets.forEach(bet => {
                     const newBet = {
@@ -201,6 +260,14 @@ const CartManager = {
         }
 
         const draws = APP_STATE.multiDrawMode ? APP_STATE.selectedDraws : [APP_STATE.selectedDraw];
+        
+        // Vérifier que le numéro n'est pas bloqué pour chaque tirage
+        for (const drawId of draws) {
+            if (isNumberBlocked(num, drawId)) {
+                alert(`Nimewo ${num} bloke pou tiraj sa a. Ou pa ka jwe li.`);
+                return;
+            }
+        }
         
         draws.forEach(drawId => {
             const bet = {

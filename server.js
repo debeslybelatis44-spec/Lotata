@@ -210,6 +210,43 @@ app.get('/api/auth/verify', authenticateToken, (req, res) => {
 // ==================== Routes protégées (tous utilisateurs) ====================
 app.use('/api', authenticateToken);
 
+// --- Tirages (état actif) ---
+// NOUVEAU : Récupérer tous les tirages avec leur statut actif
+app.get('/api/draws', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, name, time, active FROM draws ORDER BY name');
+    res.json({ draws: result.rows });
+  } catch (error) {
+    console.error('❌ Erreur récupération tirages:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// --- Numéros bloqués globaux ---
+// NOUVEAU : Récupérer les numéros globalement bloqués
+app.get('/api/blocked-numbers/global', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT number FROM blocked_numbers');
+    res.json({ blockedNumbers: result.rows.map(r => r.number) });
+  } catch (error) {
+    console.error('❌ Erreur numéros bloqués globaux:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// --- Numéros bloqués par tirage ---
+// NOUVEAU : Récupérer les numéros bloqués pour un tirage donné
+app.get('/api/blocked-numbers/draw/:drawId', async (req, res) => {
+  try {
+    const { drawId } = req.params;
+    const result = await pool.query('SELECT number FROM draw_blocked_numbers WHERE draw_id = $1', [drawId]);
+    res.json({ blockedNumbers: result.rows.map(r => r.number) });
+  } catch (error) {
+    console.error('❌ Erreur numéros bloqués par tirage:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 // --- Tickets ---
 app.post('/api/tickets/save', async (req, res) => {
   try {
@@ -221,6 +258,30 @@ app.post('/api/tickets/save', async (req, res) => {
     // Vérifier que l'agent correspond à l'utilisateur connecté (sauf si propriétaire)
     if (req.user.role === 'agent' && req.user.id != agentId) {
       return res.status(403).json({ error: 'Vous ne pouvez enregistrer que vos propres tickets' });
+    }
+
+    // MODIFICATION : Vérifier que le tirage est actif
+    const drawCheck = await pool.query('SELECT active FROM draws WHERE id = $1', [drawId]);
+    if (drawCheck.rows.length === 0 || !drawCheck.rows[0].active) {
+      return res.status(400).json({ error: 'Ce tirage est bloqué par l\'administrateur.' });
+    }
+
+    // MODIFICATION : Récupérer les numéros bloqués
+    const globalBlocked = await pool.query('SELECT number FROM blocked_numbers');
+    const globalSet = new Set(globalBlocked.rows.map(r => r.number));
+    const drawBlocked = await pool.query('SELECT number FROM draw_blocked_numbers WHERE draw_id = $1', [drawId]);
+    const drawSet = new Set(drawBlocked.rows.map(r => r.number));
+
+    // Vérifier chaque pari
+    for (const bet of bets) {
+      let cleanNumber = bet.cleanNumber || bet.number;
+      if (cleanNumber) {
+        // Nettoyer le numéro (enlever tirets, esperluettes)
+        cleanNumber = cleanNumber.toString().replace(/[-&]/g, '');
+        if (globalSet.has(cleanNumber) || drawSet.has(cleanNumber)) {
+          return res.status(400).json({ error: `Le numéro ${cleanNumber} est bloqué et ne peut pas être joué.` });
+        }
+      }
     }
 
     const ticketId = `T${Date.now()}${Math.floor(Math.random() * 1000)}`;
@@ -379,7 +440,7 @@ app.post('/api/lottery-config', authenticateToken, authorize('owner'), async (re
   }
 });
 
-// --- Numéros bloqués (globaux) ---
+// --- Numéros bloqués (globaux) - déjà existant mais on le garde pour compatibilité
 app.get('/api/blocked-numbers', async (req, res) => {
   try {
     const result = await pool.query('SELECT number FROM blocked_numbers');
