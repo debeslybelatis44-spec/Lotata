@@ -15,7 +15,7 @@ async function initApp() {
     APP_STATE.agentName = agentName;
 
     await loadLotteryConfig();
-    // NOUVEAU : charger les tirages et les numéros bloqués
+    // Charger les tirages et les numéros bloqués depuis le serveur
     await loadDrawsFromServer();
     await loadBlockedNumbers();
     await APIService.getTickets();
@@ -34,7 +34,7 @@ async function initApp() {
     console.log("LOTATO PRO Ready - Authentification OK");
 }
 
-// NOUVEAU : charger les tirages depuis le serveur
+// Charger les tirages depuis le serveur
 async function loadDrawsFromServer() {
     try {
         const response = await fetch(`${API_CONFIG.BASE_URL}/draws`, {
@@ -50,7 +50,7 @@ async function loadDrawsFromServer() {
     }
 }
 
-// NOUVEAU : charger les numéros bloqués (global et par tirage)
+// Charger les numéros bloqués (global et par tirage)
 async function loadBlockedNumbers() {
     try {
         // Numéros globaux
@@ -88,6 +88,39 @@ async function loadBlockedNumbers() {
         APP_STATE.drawBlockedNumbers = {};
     }
 }
+
+// ========== FONCTION DE DÉCONNEXION ==========
+async function logout() {
+    // Demander confirmation (optionnel)
+    if (!confirm('Èske ou sèten ou vle dekonekte?')) return;
+
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+        try {
+            // Informer le serveur de la déconnexion (optionnel)
+            await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.LOGOUT}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+        } catch (error) {
+            console.error('Erreur lors de la déconnexion côté serveur :', error);
+        }
+    }
+
+    // Nettoyer le stockage local
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('agent_id');
+    localStorage.removeItem('agent_name');
+
+    // Rediriger vers la page de connexion
+    window.location.href = 'index.html';
+}
+
+// Rendre la fonction accessible depuis le HTML
+window.logout = logout;
 
 document.addEventListener('DOMContentLoaded', initApp);
 setInterval(updateClock, 1000);
