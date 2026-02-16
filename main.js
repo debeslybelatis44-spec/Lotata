@@ -30,6 +30,9 @@ async function initApp() {
     document.getElementById('add-bet-btn').addEventListener('click', () => CartManager.addBet());
     updateGameSelector();
     updateSyncStatus();
+
+    // ✅ Afficher le nom de l'agent connecté
+    document.getElementById('agent-name').textContent = agentName;
     
     console.log("LOTATO PRO Ready - Authentification OK");
 }
