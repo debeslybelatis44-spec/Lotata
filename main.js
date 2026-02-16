@@ -53,54 +53,47 @@ async function loadDrawsFromServer() {
     }
 }
 
-// Charger les numéros bloqués (global et par tirage)
+// Charger les numéros bloqués (global et par tirage) et les limites
 async function loadBlockedNumbers() {
     try {
         // Numéros globaux
         const globalRes = await fetch(`${API_CONFIG.BASE_URL}/blocked-numbers/global`, {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
         });
-        if (globalRes.ok) {
-            const globalData = await globalRes.json();
-            APP_STATE.globalBlockedNumbers = globalData.blockedNumbers || [];
-        } else {
-            APP_STATE.globalBlockedNumbers = [];
-        }
+        APP_STATE.globalBlockedNumbers = globalRes.ok ? (await globalRes.json()).blockedNumbers : [];
 
-        // Pour chaque tirage, charger ses numéros bloqués
         const draws = APP_STATE.draws || CONFIG.DRAWS;
         APP_STATE.drawBlockedNumbers = {};
+        APP_STATE.drawNumberLimits = {};
+
         for (const draw of draws) {
-            try {
-                const drawRes = await fetch(`${API_CONFIG.BASE_URL}/blocked-numbers/draw/${draw.id}`, {
-                    headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
-                });
-                if (drawRes.ok) {
-                    const drawData = await drawRes.json();
-                    APP_STATE.drawBlockedNumbers[draw.id] = drawData.blockedNumbers || [];
-                } else {
-                    APP_STATE.drawBlockedNumbers[draw.id] = [];
-                }
-            } catch (e) {
-                APP_STATE.drawBlockedNumbers[draw.id] = [];
-            }
+            // Blocages par tirage
+            const drawRes = await fetch(`${API_CONFIG.BASE_URL}/blocked-numbers/draw/${draw.id}`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
+            });
+            APP_STATE.drawBlockedNumbers[draw.id] = drawRes.ok ? (await drawRes.json()).blockedNumbers : [];
+
+            // Limites par tirage
+            const limitRes = await fetch(`${API_CONFIG.BASE_URL}/number-limits/draw/${draw.id}`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
+            });
+            APP_STATE.drawNumberLimits[draw.id] = limitRes.ok ? await limitRes.json() : {};
         }
     } catch (error) {
-        console.error('❌ Erreur chargement numéros bloqués:', error);
+        console.error('❌ Erreur chargement restrictions:', error);
         APP_STATE.globalBlockedNumbers = [];
         APP_STATE.drawBlockedNumbers = {};
+        APP_STATE.drawNumberLimits = {};
     }
 }
 
 // ========== FONCTION DE DÉCONNEXION ==========
 async function logout() {
-    // Demander confirmation (optionnel)
     if (!confirm('Èske ou sèten ou vle dekonekte?')) return;
 
     const token = localStorage.getItem('auth_token');
     if (token) {
         try {
-            // Informer le serveur de la déconnexion (optionnel)
             await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.LOGOUT}`, {
                 method: 'POST',
                 headers: {
@@ -113,16 +106,13 @@ async function logout() {
         }
     }
 
-    // Nettoyer le stockage local
     localStorage.removeItem('auth_token');
     localStorage.removeItem('agent_id');
     localStorage.removeItem('agent_name');
 
-    // Rediriger vers la page de connexion
     window.location.href = 'index.html';
 }
 
-// Rendre la fonction accessible depuis le HTML
 window.logout = logout;
 
 document.addEventListener('DOMContentLoaded', initApp);

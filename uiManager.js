@@ -1,3 +1,5 @@
+// uiManager.js
+
 // Fonction utilitaire pour récupérer les tickets depuis l'API
 async function fetchTickets() {
     const token = localStorage.getItem('auth_token');
@@ -373,6 +375,7 @@ async function loadDrawReport(drawId = null) {
     }
 }
 
+// NOUVELLE FONCTION D'IMPRESSION DE RAPPORT AMÉLIORÉE
 function printReport() {
     const printWindow = window.open('', '_blank', 'width=800,height=600');
     
@@ -380,78 +383,58 @@ function printReport() {
     const selectedDraw = drawSelector.options[drawSelector.selectedIndex].text;
     const selectedDrawId = drawSelector.value;
     
-    let reportData = '';
-    let totalPending = 0;
-    let totalVerified = 0;
-    
     let ticketsToAnalyze = selectedDrawId === 'all' 
         ? APP_STATE.ticketsHistory 
         : APP_STATE.ticketsHistory.filter(t => 
             t.draw_id === selectedDrawId || t.drawId === selectedDrawId
           );
     
-    totalPending = ticketsToAnalyze.filter(t => !(t.checked || t.verified)).length;
-    totalVerified = ticketsToAnalyze.filter(t => t.checked || t.verified).length;
+    const totalTickets = ticketsToAnalyze.length;
+    const totalBets = ticketsToAnalyze.reduce((sum, t) => sum + (parseFloat(t.total_amount || t.totalAmount || 0) || 0), 0);
+    const totalWins = ticketsToAnalyze.reduce((sum, t) => sum + (parseFloat(t.win_amount || t.winAmount || 0) || 0), 0);
+    const netProfit = totalWins - totalBets;
     
-    let analyzedTotalBets = 0;
-    let analyzedTotalWins = 0;
-    let analyzedTotalLoss = 0;
+    let reportHtml = `
+        <h2>Rapò ${selectedDraw === 'all' ? 'Jeneral' : selectedDraw}</h2>
+        <p><strong>Dat:</strong> ${new Date().toLocaleDateString('fr-FR')}</p>
+        <p><strong>Ajan:</strong> ${APP_STATE.agentName}</p>
+        <hr>
+        <h3>Rezime</h3>
+        <table style="width:100%; border-collapse:collapse;">
+            <tr><th>Total Tikè</th><td>${totalTickets}</td></tr>
+            <tr><th>Total Paris</th><td>${totalBets.toLocaleString('fr-FR')} Gdes</td></tr>
+            <tr><th>Total Ganyen</th><td>${totalWins.toLocaleString('fr-FR')} Gdes</td></tr>
+            <tr><th>Balans</th><td style="color:${netProfit >=0 ? 'green' : 'red'}">${netProfit.toLocaleString('fr-FR')} Gdes</td></tr>
+        </table>
+    `;
     
-    ticketsToAnalyze.forEach(ticket => {
-        analyzedTotalBets += parseFloat(ticket.total_amount || ticket.totalAmount || ticket.amount || 0);
-        
-        if (ticket.checked || ticket.verified) {
-            const winAmount = parseFloat(ticket.win_amount || ticket.winAmount || ticket.prize_amount || 0);
-            if (winAmount > 0) {
-                analyzedTotalWins += winAmount;
-            } else {
-                analyzedTotalLoss += parseFloat(ticket.total_amount || ticket.totalAmount || ticket.amount || 0);
-            }
-        }
-    });
-    
-    const analyzedProfit = analyzedTotalBets - analyzedTotalWins;
-    
+    // Si "Tout Tiraj", ajouter un détail par tirage
     if (selectedDrawId === 'all') {
-        reportData = `
-            <h2>Rapò Jeneral Jodi a</h2>
-            <p><strong>Dat:</strong> ${new Date().toLocaleDateString('fr-FR')}</p>
-            <p><strong>Ajant:</strong> ${APP_STATE.agentName}</p>
-            <hr>
-            <p><strong>Statistik Tikè:</strong></p>
-            <p>• Total Tikè: ${ticketsToAnalyze.length}</p>
-            <p>• Tikè Verifye: ${totalVerified}</p>
-            <p>• Tikè an Atant: ${totalPending}</p>
-            <hr>
-            <p><strong>Statistik Finansye:</strong></p>
-            <p>Total Paris (Antre Lajan): ${analyzedTotalBets.toLocaleString('fr-FR')} Gdes</p>
-            <p>Total pou peye (Ganyen): ${analyzedTotalWins.toLocaleString('fr-FR')} Gdes</p>
-            <p>Total Retni (Pèdi): ${analyzedTotalLoss.toLocaleString('fr-FR')} Gdes</p>
-            <p><strong>Balans Net: ${analyzedProfit.toLocaleString('fr-FR')} Gdes</strong></p>
-        `;
-    } else {
-        reportData = `
-            <h2>Rapò Tiraj ${selectedDraw}</h2>
-            <p><strong>Dat:</strong> ${new Date().toLocaleDateString('fr-FR')}</p>
-            <p><strong>Ajant:</strong> ${APP_STATE.agentName}</p>
-            <hr>
-            <p><strong>Statistik Tikè:</strong></p>
-            <p>• Total Tikè: ${ticketsToAnalyze.length}</p>
-            <p>• Tikè Verifye: ${totalVerified}</p>
-            <p>• Tikè an Atant: ${totalPending}</p>
-            <hr>
-            <p><strong>Statistik Finansye:</strong></p>
-            <p>Total Paris (Antre Lajan): ${analyzedTotalBets.toLocaleString('fr-FR')} Gdes</p>
-            <p>Total pou peye (Ganyen): ${analyzedTotalWins.toLocaleString('fr-FR')} Gdes</p>
-            <p>Total Retni (Pèdi): ${analyzedTotalLoss.toLocaleString('fr-FR')} Gdes</p>
-            <p><strong>Balans Net: ${analyzedProfit.toLocaleString('fr-FR')} Gdes</strong></p>
-        `;
+        const draws = CONFIG.DRAWS;
+        reportHtml += `<hr><h3>Detay pa tiraj</h3>`;
+        for (const draw of draws) {
+            const drawTickets = APP_STATE.ticketsHistory.filter(t => t.draw_id === draw.id || t.drawId === draw.id);
+            if (drawTickets.length === 0) continue;
+            const drawBets = drawTickets.reduce((sum, t) => sum + (parseFloat(t.total_amount || t.totalAmount || 0) || 0), 0);
+            const drawWins = drawTickets.reduce((sum, t) => sum + (parseFloat(t.win_amount || t.winAmount || 0) || 0), 0);
+            const drawNet = drawWins - drawBets;
+            reportHtml += `
+                <div style="margin-top:15px;">
+                    <h4>${draw.name}</h4>
+                    <table style="width:100%;">
+                        <tr><th>Tikè</th><td>${drawTickets.length}</td></tr>
+                        <tr><th>Paris</th><td>${drawBets.toLocaleString('fr-FR')} Gdes</td></tr>
+                        <tr><th>Ganyen</th><td>${drawWins.toLocaleString('fr-FR')} Gdes</td></tr>
+                        <tr><th>Balans</th><td style="color:${drawNet >=0 ? 'green' : 'red'}">${drawNet.toLocaleString('fr-FR')} Gdes</td></tr>
+                    </table>
+                </div>
+            `;
+        }
     }
     
     const lotteryConfig = APP_STATE.lotteryConfig || CONFIG;
     const logoHtml = lotteryConfig.LOTTERY_LOGO ? 
-        `<img src="${lotteryConfig.LOTTERY_LOGO}" style="max-width: 100px; margin: 10px auto; display: block;" alt="${lotteryConfig.LOTTERY_NAME}">` : 
-        '';
+        `<img src="${lotteryConfig.LOTTERY_LOGO}" style="max-width: 100px; margin: 10px auto; display: block;" alt="${lotteryConfig.LOTTERY_NAME}">` : '';
     const addressHtml = lotteryConfig.LOTTERY_ADDRESS ? `<p style="font-size:12px;">${lotteryConfig.LOTTERY_ADDRESS}</p>` : '';
     const phoneHtml = lotteryConfig.LOTTERY_PHONE ? `<p style="font-size:12px;">Tel: ${lotteryConfig.LOTTERY_PHONE}</p>` : '';
     
@@ -461,12 +444,11 @@ function printReport() {
             <title>Rapò ${selectedDraw}</title>
             <style>
                 body { font-family: Arial, sans-serif; padding: 20px; }
-                h2 { color: #333; }
+                h2, h3, h4 { color: #333; }
                 hr { border: 1px solid #ccc; margin: 10px 0; }
-                p { margin: 8px 0; }
-                .note { font-style: italic; color: #666; font-size: 11px; margin-top: 5px; }
-                .section { margin: 15px 0; }
-                .important { font-weight: bold; font-size: 14px; }
+                table { width:100%; border-collapse:collapse; margin:10px 0; }
+                th, td { border:1px solid #ccc; padding:8px; text-align:left; }
+                th { background:#f0f0f0; }
             </style>
         </head>
         <body style="text-align:center;">
@@ -475,13 +457,9 @@ function printReport() {
             ${addressHtml}
             ${phoneHtml}
             <hr>
-            <div class="section">
-                ${reportData}
+            <div style="text-align:left;">
+                ${reportHtml}
             </div>
-            <hr>
-            <p class="note">Balans = Total Paris - Total Ganyen</p>
-            <p class="note">Balans pozitif = Pwofi pou ajan</p>
-            <p class="note">Balans negatif = Pèt pou ajan</p>
             <hr>
             <p style="font-size:12px;">Jenere nan: ${new Date().toLocaleString('fr-FR')}</p>
         </body>
@@ -497,6 +475,8 @@ function printReport() {
     }, 500);
 }
 
+// ==================== FONCTIONS POUR LES GAGNANTS ====================
+
 async function loadWinners() {
     try {
         await APIService.getWinningTickets();
@@ -510,7 +490,7 @@ async function loadWinners() {
 function updateWinnersDisplay() {
     const container = document.getElementById('winners-container');
     
-    if (APP_STATE.winningTickets.length === 0) {
+    if (!APP_STATE.winningTickets || APP_STATE.winningTickets.length === 0) {
         container.innerHTML = '<div class="empty-msg">Pa gen tikè genyen pou kounye a</div>';
         
         document.getElementById('total-winners-today').textContent = '0';
@@ -521,25 +501,30 @@ function updateWinnersDisplay() {
     
     const totalWins = APP_STATE.winningTickets.length;
     const totalAmount = APP_STATE.winningTickets.reduce((sum, ticket) => {
-        const winAmount = parseFloat(ticket.win_amount || ticket.winAmount || ticket.prize_amount || 0);
-        return sum + winAmount;
+        const winAmount = parseFloat(ticket.win_amount || ticket.winAmount || 0);
+        return sum + (isNaN(winAmount) ? 0 : winAmount);
     }, 0);
     const averageWin = totalWins > 0 ? totalAmount / totalWins : 0;
     
     document.getElementById('total-winners-today').textContent = totalWins;
     document.getElementById('total-winning-amount').textContent = totalAmount.toLocaleString('fr-FR') + ' Gdes';
-    document.getElementById('average-winning').textContent = averageWin.toFixed(2).toLocaleString('fr-FR') + ' Gdes';
+    document.getElementById('average-winning').textContent = averageWin.toFixed(2) + ' Gdes';
     
     container.innerHTML = APP_STATE.winningTickets.map(ticket => {
         const isPaid = ticket.paid || false;
-        // Correction : utiliser draw_id au lieu de drawId
-        const winningResults = APP_STATE.winningResults.find(r => 
-            r.draw_id === (ticket.draw_id || ticket.drawId)
-        );
+        const winningResults = APP_STATE.winningResults.find(r => r.draw_id === (ticket.draw_id || ticket.drawId));
         const resultStr = winningResults ? winningResults.numbers.join(', ') : 'N/A';
         
-        const betAmount = parseFloat(ticket.bet_amount || ticket.total_amount || ticket.amount || 0) || 0;
-        const winAmount = parseFloat(ticket.win_amount || ticket.winAmount || ticket.prize_amount || 0) || 0;
+        let bets = [];
+        try {
+            bets = typeof ticket.bets === 'string' ? JSON.parse(ticket.bets) : (ticket.bets || []);
+        } catch (e) {
+            bets = [];
+        }
+        const gameType = bets[0]?.game || bets[0]?.specialType || 'Borlette';
+        
+        const betAmount = parseFloat(ticket.total_amount || ticket.totalAmount || 0) || 0;
+        const winAmount = parseFloat(ticket.win_amount || ticket.winAmount || 0) || 0;
         const netProfit = winAmount - betAmount;
         
         return `
@@ -548,7 +533,7 @@ function updateWinnersDisplay() {
                     <div>
                         <strong>Tikè #${ticket.ticket_id || ticket.id}</strong>
                         <div style="font-size: 0.8rem; color: var(--text-dim);">
-                            ${ticket.draw_name || ticket.drawName} - ${new Date(ticket.date || ticket.created_at).toLocaleDateString('fr-FR')}
+                            ${ticket.draw_name || ticket.drawName} - ${new Date(ticket.date).toLocaleDateString('fr-FR')}
                         </div>
                     </div>
                     <div style="text-align: right;">
@@ -562,13 +547,13 @@ function updateWinnersDisplay() {
                 </div>
                 <div>
                     <p><strong>Rezilta Tiraj:</strong> ${resultStr}</p>
-                    <p><strong>Jwèt:</strong> ${ticket.game_type || ticket.gameType || 'Borlette'}</p>
-                    <p><strong>Nimewo Ganyen:</strong> ${ticket.winning_number || ticket.winningNumber || 'N/A'}</p>
+                    <p><strong>Jwèt:</strong> ${gameType}</p>
+                    <p><strong>Nimewo Ganyen:</strong> N/A</p>
                 </div>
                 <div class="winner-actions">
                     ${isPaid ? 
                         '<button class="btn-paid" disabled><i class="fas fa-check"></i> Peye</button>' :
-                        '<button class="btn-paid" onclick="markAsPaid(\'' + (ticket.id || ticket.ticket_id) + '\')"><i class="fas fa-money-bill-wave"></i> Make kòm Peye</button>'
+                        `<button class="btn-paid" onclick="markAsPaid('${ticket.id || ticket.ticket_id}')"><i class="fas fa-money-bill-wave"></i> Make kòm Peye</button>`
                     }
                 </div>
             </div>

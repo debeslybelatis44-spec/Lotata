@@ -221,6 +221,21 @@ const CartManager = {
                     return;
                 }
             }
+
+            // Vérifier les limites (avertissement)
+            for (const drawId of draws) {
+                if (APP_STATE.drawNumberLimits && APP_STATE.drawNumberLimits[drawId]) {
+                    const limits = APP_STATE.drawNumberLimits[drawId];
+                    const currentTotalInCart = APP_STATE.currentCart
+                        .filter(item => item.drawId === drawId && item.cleanNumber === cleanNum)
+                        .reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+                    const newTotal = currentTotalInCart + amt;
+                    if (limits[cleanNum] && newTotal > limits[cleanNum]) {
+                        alert(`Atansyon: Limite pou nimewo ${cleanNum} se ${limits[cleanNum]} Gdes. Ou ap depase si w ajoute sa.`);
+                        // La validation finale sera faite par le serveur
+                    }
+                }
+            }
             
             draws.forEach(drawId => {
                 bets.forEach(bet => {
@@ -266,6 +281,20 @@ const CartManager = {
             if (isNumberBlocked(num, drawId)) {
                 alert(`Nimewo ${num} bloke pou tiraj sa a. Ou pa ka jwe li.`);
                 return;
+            }
+        }
+
+        // Vérifier les limites (avertissement)
+        for (const drawId of draws) {
+            if (APP_STATE.drawNumberLimits && APP_STATE.drawNumberLimits[drawId]) {
+                const limits = APP_STATE.drawNumberLimits[drawId];
+                const currentTotalInCart = APP_STATE.currentCart
+                    .filter(item => item.drawId === drawId && item.cleanNumber === num)
+                    .reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+                const newTotal = currentTotalInCart + amt;
+                if (limits[num] && newTotal > limits[num]) {
+                    alert(`Atansyon: Limite pou nimewo ${num} se ${limits[num]} Gdes. Ou ap depase si w ajoute sa.`);
+                }
             }
         }
         

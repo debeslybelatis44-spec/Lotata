@@ -46,13 +46,28 @@ pool.on('connect', () => console.log('✅ Connecté à PostgreSQL'));
 pool.on('error', (err) => console.error('❌ Erreur PostgreSQL:', err));
 
 // ==================== Utilitaires ====================
-async function columnExists(table, column) { /* ... identique à avant ... */ }
-async function addColumnIfNotExists(table, column, definition) { /* ... */ }
+async function columnExists(table, column) {
+  const res = await pool.query(`
+    SELECT column_name FROM information_schema.columns 
+    WHERE table_name = $1 AND column_name = $2
+  `, [table, column]);
+  return res.rows.length > 0;
+}
 
-// Initialisation des tables (on suppose que le script SQL a été exécuté)
+async function addColumnIfNotExists(table, column, definition) {
+  if (!(await columnExists(table, column))) {
+    await pool.query(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    console.log(`✅ Colonne ${table}.${column} ajoutée`);
+  }
+}
+
+// Initialisation des tables
 async function initializeDatabase() {
   try {
     console.log('🔄 Vérification de la base de données...');
+    // Ajouter colonne paid si elle n'existe pas
+    await addColumnIfNotExists('tickets', 'paid', 'BOOLEAN DEFAULT FALSE');
+    await addColumnIfNotExists('tickets', 'paid_at', 'TIMESTAMP');
     console.log('✅ Base de données prête');
   } catch (error) {
     console.error('❌ Erreur initialisation:', error);
@@ -62,7 +77,6 @@ async function initializeDatabase() {
 // ==================== Authentification ====================
 const JWT_SECRET = process.env.JWT_SECRET || 'lotato-pro-secret-key-change-in-production';
 
-// Middleware de vérification du token
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -75,7 +89,6 @@ function authenticateToken(req, res, next) {
   });
 }
 
-// Middleware pour vérifier le rôle
 function authorize(...roles) {
   return (req, res, next) => {
     if (!req.user) return res.status(401).json({ error: 'Non authentifié' });
@@ -216,6 +229,55 @@ app.post('/api/tickets/save', async (req, res) => {
       return res.status(403).json({ error: 'Vous ne pouvez enregistrer que vos propres tickets' });
     }
 
+    // Vérifier que le tirage est actif
+    const drawCheck = await pool.query('SELECT active FROM draws WHERE id = $1', [drawId]);
+    if (drawCheck.rows.length === 0 || !drawCheck.rows[0].active) {
+      return res.status(403).json({ error: 'Tirage bloqué ou inexistant' });
+    }
+
+    // Récupérer les blocages globaux
+    const globalBlocked = await pool.query('SELECT number FROM blocked_numbers');
+    const globalBlockedSet = new Set(globalBlocked.rows.map(r => r.number));
+
+    // Récupérer les blocages par tirage
+    const drawBlocked = await pool.query('SELECT number FROM draw_blocked_numbers WHERE draw_id = $1', [drawId]);
+    const drawBlockedSet = new Set(drawBlocked.rows.map(r => r.number));
+
+    // Récupérer les limites
+    const limits = await pool.query('SELECT number, limit_amount FROM draw_number_limits WHERE draw_id = $1', [drawId]);
+    const limitsMap = new Map(limits.rows.map(r => [r.number, parseFloat(r.limit_amount)]));
+
+    // Vérifier chaque pari
+    for (const bet of bets) {
+      const cleanNumber = bet.cleanNumber || (bet.number ? bet.number.replace(/[^0-9]/g, '') : '');
+      if (!cleanNumber) continue;
+
+      // Blocage global
+      if (globalBlockedSet.has(cleanNumber)) {
+        return res.status(403).json({ error: `Numéro ${cleanNumber} est bloqué globalement` });
+      }
+      // Blocage par tirage
+      if (drawBlockedSet.has(cleanNumber)) {
+        return res.status(403).json({ error: `Numéro ${cleanNumber} est bloqué pour ce tirage` });
+      }
+      // Limite de mise
+      if (limitsMap.has(cleanNumber)) {
+        const limit = limitsMap.get(cleanNumber);
+        // Calculer le total déjà mis aujourd'hui sur ce numéro
+        const todayBetsResult = await pool.query(
+          `SELECT SUM((bets->>'amount')::numeric) as total
+           FROM tickets, jsonb_array_elements(bets::jsonb) as bet
+           WHERE draw_id = $1 AND DATE(date) = CURRENT_DATE AND bet->>'cleanNumber' = $2`,
+          [drawId, cleanNumber]
+        );
+        const currentTotal = parseFloat(todayBetsResult.rows[0]?.total) || 0;
+        const betAmount = parseFloat(bet.amount) || 0;
+        if (currentTotal + betAmount > limit) {
+          return res.status(403).json({ error: `Limite de mise pour le numéro ${cleanNumber} dépassée (max ${limit} Gdes)` });
+        }
+      }
+    }
+
     const ticketId = `T${Date.now()}${Math.floor(Math.random() * 1000)}`;
     const betsJson = JSON.stringify(bets);
     const totalAmount = parseFloat(total) || 0;
@@ -336,6 +398,27 @@ app.post('/api/tickets/check-winners', async (req, res) => {
   }
 });
 
+// Marquer un ticket comme payé
+app.post('/api/winners/pay/:ticketId', authenticateToken, async (req, res) => {
+  try {
+    const { ticketId } = req.params;
+    let query = 'UPDATE tickets SET paid = true, paid_at = NOW() WHERE id = $1';
+    const params = [ticketId];
+    if (req.user.role === 'agent') {
+      query += ' AND agent_id = $2';
+      params.push(req.user.id);
+    }
+    const result = await pool.query(query, params);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Ticket non trouvé ou non autorisé' });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Erreur paiement ticket:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 // --- Configuration loterie ---
 app.get('/api/lottery-config', async (req, res) => {
   try {
@@ -371,12 +454,38 @@ app.post('/api/lottery-config', authenticateToken, authorize('owner'), async (re
 });
 
 // --- Numéros bloqués (globaux) ---
-app.get('/api/blocked-numbers', async (req, res) => {
+app.get('/api/blocked-numbers/global', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query('SELECT number FROM blocked_numbers');
     res.json({ blockedNumbers: result.rows.map(r => r.number) });
   } catch (error) {
-    console.error('❌ Erreur numéros bloqués:', error);
+    console.error('❌ Erreur numéros globaux:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// --- Numéros bloqués par tirage ---
+app.get('/api/blocked-numbers/draw/:drawId', authenticateToken, async (req, res) => {
+  try {
+    const { drawId } = req.params;
+    const result = await pool.query('SELECT number FROM draw_blocked_numbers WHERE draw_id = $1', [drawId]);
+    res.json({ blockedNumbers: result.rows.map(r => r.number) });
+  } catch (error) {
+    console.error('❌ Erreur numéros par tirage:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// --- Limites de mise par tirage ---
+app.get('/api/number-limits/draw/:drawId', authenticateToken, async (req, res) => {
+  try {
+    const { drawId } = req.params;
+    const result = await pool.query('SELECT number, limit_amount FROM draw_number_limits WHERE draw_id = $1', [drawId]);
+    const limits = {};
+    result.rows.forEach(r => limits[r.number] = parseFloat(r.limit_amount));
+    res.json(limits);
+  } catch (error) {
+    console.error('❌ Erreur limites:', error);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -897,8 +1006,6 @@ ownerRouter.post('/number-limit', async (req, res) => {
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
-
-// ========== NOUVELLES ROUTES POUR LA LISTE DES RESTRICTIONS ==========
 
 // Liste des numéros globalement bloqués (GET)
 ownerRouter.get('/blocked-numbers', async (req, res) => {
