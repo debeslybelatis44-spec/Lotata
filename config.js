@@ -2,7 +2,6 @@ const API_CONFIG = {
     BASE_URL: 'https://lotata-islp.onrender.com/api',
     ENDPOINTS: {
         LOGIN: '/auth/login',
-        LOGOUT: '/auth/logout',          // <-- Ajouté
         SAVE_TICKET: '/tickets/save',
         GET_TICKETS: '/tickets',
         GET_REPORTS: '/reports',
@@ -30,6 +29,7 @@ const CONFIG = {
         AUTO_LOTTO4: 1000,
         AUTO_LOTTO5: 5000
     },
+    // Tirages par défaut (fallback si serveur indisponible)
     DRAWS: [
         { id: 'tn_matin', name: 'Tunisia Matin', time: '10:00', color: 'var(--tunisia)' },
         { id: 'tn_soir', name: 'Tunisia Soir', time: '17:00', color: 'var(--tunisia)' },
@@ -48,6 +48,7 @@ const CONFIG = {
     LOTTERY_PHONE: ''
 };
 
+// État initial – valeurs lues depuis localStorage + nouvelles propriétés
 let APP_STATE = {
     selectedDraw: 'tn_matin',
     selectedDraws: ['tn_matin'],
@@ -66,5 +67,9 @@ let APP_STATE = {
     isDrawBlocked: false,
     agentId: localStorage.getItem('agent_id') || null,
     agentName: localStorage.getItem('agent_name') || 'Agent',
-    lotteryConfig: null
+    lotteryConfig: null,
+    // NOUVEAU : données chargées depuis le serveur
+    draws: null,                 // tirages avec leur statut actif
+    globalBlockedNumbers: [],    // numéros globalement bloqués
+    drawBlockedNumbers: {}       // dictionnaire : drawId -> [numéros bloqués]
 };
