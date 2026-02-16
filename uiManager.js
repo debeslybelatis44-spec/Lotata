@@ -111,7 +111,7 @@ function renderHistory() {
         
         if (checked) {
             if (winAmount > 0) {
-                status = 'GANYEN';
+                status = 'GeNYEN';
                 statusClass = 'badge-win';
             } else {
                 status = 'PÈDI';
@@ -480,8 +480,8 @@ function printReport() {
             </div>
             <hr>
             <p class="note">Balans = Total Paris - Total Ganyen</p>
-            <p class="note">Balans pozitif = Pwofi pou ajant</p>
-            <p class="note">Balans negatif = Pèt pou ajant</p>
+            <p class="note">Balans pozitif = Pwofi pou ajan</p>
+            <p class="note">Balans negatif = Pèt pou ajan</p>
             <hr>
             <p style="font-size:12px;">Jenere nan: ${new Date().toLocaleString('fr-FR')}</p>
         </body>
@@ -511,7 +511,7 @@ function updateWinnersDisplay() {
     const container = document.getElementById('winners-container');
     
     if (APP_STATE.winningTickets.length === 0) {
-        container.innerHTML = '<div class="empty-msg">Pa gen tikè ganyen pou kounye a</div>';
+        container.innerHTML = '<div class="empty-msg">Pa gen tikè genyen pou kounye a</div>';
         
         document.getElementById('total-winners-today').textContent = '0';
         document.getElementById('total-winning-amount').textContent = '0 Gdes';
@@ -658,7 +658,7 @@ function viewTicketDetails(ticketId) {
     }
     
     if (bets.length === 0) {
-        details += `<p>Pa gen detay paray</p>`;
+        details += `<p>Pa gen detay paryaj</p>`;
     } else {
         bets.forEach((bet, index) => {
             if (!bet) return;
@@ -674,7 +674,7 @@ function viewTicketDetails(ticketId) {
             let betDetails = `${gameName} ${betNumber} - ${betAmount} Gdes`;
             if (betGain) {
                 const netGain = betGain - betAmount;
-                betDetails += ` (Ganyen: ${betGain}G | Net: ${netGain}G)`;
+                betDetails += ` (Genyen: ${betGain}G | Net: ${netGain}G)`;
             }
             details += `<p>${betDetails}</p>`;
         });
@@ -768,5 +768,31 @@ async function loadLotteryConfig() {
     }
 }
 
-// Exposer la fonction editTicket globalement
+// ==================== FONCTION DE DÉCONNEXION ====================
+function logout() {
+    if (!confirm('Èske ou sèten ou vle dekonekte?')) return;
+
+    const token = localStorage.getItem('auth_token');
+    
+    // Appel à l'API de déconnexion pour journaliser (optionnel)
+    fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.LOGOUT}`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    })
+    .catch(err => console.error('Erreur lors de la déconnexion côté serveur:', err))
+    .finally(() => {
+        // Nettoyer le stockage local
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('agent_id');
+        localStorage.removeItem('agent_name');
+        localStorage.removeItem('user_role');
+        
+        // Rediriger vers la page de connexion
+        window.location.href = 'index.html';
+    });
+}
+
+// Exposer la fonction editTicket globalement (déjà fait)
 window.editTicket = editTicket;
