@@ -532,8 +532,9 @@ function updateWinnersDisplay() {
     
     container.innerHTML = APP_STATE.winningTickets.map(ticket => {
         const isPaid = ticket.paid || false;
+        // Correction : utiliser draw_id au lieu de drawId
         const winningResults = APP_STATE.winningResults.find(r => 
-            r.drawId === (ticket.draw_id || ticket.drawId)
+            r.draw_id === (ticket.draw_id || ticket.drawId)
         );
         const resultStr = winningResults ? winningResults.numbers.join(', ') : 'N/A';
         
