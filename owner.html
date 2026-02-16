@@ -148,7 +148,7 @@
                 </div>
             </div>
 
-            <!-- Affichage des informations de l'utilisateur créé (point 2) -->
+            <!-- Affichage des informations de l'utilisateur créé -->
             <div id="user-created-info" class="alert alert-success" style="display:none; margin-top:20px;">
                 <strong>✅ Utilisateur créé avec succès :</strong>
                 <div id="created-user-details" style="margin:10px 0;"></div>
@@ -254,11 +254,10 @@
                 <button class="btn-primary" onclick="setNumberLimit()">Appliquer</button>
             </div>
 
-            <!-- ========== NOUVEAU : Liste des restrictions avec déblocage (point 1) ========== -->
+            <!-- ========== LISTE COMPLÈTE DES RESTRICTIONS (tirages bloqués, numéros bloqués, limites) ========== -->
             <div class="section-title"><i class="fas fa-list"></i> Liste des restrictions actuelles</div>
-            <button class="btn-primary" onclick="loadAllRestrictions()">Afficher les restrictions</button>
-            <div id="restrictions-list" class="list-container" style="max-height:400px; margin-top:15px; display:none;">
-                <!-- Le contenu sera chargé dynamiquement -->
+            <div id="restrictions-list" class="list-container" style="max-height:400px;">
+                <!-- Le contenu sera chargé automatiquement à l'ouverture de l'onglet -->
             </div>
         </div>
 
@@ -290,7 +289,7 @@
                         <option value="custom">Personnalisée</option>
                     </select>
                 </div>
-                <div id="custom-dates" style="display:none; grid-column:span 2; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                <div id="custom-dates" style="display:none; grid-column:span 2; grid-template-columns:1fr 1fr; gap:10px;">
                     <div class="form-group">
                         <label>Du</label>
                         <input type="date" id="report-from">
@@ -319,7 +318,7 @@
 
         <script>
             // ---------- CONFIGURATION ----------
-            const API_URL = ''; // Laissez vide si même origine, sinon 'https://votre-backend.com/api'
+            const API_URL = ''; // Laissez vide si même origine
             let chartInstance = null;
 
             // ---------- AUTH ----------
@@ -343,8 +342,15 @@
                 if (tabId === 'dashboard') loadDashboard();
                 if (tabId === 'users') loadUsersLists();
                 if (tabId === 'draws') loadDraws();
-                if (tabId === 'numbers') { loadBlockedNumbers(); loadDrawsForSelects(); }
-                if (tabId === 'reports') { loadSupervisorsAndAgents(); loadDrawsForReport(); }
+                if (tabId === 'numbers') {
+                    loadBlockedNumbers();
+                    loadDrawsForSelects();
+                    loadAllRestrictions(); // <-- Appel automatique de la liste complète
+                }
+                if (tabId === 'reports') {
+                    loadSupervisorsAndAgents();
+                    loadDrawsForReport();
+                }
             }
 
             // ---------- UTILITAIRES ----------
@@ -368,19 +374,17 @@
                     if (!res.ok) throw new Error('Erreur chargement dashboard');
                     const data = await res.json();
 
-                    // Connexions
                     document.getElementById('connected-sup-count').innerText = data.connected.supervisors_count;
                     document.getElementById('connected-agent-count').innerText = data.connected.agents_count;
                     
                     let supList = '';
-                    data.connected.supervisors.forEach(s => supList += `<div>👤 ${s.name} (${s.username})</div>`);
+                    data.connected.supervisors.forEach(s => supList += `<div>👤 ${s.name} (${s.username || s.email})</div>`);
                     document.getElementById('connected-sup-list').innerHTML = supList || '<span style="opacity:0.7;">Aucun superviseur connecté</span>';
                     
                     let agentList = '';
-                    data.connected.agents.forEach(a => agentList += `<div>👤 ${a.name} (${a.username})</div>`);
+                    data.connected.agents.forEach(a => agentList += `<div>👤 ${a.name} (${a.username || a.email})</div>`);
                     document.getElementById('connected-agent-list').innerHTML = agentList || '<span style="opacity:0.7;">Aucun agent connecté</span>';
 
-                    // Ventes
                     document.getElementById('sales-today').innerHTML = `${data.sales_today.toLocaleString()} G`;
 
                     // Progression des limites
@@ -390,7 +394,7 @@
                     } else {
                         limitsHtml = '<table><thead><tr><th>Tirage</th><th>Numéro</th><th>Limite</th><th>Misé</th><th>%</th></tr></thead><tbody>';
                         data.limits_progress.forEach(l => {
-                            const percent = l.progress_percent.toFixed(1);
+                            const percent = parseFloat(l.progress_percent).toFixed(1);
                             let statusClass = '';
                             if (percent >= 90) statusClass = 'badge-danger';
                             else if (percent >= 70) statusClass = 'badge-warning';
@@ -398,8 +402,8 @@
                             limitsHtml += `<tr>
                                 <td>${l.draw_name}</td>
                                 <td>${l.number}</td>
-                                <td>${l.limit_amount.toLocaleString()} G</td>
-                                <td>${l.current_bets.toLocaleString()} G</td>
+                                <td>${parseFloat(l.limit_amount).toLocaleString()} G</td>
+                                <td>${parseFloat(l.current_bets).toLocaleString()} G</td>
                                 <td><span class="${statusClass}">${percent}%</span></td>
                             </tr>`;
                         });
@@ -417,9 +421,9 @@
                             const netClass = a.net_result >= 0 ? 'profit' : 'loss';
                             agentsHtml += `<tr>
                                 <td>${a.name}</td>
-                                <td>${a.total_bets.toLocaleString()} G</td>
-                                <td>${a.total_wins.toLocaleString()} G</td>
-                                <td class="${netClass}">${a.net_result.toLocaleString()} G</td>
+                                <td>${parseFloat(a.total_bets).toLocaleString()} G</td>
+                                <td>${parseFloat(a.total_wins).toLocaleString()} G</td>
+                                <td class="${netClass}">${parseFloat(a.net_result).toLocaleString()} G</td>
                             </tr>`;
                         });
                         agentsHtml += '</tbody></table>';
@@ -436,7 +440,6 @@
             async function loadUsersLists() {
                 const token = localStorage.getItem('auth_token');
                 try {
-                    // Superviseurs
                     const supRes = await fetch(`${API_URL}/api/owner/supervisors`, {
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
@@ -445,14 +448,13 @@
                     let supHtml = '';
                     supervisors.forEach(s => {
                         supHtml += `<div class="item-row">
-                            <span><strong>${s.name}</strong> (${s.username})</span>
+                            <span><strong>${s.name}</strong> (${s.email})</span>
                             <span class="${s.blocked ? 'badge-danger' : 'badge-success'}">${s.blocked ? 'Bloqué' : 'Actif'}</span>
                             <button class="btn-danger" style="padding:4px 10px;" onclick="toggleUserBlock('${s.id}','supervisor')">${s.blocked ? 'Débloquer' : 'Bloquer'}</button>
                         </div>`;
                     });
                     document.getElementById('supervisors-list').innerHTML = supHtml || '<p>Aucun superviseur</p>';
 
-                    // Agents
                     const agentRes = await fetch(`${API_URL}/api/owner/agents`, {
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
@@ -461,7 +463,7 @@
                     let agentHtml = '';
                     agents.forEach(a => {
                         agentHtml += `<div class="item-row">
-                            <span><strong>${a.name}</strong> (${a.username})</span>
+                            <span><strong>${a.name}</strong> (${a.email})</span>
                             <span>Superviseur: ${a.supervisor_name || 'libre'}</span>
                             <span class="${a.blocked ? 'badge-danger' : 'badge-success'}">${a.blocked ? 'Bloqué' : 'Actif'}</span>
                             <button class="btn-danger" style="padding:4px 10px;" onclick="toggleUserBlock('${a.id}','agent')">${a.blocked ? 'Débloquer' : 'Bloquer'}</button>
@@ -469,13 +471,11 @@
                     });
                     document.getElementById('agents-list').innerHTML = agentHtml || '<p>Aucun agent</p>';
 
-                    // Remplir les selects de superviseurs (pour création et transfert)
                     let supOpts = '<option value="">Aucun (libre)</option>';
                     supervisors.forEach(s => { supOpts += `<option value="${s.id}">${s.name}</option>`; });
                     document.getElementById('create-supervisor').innerHTML = supOpts;
                     document.getElementById('change-supervisor-select').innerHTML = supOpts;
 
-                    // Remplir le select des agents pour le transfert
                     let agentOpts = '<option value="">Choisir agent</option>';
                     agents.forEach(a => { agentOpts += `<option value="${a.id}">${a.name}</option>`; });
                     document.getElementById('change-agent-select').innerHTML = agentOpts;
@@ -517,7 +517,6 @@
                     if (result.success) {
                         showMessage('user-create-message', '✅ Utilisateur créé avec succès', true);
                         
-                        // Affichage des informations de l'utilisateur créé (point 2)
                         if (result.user) {
                             const user = result.user;
                             const details = `
@@ -578,7 +577,7 @@
                     });
                     const draws = await res.json();
                     let opts = '<option value="">Sélectionnez un tirage</option>';
-                    draws.forEach(d => { opts += `<option value="${d.id}">${d.name} (${d.time})</option>`; });
+                    draws.forEach(d => { opts += `<option value="${d.id}">${d.name} (${d.time || ''})</option>`; });
                     document.getElementById('draw-select').innerHTML = opts;
                     document.getElementById('draw-block-select').innerHTML = opts;
                 } catch (e) { console.error(e); }
@@ -650,6 +649,7 @@
                     body: JSON.stringify({ number: num })
                 });
                 loadBlockedNumbers();
+                loadAllRestrictions();
             }
             async function unblockNumberGlobal() {
                 const token = localStorage.getItem('auth_token');
@@ -660,6 +660,7 @@
                     body: JSON.stringify({ number: num })
                 });
                 loadBlockedNumbers();
+                loadAllRestrictions();
             }
 
             async function blockNumberDraw() {
@@ -673,6 +674,7 @@
                     body: JSON.stringify({ drawId, number: num })
                 });
                 alert('Numéro bloqué pour ce tirage');
+                loadAllRestrictions();
             }
             async function unblockNumberDraw() {
                 const token = localStorage.getItem('auth_token');
@@ -684,6 +686,7 @@
                     body: JSON.stringify({ drawId, number: num })
                 });
                 alert('Numéro débloqué pour ce tirage');
+                loadAllRestrictions();
             }
 
             async function setNumberLimit() {
@@ -698,9 +701,10 @@
                     body: JSON.stringify({ drawId, number, limitAmount: amount })
                 });
                 alert('Limite appliquée');
+                loadAllRestrictions();
             }
 
-            // ---------- NOUVELLES FONCTIONS POUR LA LISTE DES RESTRICTIONS (point 1) ----------
+            // ---------- FONCTIONS POUR LA LISTE DES RESTRICTIONS (tirages bloqués, numéros, limites) ----------
             async function fetchGlobalBlockedNumbers() {
                 const token = localStorage.getItem('auth_token');
                 const res = await fetch(`${API_URL}/api/owner/blocked-numbers`, {
@@ -712,24 +716,29 @@
 
             async function fetchPerDrawBlockedNumbers() {
                 const token = localStorage.getItem('auth_token');
-                // On suppose un endpoint qui retourne la liste des blocages par tirage
                 const res = await fetch(`${API_URL}/api/owner/blocked-numbers-per-draw`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                if (!res.ok) return []; // si l'endpoint n'existe pas, on retourne tableau vide
-                const data = await res.json();
-                return data.map(item => ({ type: 'per-draw', drawId: item.drawId, drawName: item.drawName, number: item.number }));
+                if (!res.ok) return [];
+                return await res.json();
             }
 
             async function fetchNumberLimits() {
                 const token = localStorage.getItem('auth_token');
-                // Endpoint pour lister les limites
                 const res = await fetch(`${API_URL}/api/owner/number-limits`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 if (!res.ok) return [];
-                const data = await res.json();
-                return data.map(item => ({ type: 'limit', drawId: item.drawId, drawName: item.drawName, number: item.number, limit: item.limitAmount }));
+                return await res.json();
+            }
+
+            async function fetchBlockedDraws() {
+                const token = localStorage.getItem('auth_token');
+                const res = await fetch(`${API_URL}/api/owner/blocked-draws`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) return [];
+                return await res.json();
             }
 
             async function unblockPerDraw(drawId, number) {
@@ -739,73 +748,101 @@
                     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify({ drawId, number })
                 });
-                loadAllRestrictions(); // recharger la liste
+                loadAllRestrictions();
             }
 
             async function removeLimit(drawId, number) {
                 const token = localStorage.getItem('auth_token');
-                // Endpoint pour supprimer une limite (à créer côté backend)
                 await fetch(`${API_URL}/api/owner/remove-number-limit`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify({ drawId, number })
                 });
-                loadAllRestrictions(); // recharger
+                loadAllRestrictions();
+            }
+
+            async function unblockDraw(drawId) {
+                const token = localStorage.getItem('auth_token');
+                await fetch(`${API_URL}/api/owner/block-draw`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ drawId, block: false })
+                });
+                loadAllRestrictions();
+                loadDraws(); // pour mettre à jour les listes déroulantes
             }
 
             async function loadAllRestrictions() {
                 const container = document.getElementById('restrictions-list');
-                container.style.display = 'block';
                 container.innerHTML = '<p>Chargement des restrictions...</p>';
 
                 try {
-                    const [globalBlocked, perDrawBlocked, limits] = await Promise.all([
+                    const [globalBlocked, perDrawBlocked, limits, blockedDraws] = await Promise.all([
                         fetchGlobalBlockedNumbers(),
                         fetchPerDrawBlockedNumbers(),
-                        fetchNumberLimits()
+                        fetchNumberLimits(),
+                        fetchBlockedDraws()
                     ]);
+
+                    if (globalBlocked.length === 0 && perDrawBlocked.length === 0 && limits.length === 0 && blockedDraws.length === 0) {
+                        container.innerHTML = '<p class="badge-success" style="padding:10px;">✅ Aucune restriction active</p>';
+                        return;
+                    }
 
                     let html = '<table><thead><tr><th>Type</th><th>Tirage</th><th>Numéro</th><th>Limite (G)</th><th>Action</th></tr></thead><tbody>';
 
+                    // Tirages bloqués
+                    blockedDraws.forEach(item => {
+                        html += `<tr style="background:rgba(255,77,77,0.1);">
+                            <td>⏸️ Tirage bloqué</td>
+                            <td>${item.drawName}</td>
+                            <td>—</td>
+                            <td>—</td>
+                            <td><button class="btn-primary" style="padding:4px 8px;" onclick="unblockDraw('${item.drawId}')">Débloquer</button></td>
+                        </tr>`;
+                    });
+
+                    // Blocages globaux
                     globalBlocked.forEach(item => {
-                        html += `<tr>
-                            <td>Global</td>
+                        html += `<tr style="background:rgba(255,77,77,0.1);">
+                            <td>🚫 Blocage global</td>
                             <td>Tous</td>
-                            <td>${item.number}</td>
+                            <td><strong>${item.number}</strong></td>
                             <td>—</td>
-                            <td><button class="btn-primary" style="padding:4px 8px;" onclick="unblockNumberGlobalWithValue('${item.number}')">Débloquer global</button></td>
+                            <td><button class="btn-primary" style="padding:4px 8px;" onclick="unblockNumberGlobalWithValue('${item.number}')">Débloquer</button></td>
                         </tr>`;
                     });
 
+                    // Blocages par tirage
                     perDrawBlocked.forEach(item => {
-                        html += `<tr>
-                            <td>Par tirage (bloqué)</td>
-                            <td>${item.drawName || item.drawId}</td>
-                            <td>${item.number}</td>
+                        html += `<tr style="background:rgba(255,170,0,0.1);">
+                            <td>🔒 Blocage spécifique</td>
+                            <td>${item.draw_name || item.drawId}</td>
+                            <td><strong>${item.number}</strong></td>
                             <td>—</td>
-                            <td><button class="btn-primary" style="padding:4px 8px;" onclick="unblockPerDraw('${item.drawId}', '${item.number}')">Débloquer</button></td>
+                            <td><button class="btn-primary" style="padding:4px 8px;" onclick="unblockPerDraw('${item.draw_id}', '${item.number}')">Débloquer</button></td>
                         </tr>`;
                     });
 
+                    // Limites de mise
                     limits.forEach(item => {
                         html += `<tr>
-                            <td>Limite</td>
-                            <td>${item.drawName || item.drawId}</td>
-                            <td>${item.number}</td>
-                            <td>${item.limit} G</td>
-                            <td><button class="btn-danger" style="padding:4px 8px;" onclick="removeLimit('${item.drawId}', '${item.number}')">Supprimer limite</button></td>
+                            <td>💰 Limite de mise</td>
+                            <td>${item.draw_name || item.drawId}</td>
+                            <td><strong>${item.number}</strong></td>
+                            <td>${parseFloat(item.limit_amount).toLocaleString()} G</td>
+                            <td><button class="btn-danger" style="padding:4px 8px;" onclick="removeLimit('${item.draw_id}', '${item.number}')">Supprimer</button></td>
                         </tr>`;
                     });
 
                     html += '</tbody></table>';
                     container.innerHTML = html;
                 } catch (e) {
-                    container.innerHTML = '<p class="loss">Erreur lors du chargement des restrictions.</p>';
+                    container.innerHTML = '<p class="loss">❌ Erreur lors du chargement des restrictions. Vérifiez les appels API.</p>';
                     console.error(e);
                 }
             }
 
-            // Fonction utilitaire pour débloquer global depuis la liste
             async function unblockNumberGlobalWithValue(num) {
                 const token = localStorage.getItem('auth_token');
                 await fetch(`${API_URL}/api/owner/unblock-number`, {
@@ -814,19 +851,18 @@
                     body: JSON.stringify({ number: num })
                 });
                 loadAllRestrictions();
-                loadBlockedNumbers(); // mettre à jour aussi l'affichage simple
+                loadBlockedNumbers();
             }
 
             // ---------- RAPPORTS ----------
             async function loadSupervisorsAndAgents() {
                 const token = localStorage.getItem('auth_token');
-                // Superviseurs
                 const supRes = await fetch(`${API_URL}/api/owner/supervisors`, { headers: { 'Authorization': `Bearer ${token}` } });
                 const supervisors = await supRes.json();
                 let supOpts = '<option value="all">Tous superviseurs</option>';
                 supervisors.forEach(s => supOpts += `<option value="${s.id}">${s.name}</option>`);
                 document.getElementById('report-supervisor').innerHTML = supOpts;
-                // Agents
+
                 const agentRes = await fetch(`${API_URL}/api/owner/agents`, { headers: { 'Authorization': `Bearer ${token}` } });
                 const agents = await agentRes.json();
                 let agentOpts = '<option value="all">Tous agents</option>';
@@ -870,12 +906,12 @@
             function displayReport(report) {
                 const s = report.summary;
                 let html = `<div class="stats-grid">`;
-                html += `<div class="stat-card"><div style="font-size:2rem;">${s.totalTickets}</div><div>Tickets</div></div>`;
-                html += `<div class="stat-card"><div style="font-size:2rem;">${s.totalBets.toLocaleString()} G</div><div>Pariés</div></div>`;
-                html += `<div class="stat-card"><div style="font-size:2rem;">${s.totalWins.toLocaleString()} G</div><div>Gains</div></div>`;
-                html += `<div class="stat-card"><div style="font-size:2rem;" class="${s.netResult >= 0 ? 'profit' : 'loss'}">${s.netResult.toLocaleString()} G</div><div>Résultat net</div></div>`;
-                html += `<div class="stat-card"><div style="font-size:2rem;">${s.gainCount}</div><div>Agents en gain</div></div>`;
-                html += `<div class="stat-card"><div style="font-size:2rem;">${s.lossCount}</div><div>Agents en perte</div></div>`;
+                html += `<div class="stat-card"><div style="font-size:2rem;">${s.total_tickets}</div><div>Tickets</div></div>`;
+                html += `<div class="stat-card"><div style="font-size:2rem;">${parseFloat(s.total_bets).toLocaleString()} G</div><div>Pariés</div></div>`;
+                html += `<div class="stat-card"><div style="font-size:2rem;">${parseFloat(s.total_wins).toLocaleString()} G</div><div>Gains</div></div>`;
+                html += `<div class="stat-card"><div style="font-size:2rem;" class="${parseFloat(s.net_result) >= 0 ? 'profit' : 'loss'}">${parseFloat(s.net_result).toLocaleString()} G</div><div>Résultat net</div></div>`;
+                html += `<div class="stat-card"><div style="font-size:2rem;">${s.gain_count}</div><div>Agents en gain</div></div>`;
+                html += `<div class="stat-card"><div style="font-size:2rem;">${s.loss_count}</div><div>Agents en perte</div></div>`;
                 html += `</div>`;
 
                 if (report.detail && report.detail.length > 0) {
@@ -895,7 +931,6 @@
                 }
                 document.getElementById('report-result').innerHTML = html;
 
-                // Graphique
                 const ctx = document.getElementById('reportChart').getContext('2d');
                 if (chartInstance) chartInstance.destroy();
                 chartInstance = new Chart(ctx, {
@@ -904,7 +939,7 @@
                         labels: ['Mises', 'Gains', 'Résultat net'],
                         datasets: [{
                             label: 'Montants (G)',
-                            data: [s.totalBets, s.totalWins, s.netResult],
+                            data: [parseFloat(s.total_bets), parseFloat(s.total_wins), parseFloat(s.net_result)],
                             backgroundColor: ['#00d4ff', '#00f190', '#ad00f1']
                         }]
                     },
@@ -931,7 +966,7 @@
 
             // ---------- CHARGEMENT INITIAL ----------
             window.onload = function() {
-                loadDashboard(); // onglet dashboard par défaut
+                loadDashboard();
                 loadUsersLists();
                 loadDraws();
                 loadBlockedNumbers();
@@ -940,6 +975,7 @@
                 loadDrawsForReport();
                 toggleSupervisorField();
                 toggleCustomDates();
+                // La liste des restrictions est chargée via l'onglet numbers, mais on peut aussi la précharger ici si on veut
             };
         </script>
     </div>
