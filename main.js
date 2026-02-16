@@ -14,9 +14,6 @@ async function initApp() {
     APP_STATE.agentId = agentId;
     APP_STATE.agentName = agentName;
 
-    // ✅ Mise à jour du nom affiché dans l'en-tête
-    document.getElementById('agent-name').textContent = agentName;
-
     await loadLotteryConfig();
     await APIService.getTickets();
     await APIService.getWinningTickets();
