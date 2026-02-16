@@ -9,6 +9,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const moment = require('moment');
 const path = require('path');
+const multer = require('multer');               // ← ajout pour gérer les fichiers
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -27,6 +28,13 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(morgan('dev'));
+
+// Configuration de multer pour l'upload de logo (stockage en mémoire, on pourra le convertir en base64 ou sauvegarder sur disque)
+const storage = multer.memoryStorage();
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024 } // 5 Mo max
+});
 
 // Rate limiting
 const limiter = rateLimit({
@@ -61,13 +69,18 @@ async function addColumnIfNotExists(table, column, definition) {
   }
 }
 
-// Initialisation des tables
+// Initialisation des tables (ajout des colonnes manquantes pour la config)
 async function initializeDatabase() {
   try {
     console.log('🔄 Vérification de la base de données...');
-    // Ajouter colonne paid si elle n'existe pas
+    // Colonnes existantes déjà gérées
     await addColumnIfNotExists('tickets', 'paid', 'BOOLEAN DEFAULT FALSE');
     await addColumnIfNotExists('tickets', 'paid_at', 'TIMESTAMP');
+
+    // Ajout des colonnes pour la configuration propriétaire
+    await addColumnIfNotExists('lottery_config', 'slogan', 'TEXT');
+    await addColumnIfNotExists('lottery_config', 'multipliers', 'JSONB'); // stocke les multiplicateurs
+
     console.log('✅ Base de données prête');
   } catch (error) {
     console.error('❌ Erreur initialisation:', error);
@@ -1180,6 +1193,108 @@ ownerRouter.get('/reports', async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Erreur rapport owner:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// ========== NOUVELLES ROUTES POUR LA CONFIGURATION PROPRIÉTAIRE ==========
+
+// GET /api/owner/settings - Récupérer les paramètres généraux (nom, slogan, logo, multiplicateurs)
+ownerRouter.get('/settings', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM lottery_config LIMIT 1');
+    const config = result.rows[0] || {};
+
+    // Valeurs par défaut des multiplicateurs
+    const defaultMultipliers = {
+      lot1: 60,
+      lot2: 20,
+      lot3: 10,
+      lotto3: 500,
+      lotto4: 5000,
+      lotto5: 25000,
+      mariage: 500
+    };
+
+    // Si la colonne multipliers n'existe pas encore, on utilise les défauts
+    let multipliers = config.multipliers || defaultMultipliers;
+    // Si c'est une chaîne JSON, on la parse
+    if (typeof multipliers === 'string') {
+      try { multipliers = JSON.parse(multipliers); } catch { multipliers = defaultMultipliers; }
+    }
+
+    res.json({
+      name: config.name || 'LOTATO PRO',
+      slogan: config.slogan || '',
+      logoUrl: config.logo || '',
+      multipliers: multipliers
+    });
+  } catch (error) {
+    console.error('❌ Erreur GET /settings:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// POST /api/owner/settings - Enregistrer les paramètres (gère à la fois JSON et multipart/form-data)
+ownerRouter.post('/settings', upload.single('logo'), async (req, res) => {
+  try {
+    let { name, slogan, logoUrl, multipliers } = req.body;
+
+    // Si c'est du FormData, multipliers peut être une chaîne JSON, on la parse
+    if (multipliers && typeof multipliers === 'string') {
+      try { multipliers = JSON.parse(multipliers); } catch { multipliers = {}; }
+    }
+
+    // Valeurs par défaut si certains champs manquent
+    const defaultMultipliers = {
+      lot1: 60,
+      lot2: 20,
+      lot3: 10,
+      lotto3: 500,
+      lotto4: 5000,
+      lotto5: 25000,
+      mariage: 500
+    };
+    multipliers = { ...defaultMultipliers, ...(multipliers || {}) };
+
+    // Gestion du logo : si un fichier a été uploadé, on le convertit en base64 pour le stocker
+    let logo = logoUrl;
+    if (req.file) {
+      // Convertir le buffer en base64
+      const base64 = req.file.buffer.toString('base64');
+      const mimeType = req.file.mimetype;
+      logo = `data:${mimeType};base64,${base64}`;
+    }
+
+    // Mettre à jour ou insérer dans lottery_config
+    const check = await pool.query('SELECT id FROM lottery_config LIMIT 1');
+    if (check.rows.length === 0) {
+      await pool.query(
+        `INSERT INTO lottery_config (name, slogan, logo, multipliers) VALUES ($1, $2, $3, $4)`,
+        [name || 'LOTATO PRO', slogan || '', logo || '', JSON.stringify(multipliers)]
+      );
+    } else {
+      // Construction dynamique de la requête UPDATE
+      const updates = [];
+      const values = [];
+      let idx = 1;
+
+      if (name !== undefined) { updates.push(`name = $${idx++}`); values.push(name); }
+      if (slogan !== undefined) { updates.push(`slogan = $${idx++}`); values.push(slogan); }
+      if (logo !== undefined) { updates.push(`logo = $${idx++}`); values.push(logo); }
+      if (multipliers !== undefined) { updates.push(`multipliers = $${idx++}`); values.push(JSON.stringify(multipliers)); }
+
+      if (updates.length > 0) {
+        await pool.query(
+          `UPDATE lottery_config SET ${updates.join(', ')}`,
+          values
+        );
+      }
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Erreur POST /settings:', error);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
