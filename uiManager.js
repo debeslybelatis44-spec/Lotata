@@ -286,7 +286,9 @@ async function loadReports() {
         const drawSelector = document.getElementById('draw-report-selector');
         drawSelector.innerHTML = '<option value="all">Tout Tiraj</option>';
         
-        CONFIG.DRAWS.forEach(draw => {
+        // Utiliser APP_STATE.draws (chargés depuis le serveur) ou CONFIG.DRAWS en fallback
+        const draws = APP_STATE.draws || CONFIG.DRAWS;
+        draws.forEach(draw => {
             const option = document.createElement('option');
             option.value = draw.id;
             option.textContent = draw.name;
@@ -375,104 +377,128 @@ async function loadDrawReport(drawId = null) {
     }
 }
 
-// NOUVELLE FONCTION D'IMPRESSION DE RAPPORT AMÉLIORÉE
+// FONCTION D'IMPRESSION DE RAPPORT AMÉLIORÉE
 function printReport() {
-    const printWindow = window.open('', '_blank', 'width=800,height=600');
-    
-    const drawSelector = document.getElementById('draw-report-selector');
-    const selectedDraw = drawSelector.options[drawSelector.selectedIndex].text;
-    const selectedDrawId = drawSelector.value;
-    
-    let ticketsToAnalyze = selectedDrawId === 'all' 
-        ? APP_STATE.ticketsHistory 
-        : APP_STATE.ticketsHistory.filter(t => 
-            t.draw_id === selectedDrawId || t.drawId === selectedDrawId
-          );
-    
-    const totalTickets = ticketsToAnalyze.length;
-    const totalBets = ticketsToAnalyze.reduce((sum, t) => sum + (parseFloat(t.total_amount || t.totalAmount || 0) || 0), 0);
-    const totalWins = ticketsToAnalyze.reduce((sum, t) => sum + (parseFloat(t.win_amount || t.winAmount || 0) || 0), 0);
-    const netProfit = totalWins - totalBets;
-    
-    let reportHtml = `
-        <h2>Rapò ${selectedDraw === 'all' ? 'Jeneral' : selectedDraw}</h2>
-        <p><strong>Dat:</strong> ${new Date().toLocaleDateString('fr-FR')}</p>
-        <p><strong>Ajan:</strong> ${APP_STATE.agentName}</p>
-        <hr>
-        <h3>Rezime</h3>
-        <table style="width:100%; border-collapse:collapse;">
-            <tr><th>Total Tikè</th><td>${totalTickets}</td></tr>
-            <tr><th>Total Paris</th><td>${totalBets.toLocaleString('fr-FR')} Gdes</td></tr>
-            <tr><th>Total Ganyen</th><td>${totalWins.toLocaleString('fr-FR')} Gdes</td></tr>
-            <tr><th>Balans</th><td style="color:${netProfit >=0 ? 'green' : 'red'}">${netProfit.toLocaleString('fr-FR')} Gdes</td></tr>
-        </table>
-    `;
-    
-    // Si "Tout Tiraj", ajouter un détail par tirage
-    if (selectedDrawId === 'all') {
-        const draws = CONFIG.DRAWS;
-        reportHtml += `<hr><h3>Detay pa tiraj</h3>`;
-        for (const draw of draws) {
-            const drawTickets = APP_STATE.ticketsHistory.filter(t => t.draw_id === draw.id || t.drawId === draw.id);
-            if (drawTickets.length === 0) continue;
-            const drawBets = drawTickets.reduce((sum, t) => sum + (parseFloat(t.total_amount || t.totalAmount || 0) || 0), 0);
-            const drawWins = drawTickets.reduce((sum, t) => sum + (parseFloat(t.win_amount || t.winAmount || 0) || 0), 0);
-            const drawNet = drawWins - drawBets;
-            reportHtml += `
-                <div style="margin-top:15px;">
-                    <h4>${draw.name}</h4>
-                    <table style="width:100%;">
-                        <tr><th>Tikè</th><td>${drawTickets.length}</td></tr>
-                        <tr><th>Paris</th><td>${drawBets.toLocaleString('fr-FR')} Gdes</td></tr>
-                        <tr><th>Ganyen</th><td>${drawWins.toLocaleString('fr-FR')} Gdes</td></tr>
-                        <tr><th>Balans</th><td style="color:${drawNet >=0 ? 'green' : 'red'}">${drawNet.toLocaleString('fr-FR')} Gdes</td></tr>
-                    </table>
-                </div>
-            `;
-        }
-    }
-    
-    const lotteryConfig = APP_STATE.lotteryConfig || CONFIG;
-    const logoHtml = lotteryConfig.LOTTERY_LOGO ? 
-        `<img src="${lotteryConfig.LOTTERY_LOGO}" style="max-width: 100px; margin: 10px auto; display: block;" alt="${lotteryConfig.LOTTERY_NAME}">` : '';
-    const addressHtml = lotteryConfig.LOTTERY_ADDRESS ? `<p style="font-size:12px;">${lotteryConfig.LOTTERY_ADDRESS}</p>` : '';
-    const phoneHtml = lotteryConfig.LOTTERY_PHONE ? `<p style="font-size:12px;">Tel: ${lotteryConfig.LOTTERY_PHONE}</p>` : '';
-    
-    const content = `
-        <html>
-        <head>
-            <title>Rapò ${selectedDraw}</title>
-            <style>
-                body { font-family: Arial, sans-serif; padding: 20px; }
-                h2, h3, h4 { color: #333; }
-                hr { border: 1px solid #ccc; margin: 10px 0; }
-                table { width:100%; border-collapse:collapse; margin:10px 0; }
-                th, td { border:1px solid #ccc; padding:8px; text-align:left; }
-                th { background:#f0f0f0; }
-            </style>
-        </head>
-        <body style="text-align:center;">
-            ${logoHtml}
-            <h1>${lotteryConfig.LOTTERY_NAME}</h1>
-            ${addressHtml}
-            ${phoneHtml}
-            <hr>
-            <div style="text-align:left;">
-                ${reportHtml}
-            </div>
-            <hr>
-            <p style="font-size:12px;">Jenere nan: ${new Date().toLocaleString('fr-FR')}</p>
-        </body>
-        </html>
-    `;
+    try {
+        console.log('Début impression rapport');
+        console.log('Tickets history:', APP_STATE.ticketsHistory);
 
-    printWindow.document.write(content);
-    printWindow.document.close();
-    
-    setTimeout(() => {
-        printWindow.print();
-        printWindow.close();
-    }, 500);
+        // Vérifier qu'il y a des tickets
+        if (!APP_STATE.ticketsHistory || APP_STATE.ticketsHistory.length === 0) {
+            alert("Pa gen tikè nan istorik la pou jenere rapò.");
+            return;
+        }
+
+        // Ouvrir une nouvelle fenêtre avec vérification anti-pop-up
+        const printWindow = window.open('', '_blank', 'width=800,height=600');
+        if (!printWindow) {
+            alert("Tanpri pèmèt pop-up pou enprime rapò a.");
+            return;
+        }
+
+        const drawSelector = document.getElementById('draw-report-selector');
+        const selectedDraw = drawSelector.options[drawSelector.selectedIndex].text;
+        const selectedDrawId = drawSelector.value;
+
+        // Filtrer les tickets selon la sélection
+        let ticketsToAnalyze = selectedDrawId === 'all' 
+            ? APP_STATE.ticketsHistory 
+            : APP_STATE.ticketsHistory.filter(t => 
+                t.draw_id === selectedDrawId || t.drawId === selectedDrawId
+              );
+
+        const totalTickets = ticketsToAnalyze.length;
+        const totalBets = ticketsToAnalyze.reduce((sum, t) => sum + (parseFloat(t.total_amount || t.totalAmount || t.amount || 0) || 0), 0);
+        const totalWins = ticketsToAnalyze.reduce((sum, t) => sum + (parseFloat(t.win_amount || t.winAmount || t.prize_amount || 0) || 0), 0);
+        const netProfit = totalWins - totalBets;
+
+        let reportHtml = `
+            <h2>Rapò ${selectedDraw === 'all' ? 'Jeneral' : selectedDraw}</h2>
+            <p><strong>Dat:</strong> ${new Date().toLocaleDateString('fr-FR')}</p>
+            <p><strong>Ajan:</strong> ${APP_STATE.agentName || 'Agent'}</p>
+            <hr>
+            <h3>Rezime</h3>
+            <table style="width:100%; border-collapse:collapse;">
+                <tr><th>Total Tikè</th><td>${totalTickets}</td></tr>
+                <tr><th>Total Paris</th><td>${totalBets.toLocaleString('fr-FR')} Gdes</td></tr>
+                <tr><th>Total Ganyen</th><td>${totalWins.toLocaleString('fr-FR')} Gdes</td></tr>
+                <tr><th>Balans</th><td style="color:${netProfit >=0 ? 'green' : 'red'}">${netProfit.toLocaleString('fr-FR')} Gdes</td></tr>
+            </table>
+        `;
+
+        // Si "Tout Tiraj", ajouter un détail par tirage
+        if (selectedDrawId === 'all') {
+            const draws = APP_STATE.draws || CONFIG.DRAWS;
+            reportHtml += `<hr><h3>Detay pa tiraj</h3>`;
+            for (const draw of draws) {
+                // Ignorer les tirages inactifs si la propriété existe
+                if (draw.active === false) continue;
+                const drawTickets = APP_STATE.ticketsHistory.filter(t => t.draw_id === draw.id || t.drawId === draw.id);
+                if (drawTickets.length === 0) continue;
+                const drawBets = drawTickets.reduce((sum, t) => sum + (parseFloat(t.total_amount || t.totalAmount || t.amount || 0) || 0), 0);
+                const drawWins = drawTickets.reduce((sum, t) => sum + (parseFloat(t.win_amount || t.winAmount || t.prize_amount || 0) || 0), 0);
+                const drawNet = drawWins - drawBets;
+                reportHtml += `
+                    <div style="margin-top:15px;">
+                        <h4>${draw.name}</h4>
+                        <table style="width:100%;">
+                            <tr><th>Tikè</th><td>${drawTickets.length}</td></tr>
+                            <tr><th>Paris</th><td>${drawBets.toLocaleString('fr-FR')} Gdes</td></tr>
+                            <tr><th>Ganyen</th><td>${drawWins.toLocaleString('fr-FR')} Gdes</td></tr>
+                            <tr><th>Balans</th><td style="color:${drawNet >=0 ? 'green' : 'red'}">${drawNet.toLocaleString('fr-FR')} Gdes</td></tr>
+                        </table>
+                    </div>
+                `;
+            }
+        }
+
+        const lotteryConfig = APP_STATE.lotteryConfig || CONFIG;
+        const logoHtml = lotteryConfig.LOTTERY_LOGO ? 
+            `<img src="${lotteryConfig.LOTTERY_LOGO}" style="max-width: 100px; margin: 10px auto; display: block;" alt="${lotteryConfig.LOTTERY_NAME}">` : '';
+        const addressHtml = lotteryConfig.LOTTERY_ADDRESS ? `<p style="font-size:12px;">${lotteryConfig.LOTTERY_ADDRESS}</p>` : '';
+        const phoneHtml = lotteryConfig.LOTTERY_PHONE ? `<p style="font-size:12px;">Tel: ${lotteryConfig.LOTTERY_PHONE}</p>` : '';
+
+        const content = `
+            <html>
+            <head>
+                <title>Rapò ${selectedDraw}</title>
+                <style>
+                    body { font-family: Arial, sans-serif; padding: 20px; }
+                    h2, h3, h4 { color: #333; }
+                    hr { border: 1px solid #ccc; margin: 10px 0; }
+                    table { width:100%; border-collapse:collapse; margin:10px 0; }
+                    th, td { border:1px solid #ccc; padding:8px; text-align:left; }
+                    th { background:#f0f0f0; }
+                </style>
+            </head>
+            <body style="text-align:center;">
+                ${logoHtml}
+                <h1>${lotteryConfig.LOTTERY_NAME || 'LOTATO PRO'}</h1>
+                ${addressHtml}
+                ${phoneHtml}
+                <hr>
+                <div style="text-align:left;">
+                    ${reportHtml}
+                </div>
+                <hr>
+                <p style="font-size:12px;">Jenere nan: ${new Date().toLocaleString('fr-FR')}</p>
+            </body>
+            </html>
+        `;
+
+        printWindow.document.write(content);
+        printWindow.document.close();
+
+        // Attendre que le contenu soit chargé puis lancer l'impression
+        printWindow.onload = function() {
+            printWindow.print();
+            // Optionnel : fermer automatiquement après impression
+            // printWindow.onafterprint = function() { printWindow.close(); };
+        };
+    } catch (error) {
+        console.error('Erreur dans printReport:', error);
+        alert('Erè pandan enpresyon: ' + error.message);
+    }
 }
 
 // ==================== FONCTIONS POUR LES GAGNANTS ====================
@@ -780,5 +806,7 @@ function logout() {
     });
 }
 
-// Exposer la fonction editTicket globalement (déjà fait)
+// Exposer les fonctions globalement
 window.editTicket = editTicket;
+window.printReport = printReport;
+window.logout = logout;
