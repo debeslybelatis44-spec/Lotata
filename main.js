@@ -41,3 +41,36 @@ if ('serviceWorker' in navigator) {
         .then(reg => console.log('PWA: Service Worker actif'))
         .catch(err => console.error('PWA: Erreur', err));
 }
+
+// ========== FONCTION DE DÉCONNEXION ==========
+async function logout() {
+    // Demander confirmation (optionnel)
+    if (!confirm('Èske ou sèten ou vle dekonekte?')) return;
+
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+        try {
+            // Informer le serveur de la déconnexion (optionnel)
+            await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.LOGOUT}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+        } catch (error) {
+            console.error('Erreur lors de la déconnexion côté serveur :', error);
+        }
+    }
+
+    // Nettoyer le stockage local
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('agent_id');
+    localStorage.removeItem('agent_name');
+
+    // Rediriger vers la page de connexion
+    window.location.href = 'index.html';
+}
+
+// Rendre la fonction accessible depuis le HTML
+window.logout = logout;
