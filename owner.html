@@ -44,6 +44,7 @@
         th, td { padding:12px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.05); }
         .profit { color:#00f190; }
         .loss { color:#ff4d4d; }
+        .restriction-item { display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid #333; }
     </style>
 </head>
 <body>
@@ -147,6 +148,13 @@
                 </div>
             </div>
 
+            <!-- Affichage des informations de l'utilisateur créé (point 2) -->
+            <div id="user-created-info" class="alert alert-success" style="display:none; margin-top:20px;">
+                <strong>✅ Utilisateur créé avec succès :</strong>
+                <div id="created-user-details" style="margin:10px 0;"></div>
+                <button class="btn-primary" onclick="document.getElementById('user-created-info').style.display='none'">Fermer</button>
+            </div>
+
             <div class="section-title"><i class="fas fa-list"></i> Agents & Superviseurs</div>
             <div id="user-load-error" class="alert alert-danger" style="display:none;"></div>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
@@ -244,6 +252,13 @@
                     <input type="number" id="limit-amount" placeholder="100">
                 </div>
                 <button class="btn-primary" onclick="setNumberLimit()">Appliquer</button>
+            </div>
+
+            <!-- ========== NOUVEAU : Liste des restrictions avec déblocage (point 1) ========== -->
+            <div class="section-title"><i class="fas fa-list"></i> Liste des restrictions actuelles</div>
+            <button class="btn-primary" onclick="loadAllRestrictions()">Afficher les restrictions</button>
+            <div id="restrictions-list" class="list-container" style="max-height:400px; margin-top:15px; display:none;">
+                <!-- Le contenu sera chargé dynamiquement -->
             </div>
         </div>
 
@@ -501,6 +516,22 @@
                     const result = await res.json();
                     if (result.success) {
                         showMessage('user-create-message', '✅ Utilisateur créé avec succès', true);
+                        
+                        // Affichage des informations de l'utilisateur créé (point 2)
+                        if (result.user) {
+                            const user = result.user;
+                            const details = `
+                                <p><strong>Nom :</strong> ${user.name}</p>
+                                <p><strong>Identifiant :</strong> ${user.username}</p>
+                                <p><strong>Rôle :</strong> ${user.role}</p>
+                                <p><strong>CIN :</strong> ${user.cin || 'Non renseigné'}</p>
+                                <p><strong>Zone :</strong> ${user.zone || 'Non renseignée'}</p>
+                                <p><strong>Superviseur :</strong> ${user.supervisor_name || 'Aucun'}</p>
+                            `;
+                            document.getElementById('created-user-details').innerHTML = details;
+                            document.getElementById('user-created-info').style.display = 'block';
+                        }
+
                         loadUsersLists();
                         document.getElementById('create-fullname').value = '';
                         document.getElementById('create-cin').value = '';
@@ -669,6 +700,123 @@
                 alert('Limite appliquée');
             }
 
+            // ---------- NOUVELLES FONCTIONS POUR LA LISTE DES RESTRICTIONS (point 1) ----------
+            async function fetchGlobalBlockedNumbers() {
+                const token = localStorage.getItem('auth_token');
+                const res = await fetch(`${API_URL}/api/owner/blocked-numbers`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                return (data.blockedNumbers || []).map(num => ({ type: 'global', number: num }));
+            }
+
+            async function fetchPerDrawBlockedNumbers() {
+                const token = localStorage.getItem('auth_token');
+                // On suppose un endpoint qui retourne la liste des blocages par tirage
+                const res = await fetch(`${API_URL}/api/owner/blocked-numbers-per-draw`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) return []; // si l'endpoint n'existe pas, on retourne tableau vide
+                const data = await res.json();
+                return data.map(item => ({ type: 'per-draw', drawId: item.drawId, drawName: item.drawName, number: item.number }));
+            }
+
+            async function fetchNumberLimits() {
+                const token = localStorage.getItem('auth_token');
+                // Endpoint pour lister les limites
+                const res = await fetch(`${API_URL}/api/owner/number-limits`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) return [];
+                const data = await res.json();
+                return data.map(item => ({ type: 'limit', drawId: item.drawId, drawName: item.drawName, number: item.number, limit: item.limitAmount }));
+            }
+
+            async function unblockPerDraw(drawId, number) {
+                const token = localStorage.getItem('auth_token');
+                await fetch(`${API_URL}/api/owner/unblock-number-draw`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ drawId, number })
+                });
+                loadAllRestrictions(); // recharger la liste
+            }
+
+            async function removeLimit(drawId, number) {
+                const token = localStorage.getItem('auth_token');
+                // Endpoint pour supprimer une limite (à créer côté backend)
+                await fetch(`${API_URL}/api/owner/remove-number-limit`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ drawId, number })
+                });
+                loadAllRestrictions(); // recharger
+            }
+
+            async function loadAllRestrictions() {
+                const container = document.getElementById('restrictions-list');
+                container.style.display = 'block';
+                container.innerHTML = '<p>Chargement des restrictions...</p>';
+
+                try {
+                    const [globalBlocked, perDrawBlocked, limits] = await Promise.all([
+                        fetchGlobalBlockedNumbers(),
+                        fetchPerDrawBlockedNumbers(),
+                        fetchNumberLimits()
+                    ]);
+
+                    let html = '<table><thead><tr><th>Type</th><th>Tirage</th><th>Numéro</th><th>Limite (G)</th><th>Action</th></tr></thead><tbody>';
+
+                    globalBlocked.forEach(item => {
+                        html += `<tr>
+                            <td>Global</td>
+                            <td>Tous</td>
+                            <td>${item.number}</td>
+                            <td>—</td>
+                            <td><button class="btn-primary" style="padding:4px 8px;" onclick="unblockNumberGlobalWithValue('${item.number}')">Débloquer global</button></td>
+                        </tr>`;
+                    });
+
+                    perDrawBlocked.forEach(item => {
+                        html += `<tr>
+                            <td>Par tirage (bloqué)</td>
+                            <td>${item.drawName || item.drawId}</td>
+                            <td>${item.number}</td>
+                            <td>—</td>
+                            <td><button class="btn-primary" style="padding:4px 8px;" onclick="unblockPerDraw('${item.drawId}', '${item.number}')">Débloquer</button></td>
+                        </tr>`;
+                    });
+
+                    limits.forEach(item => {
+                        html += `<tr>
+                            <td>Limite</td>
+                            <td>${item.drawName || item.drawId}</td>
+                            <td>${item.number}</td>
+                            <td>${item.limit} G</td>
+                            <td><button class="btn-danger" style="padding:4px 8px;" onclick="removeLimit('${item.drawId}', '${item.number}')">Supprimer limite</button></td>
+                        </tr>`;
+                    });
+
+                    html += '</tbody></table>';
+                    container.innerHTML = html;
+                } catch (e) {
+                    container.innerHTML = '<p class="loss">Erreur lors du chargement des restrictions.</p>';
+                    console.error(e);
+                }
+            }
+
+            // Fonction utilitaire pour débloquer global depuis la liste
+            async function unblockNumberGlobalWithValue(num) {
+                const token = localStorage.getItem('auth_token');
+                await fetch(`${API_URL}/api/owner/unblock-number`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ number: num })
+                });
+                loadAllRestrictions();
+                loadBlockedNumbers(); // mettre à jour aussi l'affichage simple
+            }
+
             // ---------- RAPPORTS ----------
             async function loadSupervisorsAndAgents() {
                 const token = localStorage.getItem('auth_token');
@@ -797,3 +945,4 @@
     </div>
 </body>
 </html>
+```
