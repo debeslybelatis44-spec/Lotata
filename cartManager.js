@@ -324,7 +324,8 @@ var CartManager = {
     },
 
     removeBet(id) {
-        APP_STATE.currentCart = APP_STATE.currentCart.filter(item => item.id !== id);
+        // CORRECTION : convertir les IDs en chaîne pour une comparaison fiable
+        APP_STATE.currentCart = APP_STATE.currentCart.filter(item => item.id.toString() !== id.toString());
         this.renderCart();
     },
 
@@ -608,7 +609,7 @@ function generateTicketHTML(ticket) {
             <div class="ticket-header">
                 ${logoUrl ? `<img src="${logoUrl}" class="logo" alt="${lotteryName}">` : ''}
                 <h2 class="bold mb-1" style="font-size:14px;">${lotteryName}</h2>
-                ${slogan ? `<p style="font-size:10px; font-style:italic;">${slogan}</p>` : ''}   <!-- NOUVEAU -->
+                ${slogan ? `<p style="font-size:10px; font-style:italic;">${slogan}</p>` : ''}
                 ${address ? `<p style="font-size:9px;">${address}</p>` : ''}
                 ${phone ? `<p style="font-size:9px;">Tel: ${phone}</p>` : ''}
             </div>

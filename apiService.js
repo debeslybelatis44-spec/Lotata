@@ -72,7 +72,12 @@ const APIService = {
 
     async getWinningTickets() {
         try {
-            const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.GET_WINNERS}?agentId=${APP_STATE.agentId}`);
+            const token = localStorage.getItem('auth_token');
+            const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.GET_WINNERS}?agentId=${APP_STATE.agentId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
             
             if (!response.ok) throw new Error('Erreur réseau');
             
@@ -81,13 +86,19 @@ const APIService = {
             return data;
         } catch (error) {
             console.error('Erreur récupération gagnants:', error);
+            APP_STATE.winningTickets = [];   // ← ajout pour éviter undefined
             return { winners: [] };
         }
     },
 
     async getWinningResults() {
         try {
-            const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.GET_WINNING_RESULTS}?agentId=${APP_STATE.agentId}`);
+            const token = localStorage.getItem('auth_token');
+            const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.GET_WINNING_RESULTS}?agentId=${APP_STATE.agentId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
             
             if (!response.ok) throw new Error('Erreur réseau');
             
@@ -96,16 +107,19 @@ const APIService = {
             return data;
         } catch (error) {
             console.error('Erreur récupération résultats gagnants:', error);
+            APP_STATE.winningResults = [];   // ← ajout
             return { results: [] };
         }
     },
 
     async deleteTicket(ticketId) {
         try {
+            const token = localStorage.getItem('auth_token');
             const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.DELETE_TICKET}/${ticketId}`, {
                 method: 'DELETE',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
                 }
             });
             
@@ -124,7 +138,12 @@ const APIService = {
 
     async getLotteryConfig() {
         try {
-            const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.GET_LOTTERY_CONFIG}`);
+            const token = localStorage.getItem('auth_token');   // ← CORRECTION : ajout du token
+            const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.GET_LOTTERY_CONFIG}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
             
             if (!response.ok) throw new Error('Erreur réseau');
             
@@ -138,10 +157,12 @@ const APIService = {
 
     async checkWinningTickets() {
         try {
+            const token = localStorage.getItem('auth_token');
             const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.CHECK_WINNING_TICKETS}?agentId=${APP_STATE.agentId}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
                 }
             });
             
