@@ -7,7 +7,8 @@ function isNumberBlocked(number, drawId) {
     return drawBlocked.includes(number);
 }
 
-const CartManager = {
+// Rendre CartManager global (var au lieu de const)
+var CartManager = {
     addBet() {
         if (APP_STATE.isDrawBlocked) {
             alert("Tiraj sa a ap rantre nan 3 minit. Ou pa ka ajoute plis paray.");
@@ -386,6 +387,8 @@ const CartManager = {
     }
 };
 
+// Le reste du fichier reste identique (processFinalTicket, printThermalTicket, etc.)
+
 async function processFinalTicket() {
     if (APP_STATE.currentCart.length === 0) {
         alert("Pa gen anyen nan panye an!");
@@ -514,10 +517,11 @@ function printThermalTicket(ticket) {
 
 function generateTicketHTML(ticket) {
     const lotteryConfig = APP_STATE.lotteryConfig || CONFIG;
-    const lotteryName = lotteryConfig.LOTTERY_NAME || 'LOTTERIE';
-    const logoUrl = lotteryConfig.LOTTERY_LOGO || '';
-    const address = lotteryConfig.LOTTERY_ADDRESS || '';
-    const phone = lotteryConfig.LOTTERY_PHONE || '';
+    const lotteryName = lotteryConfig.LOTTERY_NAME || lotteryConfig.name || 'LOTTERIE';
+    const slogan = lotteryConfig.slogan || '';   // ← NOUVEAU
+    const logoUrl = lotteryConfig.LOTTERY_LOGO || lotteryConfig.logo || '';
+    const address = lotteryConfig.LOTTERY_ADDRESS || lotteryConfig.address || '';
+    const phone = lotteryConfig.LOTTERY_PHONE || lotteryConfig.phone || '';
     
     let betsHtml = '';
     if (Array.isArray(ticket.bets)) {
@@ -604,6 +608,7 @@ function generateTicketHTML(ticket) {
             <div class="ticket-header">
                 ${logoUrl ? `<img src="${logoUrl}" class="logo" alt="${lotteryName}">` : ''}
                 <h2 class="bold mb-1" style="font-size:14px;">${lotteryName}</h2>
+                ${slogan ? `<p style="font-size:10px; font-style:italic;">${slogan}</p>` : ''}   <!-- NOUVEAU -->
                 ${address ? `<p style="font-size:9px;">${address}</p>` : ''}
                 ${phone ? `<p style="font-size:9px;">Tel: ${phone}</p>` : ''}
             </div>
