@@ -477,61 +477,40 @@ async function processFinalTicket() {
 
 function printThermalTicket(ticket) {
     try {
-        // Générer le HTML du ticket
-        const ticketHTML = generateTicketHTML(ticket);
+        const printContent = generateTicketHTML(ticket);
         
-        // Créer un conteneur temporaire
-        const printContainer = document.createElement('div');
-        printContainer.id = 'thermal-print-container';
-        printContainer.style.position = 'fixed';
-        printContainer.style.top = '-100%';
-        printContainer.style.left = '-100%';
-        printContainer.style.width = '100%';
-        printContainer.style.height = 'auto';
-        printContainer.style.backgroundColor = '#fff';
-        printContainer.style.zIndex = '-1000';
-        printContainer.style.visibility = 'hidden'; // Sera visible uniquement à l'impression grâce aux médias
-        printContainer.innerHTML = ticketHTML;
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'absolute';
+        iframe.style.width = '0px';
+        iframe.style.height = '0px';
+        iframe.style.border = 'none';
+        iframe.style.left = '-1000px';
+        iframe.style.top = '-1000px';
         
-        document.body.appendChild(printContainer);
+        document.body.appendChild(iframe);
         
-        // Ajouter temporairement une feuille de style pour l'impression
-        const style = document.createElement('style');
-        style.id = 'print-style-temp';
-        style.textContent = `
-            @media print {
-                body > *:not(#thermal-print-container) {
-                    display: none !important;
-                }
-                #thermal-print-container {
-                    position: static !important;
-                    visibility: visible !important;
-                    display: block !important;
-                    width: 100%;
-                    margin: 0;
-                    padding: 0;
-                }
-            }
-        `;
-        document.head.appendChild(style);
+        let iframeDoc = iframe.contentWindow || iframe.contentDocument;
+        if (iframeDoc.document) {
+            iframeDoc = iframeDoc.document;
+        }
         
-        // Déclencher l'impression
-        window.print();
+        iframeDoc.open();
+        iframeDoc.write(printContent);
+        iframeDoc.close();
         
-        // Nettoyer après impression (avec un délai pour laisser le temps à l'impression de démarrer)
         setTimeout(() => {
-            if (document.body.contains(printContainer)) {
-                document.body.removeChild(printContainer);
-            }
-            const tempStyle = document.getElementById('print-style-temp');
-            if (tempStyle) {
-                document.head.removeChild(tempStyle);
-            }
-        }, 1000);
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+            
+            setTimeout(() => {
+                document.body.removeChild(iframe);
+            }, 1000);
+            
+        }, 500);
         
     } catch (error) {
         console.error('Erreur impression:', error);
-        alert("Impossible d'imprimer le ticket. Vérifiez votre connexion ou réessayez.");
+        fallbackPrintTicket(ticket);
     }
 }
 
@@ -568,100 +547,104 @@ function generateTicketHTML(ticket) {
     const multiDrawNote = ticket.multiDraw ? 
         '<div style="text-align:center; font-weight:bold; margin:5px 0;">--- MULTI-TIRAJ ---</div>' : '';
 
-    // Styles intégrés directement pour l'impression
     return `
-        <style>
-            @media print {
-                @page {
-                    size: 80mm auto;
-                    margin: 2mm;
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Ticket #${ticket.ticket_id || ticket.id}</title>
+            <style>
+                @media print {
+                    @page {
+                        size: 80mm auto;
+                        margin: 2mm;
+                    }
+                    body {
+                        font-family: 'Arial', 'Helvetica', sans-serif;
+                        font-size: 11px;
+                        width: 76mm;
+                        margin: 0 auto;
+                        padding: 3mm;
+                        color: #000000;
+                        background: #ffffff;
+                        line-height: 1.3;
+                    }
+                    * {
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
+                    }
+                    .ticket-header {
+                        text-align: center;
+                        border-bottom: 1px solid #000;
+                        padding-bottom: 5px;
+                        margin-bottom: 5px;
+                    }
+                    .ticket-header h2 {
+                        margin: 5px 0 2px 0;
+                        font-size: 16px;
+                        font-weight: bold;
+                        text-transform: uppercase;
+                    }
+                    .ticket-header .slogan {
+                        font-style: italic;
+                        font-size: 10px;
+                        color: #333;
+                    }
+                    .ticket-header .address,
+                    .ticket-header .phone {
+                        font-size: 9px;
+                        color: #555;
+                    }
+                    .ticket-body {
+                        margin: 8px 0;
+                    }
+                    .info-line {
+                        display: flex;
+                        justify-content: space-between;
+                        margin: 3px 0;
+                        font-size: 11px;
+                    }
+                    .info-line .label {
+                        font-weight: bold;
+                    }
+                    .divider {
+                        border-top: 1px dashed #333;
+                        margin: 8px 0;
+                    }
+                    .bets-title {
+                        font-weight: bold;
+                        font-size: 12px;
+                        margin: 8px 0 4px 0;
+                        text-align: center;
+                    }
+                    .total-line {
+                        display: flex;
+                        justify-content: space-between;
+                        font-weight: bold;
+                        font-size: 13px;
+                        margin-top: 8px;
+                        padding-top: 5px;
+                        border-top: 2px solid #000;
+                    }
+                    .ticket-footer {
+                        text-align: center;
+                        margin-top: 10px;
+                        border-top: 1px solid #000;
+                        padding-top: 5px;
+                        font-size: 10px;
+                    }
+                    .ticket-footer p {
+                        margin: 3px 0;
+                    }
+                    .logo {
+                        max-width: 60mm;
+                        max-height: 15mm;
+                        margin: 0 auto;
+                        display: block;
+                    }
                 }
-                body, html {
-                    margin: 0;
-                    padding: 0;
-                    background: white;
-                    font-family: 'Arial', 'Helvetica', sans-serif;
-                    font-size: 11px;
-                    width: 76mm;
-                }
-                .ticket {
-                    padding: 3mm;
-                    background: #ffffff;
-                    color: #000000;
-                    line-height: 1.3;
-                }
-                .ticket-header {
-                    text-align: center;
-                    border-bottom: 1px solid #000;
-                    padding-bottom: 5px;
-                    margin-bottom: 5px;
-                }
-                .ticket-header h2 {
-                    margin: 5px 0 2px 0;
-                    font-size: 16px;
-                    font-weight: bold;
-                    text-transform: uppercase;
-                }
-                .ticket-header .slogan {
-                    font-style: italic;
-                    font-size: 10px;
-                    color: #333;
-                }
-                .ticket-header .address,
-                .ticket-header .phone {
-                    font-size: 9px;
-                    color: #555;
-                }
-                .ticket-body {
-                    margin: 8px 0;
-                }
-                .info-line {
-                    display: flex;
-                    justify-content: space-between;
-                    margin: 3px 0;
-                    font-size: 11px;
-                }
-                .info-line .label {
-                    font-weight: bold;
-                }
-                .divider {
-                    border-top: 1px dashed #333;
-                    margin: 8px 0;
-                }
-                .bets-title {
-                    font-weight: bold;
-                    font-size: 12px;
-                    margin: 8px 0 4px 0;
-                    text-align: center;
-                }
-                .total-line {
-                    display: flex;
-                    justify-content: space-between;
-                    font-weight: bold;
-                    font-size: 13px;
-                    margin-top: 8px;
-                    padding-top: 5px;
-                    border-top: 2px solid #000;
-                }
-                .ticket-footer {
-                    text-align: center;
-                    margin-top: 10px;
-                    border-top: 1px solid #000;
-                    padding-top: 5px;
-                    font-size: 10px;
-                }
-                .ticket-footer p {
-                    margin: 3px 0;
-                }
-                .logo {
-                    max-width: 60mm;
-                    max-height: 15mm;
-                    margin: 0 auto;
-                    display: block;
-                }
-            }
-        </style>
-        <div class="ticket">
+            </style>
+        </head>
+        <body onload="window.print(); setTimeout(() => window.close(), 500);">
             <div class="ticket-header">
                 ${logoUrl ? `<img src="${logoUrl}" class="logo" alt="${lotteryName}">` : ''}
                 <h2>${lotteryName}</h2>
@@ -708,13 +691,214 @@ function generateTicketHTML(ticket) {
                 <p style="font-size:12px; font-weight:bold;">LOTATO</p>
                 <p style="font-size:8px;">${new Date().toLocaleString()}</p>
             </div>
-        </div>
+        </body>
+        </html>
     `;
 }
+
+function fallbackPrintTicket(ticket) {
+    const printWindow = window.open('', '_blank', 'width=300,height=600');
+    if (!printWindow) {
+        alert("Tanpri pèmèt pop-up pou enprime tikè a.");
+        return;
+    }
+    
+    printWindow.document.write(generateTicketHTML(ticket));
+    printWindow.document.close();
+}
+
+// --- Rapports et autres fonctions d'impression (inchangées) ---
+
+function printDailyReport() {
+    if (!APP_STATE.ticketsHistory || APP_STATE.ticketsHistory.length === 0) {
+        alert("Pa gen tikè nan istorik la!");
+        return;
+    }
+    
+    const today = new Date().toLocaleDateString('fr-FR');
+    const todayTickets = APP_STATE.ticketsHistory.filter(ticket => 
+        new Date(ticket.date).toLocaleDateString('fr-FR') === today
+    );
+    
+    if (todayTickets.length === 0) {
+        alert("Pa gen tikè pou jodi a!");
+        return;
+    }
+    
+    const totalAmount = todayTickets.reduce((sum, ticket) => 
+        sum + (parseFloat(ticket.total_amount) || 0), 0
+    );
+    
+    const reportContent = generateReportHTML(todayTickets, today, totalAmount);
+    
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.width = '0px';
+    iframe.style.height = '0px';
+    iframe.style.border = 'none';
+    iframe.style.left = '-1000px';
+    iframe.style.top = '-1000px';
+    
+    document.body.appendChild(iframe);
+    
+    let iframeDoc = iframe.contentWindow || iframe.contentDocument;
+    if (iframeDoc.document) {
+        iframeDoc = iframeDoc.document;
+    }
+    
+    iframeDoc.open();
+    iframeDoc.write(reportContent);
+    iframeDoc.close();
+    
+    setTimeout(() => {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+        
+        setTimeout(() => {
+            document.body.removeChild(iframe);
+        }, 1000);
+    }, 500);
+}
+
+function generateReportHTML(tickets, date, totalAmount) {
+    const lotteryConfig = APP_STATE.lotteryConfig || CONFIG;
+    const lotteryName = lotteryConfig.LOTTERY_NAME || 'LOTERIE';
+    const agentName = APP_STATE.agentName || 'Agent';
+    
+    let ticketsHtml = tickets.map(ticket => `
+        <tr>
+            <td>${ticket.ticket_id || ticket.id}</td>
+            <td>${ticket.draw_name || ''}</td>
+            <td>${new Date(ticket.date).toLocaleTimeString('fr-FR')}</td>
+            <td style="text-align:right;">${ticket.total_amount || ticket.total}</td>
+        </tr>
+    `).join('');
+    
+    return `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Rapò Jounalye - ${date}</title>
+            <style>
+                @media print {
+                    @page {
+                        size: A4;
+                        margin: 15mm;
+                    }
+                    body {
+                        font-family: Arial, sans-serif;
+                        font-size: 12px;
+                        line-height: 1.4;
+                    }
+                    .report-header {
+                        text-align: center;
+                        margin-bottom: 20px;
+                        border-bottom: 2px solid #000;
+                        padding-bottom: 10px;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin: 15px 0;
+                    }
+                    th, td {
+                        border: 1px solid #000;
+                        padding: 6px;
+                        text-align: left;
+                    }
+                    th {
+                        background-color: #f0f0f0;
+                        font-weight: bold;
+                    }
+                    .total-row {
+                        font-weight: bold;
+                        background-color: #e0e0e0;
+                    }
+                    .summary {
+                        margin-top: 20px;
+                        padding: 10px;
+                        border: 1px solid #000;
+                        background-color: #f9f9f9;
+                    }
+                }
+            </style>
+        </head>
+        <body onload="window.print(); setTimeout(() => window.close(), 1000);">
+            <div class="report-header">
+                <h1>${lotteryName}</h1>
+                <h2>Rapò Vann Jounalye</h2>
+                <p>Dat: ${date} | Ajan: ${agentName}</p>
+            </div>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>N° Tikè</th>
+                        <th>Tiraj</th>
+                        <th>Lè</th>
+                        <th>Montan (Gdes)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${ticketsHtml}
+                </tbody>
+                <tfoot>
+                    <tr class="total-row">
+                        <td colspan="3">TOTAL JENERAL:</td>
+                        <td style="text-align:right;">${totalAmount} Gdes</td>
+                    </tr>
+                </tfoot>
+            </table>
+            
+            <div class="summary">
+                <h3>Rezime</h3>
+                <p>Total Tikè: ${tickets.length}</p>
+                <p>Total Vann: ${totalAmount} Gdes</p>
+                <p>Mwayèn pa Tikè: ${(totalAmount / tickets.length).toFixed(2)} Gdes</p>
+                <p>Dènye tikè: ${tickets[0] ? new Date(tickets[0].date).toLocaleTimeString('fr-FR') : 'N/A'}</p>
+            </div>
+            
+            <div style="margin-top: 30px; text-align: center; font-size: 10px;">
+                <p>Rapò jenere le: ${new Date().toLocaleString('fr-FR')}</p>
+                <p>© ${lotteryName} - Tout dwa rezève</p>
+            </div>
+        </body>
+        </html>
+    `;
+}
+
+function exportPDFReport() {
+    if (!APP_STATE.ticketsHistory || APP_STATE.ticketsHistory.length === 0) {
+        alert("Pa gen tikè nan istorik la!");
+        return;
+    }
+    
+    const today = new Date().toLocaleDateString('fr-FR');
+    const todayTickets = APP_STATE.ticketsHistory.filter(ticket => 
+        new Date(ticket.date).toLocaleDateString('fr-FR') === today
+    );
+    
+    if (todayTickets.length === 0) {
+        alert("Pa gen tikè pou jodi a!");
+        return;
+    }
+    
+    const content = generateReportHTML(todayTickets, today, 
+        todayTickets.reduce((sum, t) => sum + (parseFloat(t.total_amount) || 0), 0)
+    );
+    
+    const win = window.open('', '_blank');
+    win.document.write(content);
+    win.document.close();
+    
+    setTimeout(() => {
+        win.print();
+    }, 500);
+}
+
+window.printDailyReport = printDailyReport;
+window.exportPDFReport = exportPDFReport;
 
 function closeWinnerModal() {
     document.getElementById('winner-overlay').style.display = 'none';
 }
-
-// Les autres fonctions (impression de rapports, etc.) restent inchangées
-// ... (les fonctions existantes après ce point ne sont pas modifiées, mais pour la complétude, nous les incluons dans le fichier final)
