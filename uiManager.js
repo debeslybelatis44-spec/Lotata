@@ -373,129 +373,114 @@ async function loadDrawReport(drawId = null) {
     }
 }
 
+// --- FONCTION D'IMPRESSION DES RAPPORTS AMÉLIORÉE ---
 function printReport() {
-    const printWindow = window.open('', '_blank', 'width=800,height=600');
-    
     const drawSelector = document.getElementById('draw-report-selector');
     const selectedDraw = drawSelector.options[drawSelector.selectedIndex].text;
     const selectedDrawId = drawSelector.value;
     
-    let reportData = '';
-    let totalPending = 0;
-    let totalVerified = 0;
-    
-    let ticketsToAnalyze = selectedDrawId === 'all' 
+    // Filtrer les tickets selon le tirage choisi
+    const tickets = selectedDrawId === 'all' 
         ? APP_STATE.ticketsHistory 
-        : APP_STATE.ticketsHistory.filter(t => 
-            t.draw_id === selectedDrawId || t.drawId === selectedDrawId
-          );
+        : APP_STATE.ticketsHistory.filter(t => t.draw_id === selectedDrawId || t.drawId === selectedDrawId);
     
-    totalPending = ticketsToAnalyze.filter(t => !(t.checked || t.verified)).length;
-    totalVerified = ticketsToAnalyze.filter(t => t.checked || t.verified).length;
-    
-    let analyzedTotalBets = 0;
-    let analyzedTotalWins = 0;
-    let analyzedTotalLoss = 0;
-    
-    ticketsToAnalyze.forEach(ticket => {
-        analyzedTotalBets += parseFloat(ticket.total_amount || ticket.totalAmount || ticket.amount || 0);
-        
+    // Calculs
+    let totalTickets = tickets.length;
+    let totalBets = 0, totalWins = 0, totalLoss = 0;
+    tickets.forEach(ticket => {
+        const amount = parseFloat(ticket.total_amount || ticket.totalAmount || ticket.amount || 0);
+        totalBets += amount;
         if (ticket.checked || ticket.verified) {
-            const winAmount = parseFloat(ticket.win_amount || ticket.winAmount || ticket.prize_amount || 0);
-            if (winAmount > 0) {
-                analyzedTotalWins += winAmount;
-            } else {
-                analyzedTotalLoss += parseFloat(ticket.total_amount || ticket.totalAmount || ticket.amount || 0);
-            }
+            const win = parseFloat(ticket.win_amount || ticket.winAmount || ticket.prize_amount || 0);
+            if (win > 0) totalWins += win;
+            else totalLoss += amount;
         }
     });
+    const balance = totalBets - totalWins;
     
-    const analyzedProfit = analyzedTotalBets - analyzedTotalWins;
-    
-    if (selectedDrawId === 'all') {
-        reportData = `
-            <h2>Rapò Jeneral Jodi a</h2>
-            <p><strong>Dat:</strong> ${new Date().toLocaleDateString('fr-FR')}</p>
-            <p><strong>Ajant:</strong> ${APP_STATE.agentName}</p>
-            <hr>
-            <p><strong>Statistik Tikè:</strong></p>
-            <p>• Total Tikè: ${ticketsToAnalyze.length}</p>
-            <p>• Tikè Verifye: ${totalVerified}</p>
-            <p>• Tikè an Atant: ${totalPending}</p>
-            <hr>
-            <p><strong>Statistik Finansye:</strong></p>
-            <p>Total Paris (Antre Lajan): ${analyzedTotalBets.toLocaleString('fr-FR')} Gdes</p>
-            <p>Total pou peye (Ganyen): ${analyzedTotalWins.toLocaleString('fr-FR')} Gdes</p>
-            <p>Total Retni (Pèdi): ${analyzedTotalLoss.toLocaleString('fr-FR')} Gdes</p>
-            <p><strong>Balans Net: ${analyzedProfit.toLocaleString('fr-FR')} Gdes</strong></p>
-        `;
-    } else {
-        reportData = `
-            <h2>Rapò Tiraj ${selectedDraw}</h2>
-            <p><strong>Dat:</strong> ${new Date().toLocaleDateString('fr-FR')}</p>
-            <p><strong>Ajant:</strong> ${APP_STATE.agentName}</p>
-            <hr>
-            <p><strong>Statistik Tikè:</strong></p>
-            <p>• Total Tikè: ${ticketsToAnalyze.length}</p>
-            <p>• Tikè Verifye: ${totalVerified}</p>
-            <p>• Tikè an Atant: ${totalPending}</p>
-            <hr>
-            <p><strong>Statistik Finansye:</strong></p>
-            <p>Total Paris (Antre Lajan): ${analyzedTotalBets.toLocaleString('fr-FR')} Gdes</p>
-            <p>Total pou peye (Ganyen): ${analyzedTotalWins.toLocaleString('fr-FR')} Gdes</p>
-            <p>Total Retni (Pèdi): ${analyzedTotalLoss.toLocaleString('fr-FR')} Gdes</p>
-            <p><strong>Balans Net: ${analyzedProfit.toLocaleString('fr-FR')} Gdes</strong></p>
-        `;
-    }
-    
+    // Génération du HTML avec style professionnel
     const lotteryConfig = APP_STATE.lotteryConfig || CONFIG;
-    const logoHtml = lotteryConfig.LOTTERY_LOGO ? 
-        `<img src="${lotteryConfig.LOTTERY_LOGO}" style="max-width: 100px; margin: 10px auto; display: block;" alt="${lotteryConfig.LOTTERY_NAME}">` : 
-        '';
-    const addressHtml = lotteryConfig.LOTTERY_ADDRESS ? `<p style="font-size:12px;">${lotteryConfig.LOTTERY_ADDRESS}</p>` : '';
-    const phoneHtml = lotteryConfig.LOTTERY_PHONE ? `<p style="font-size:12px;">Tel: ${lotteryConfig.LOTTERY_PHONE}</p>` : '';
-    
     const content = `
-        <html>
-        <head>
-            <title>Rapò ${selectedDraw}</title>
-            <style>
-                body { font-family: Arial, sans-serif; padding: 20px; }
-                h2 { color: #333; }
-                hr { border: 1px solid #ccc; margin: 10px 0; }
-                p { margin: 8px 0; }
-                .note { font-style: italic; color: #666; font-size: 11px; margin-top: 5px; }
-                .section { margin: 15px 0; }
-                .important { font-weight: bold; font-size: 14px; }
-            </style>
-        </head>
-        <body style="text-align:center;">
-            ${logoHtml}
-            <h1>${lotteryConfig.LOTTERY_NAME}</h1>
-            ${addressHtml}
-            ${phoneHtml}
-            <hr>
-            <div class="section">
-                ${reportData}
-            </div>
-            <hr>
-            <p class="note">Balans = Total Paris - Total Ganyen</p>
-            <p class="note">Balans pozitif = Pwofi pou ajan</p>
-            <p class="note">Balans negatif = Pèt pou ajan</p>
-            <hr>
-            <p style="font-size:12px;">Jenere nan: ${new Date().toLocaleString('fr-FR')}</p>
-        </body>
-        </html>
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Rapò ${selectedDraw}</title>
+        <style>
+            @page { size: A4; margin: 2cm; }
+            body { font-family: 'Arial', sans-serif; line-height: 1.5; color: #222; }
+            .header { text-align: center; margin-bottom: 30px; }
+            .header h1 { font-size: 24px; margin: 5px 0; color: #000; }
+            .header h2 { font-size: 18px; font-weight: normal; color: #333; }
+            .header p { margin: 2px 0; font-size: 14px; }
+            .section { margin: 20px 0; }
+            .section h3 { border-bottom: 2px solid #000; padding-bottom: 5px; }
+            table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+            th, td { border: 1px solid #aaa; padding: 8px; text-align: left; }
+            th { background-color: #eee; font-weight: bold; }
+            .total-row { font-weight: bold; background-color: #f9f9f9; }
+            .summary { background: #f5f5f5; padding: 15px; border-radius: 5px; margin-top: 20px; }
+            .summary p { margin: 5px 0; font-size: 16px; }
+            .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #ccc; padding-top: 10px; }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>${lotteryConfig.LOTTERY_NAME || 'LOTERIE'}</h1>
+            <h2>Rapò Vann ${selectedDraw}</h2>
+            <p>Dat: ${new Date().toLocaleDateString('fr-FR')}</p>
+            <p>Ajan: ${APP_STATE.agentName}</p>
+        </div>
+        
+        <div class="section">
+            <h3>Rekapitilatif</h3>
+            <table>
+                <tr><th>Total Tikè</th><td>${totalTickets}</td></tr>
+                <tr><th>Total Paris</th><td>${totalBets.toLocaleString('fr-FR')} Gdes</td></tr>
+                <tr><th>Total Ganyen</th><td>${totalWins.toLocaleString('fr-FR')} Gdes</td></tr>
+                <tr><th>Pèdi</th><td>${totalLoss.toLocaleString('fr-FR')} Gdes</td></tr>
+                <tr class="total-row"><th>Balans</th><td>${balance.toLocaleString('fr-FR')} Gdes</td></tr>
+            </table>
+        </div>
+        
+        <div class="section">
+            <h3>Detay Tikè</h3>
+            <table>
+                <thead>
+                    <tr><th>N° Tikè</th><th>Tiraj</th><th>Lè</th><th>Montan</th><th>Ganyen</th></tr>
+                </thead>
+                <tbody>
+                    ${tickets.map(t => `
+                        <tr>
+                            <td>${t.ticket_id || t.id}</td>
+                            <td>${t.draw_name || ''}</td>
+                            <td>${new Date(t.date).toLocaleTimeString('fr-FR')}</td>
+                            <td>${(t.total_amount || t.amount || 0).toLocaleString('fr-FR')} Gdes</td>
+                            <td>${(t.win_amount || 0).toLocaleString('fr-FR')} Gdes</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="footer">
+            <p>Rapò jenere le: ${new Date().toLocaleString('fr-FR')}</p>
+            <p>© ${lotteryConfig.LOTTERY_NAME} - Tout dwa rezève</p>
+        </div>
+    </body>
+    </html>
     `;
-
+    
+    // Ouvrir une nouvelle fenêtre pour l'impression
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
     printWindow.document.write(content);
     printWindow.document.close();
-    
-    setTimeout(() => {
-        printWindow.print();
-        printWindow.close();
-    }, 500);
+    printWindow.focus();
+    printWindow.print();
+    // Optionnel : fermer après impression
+    // printWindow.onafterprint = () => printWindow.close();
 }
+
+// --- Fin fonction d'impression des rapports ---
 
 async function loadWinners() {
     try {
