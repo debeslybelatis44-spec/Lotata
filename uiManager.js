@@ -156,6 +156,10 @@ function renderHistory() {
                                 <i class="fas fa-edit"></i> Modifye
                             </button>
                         ` : ''}
+                        <!-- Bouton pour réimprimer le ticket -->
+                        <button class="btn-small print-btn" onclick="reprintTicket('${ticketId}')">
+                            <i class="fas fa-print"></i> Enprime
+                        </button>
                         <button class="delete-history-btn" onclick="deleteTicket('${ticketId}')" ${canDelete ? '' : 'disabled'}>
                             <i class="fas fa-trash"></i> Efase
                         </button>
@@ -168,16 +172,21 @@ function renderHistory() {
 
 async function deleteTicket(ticketId) {
     if (!confirm('Èske ou sèten ou vle efase tikè sa a?')) return;
-    
+
     try {
-        await APIService.deleteTicket(ticketId);
+        const response = await APIService.deleteTicket(ticketId);
         
-        APP_STATE.ticketsHistory = APP_STATE.ticketsHistory.filter(t => 
-            (t.id !== ticketId && t.ticket_id !== ticketId)
-        );
-        
-        renderHistory();
-        alert('Tikè efase ak siksè!');
+        // Vérifier si la suppression a réussi (selon la structure de votre API)
+        if (response && (response.success === true || response.status === 'ok' || response.message)) {
+            // Supprimer localement
+            APP_STATE.ticketsHistory = APP_STATE.ticketsHistory.filter(t => 
+                (t.id !== ticketId && t.ticket_id !== ticketId)
+            );
+            renderHistory();
+            alert('Tikè efase ak siksè!');
+        } else {
+            throw new Error('Repons envalid nan serve a');
+        }
     } catch (error) {
         console.error('Erreur suppression:', error);
         alert('Erè nan efasman tikè a: ' + error.message);
@@ -225,6 +234,17 @@ function editTicket(ticketId) {
     CartManager.renderCart();
     switchTab('home');
     alert(`Tikè #${ticket.ticket_id || ticket.id} charge nan panye. Ou kapab modifye l.`);
+}
+
+// Nouvelle fonction pour réimprimer un ticket depuis l'historique
+function reprintTicket(ticketId) {
+    const ticket = APP_STATE.ticketsHistory.find(t => t.id === ticketId || t.ticket_id === ticketId);
+    if (!ticket) {
+        alert("Tikè pa jwenn!");
+        return;
+    }
+    // Réutilise la fonction d'impression définie dans cartManager.js
+    printThermalTicket(ticket);
 }
 
 async function loadReports() {
@@ -773,3 +793,4 @@ window.markAsPaid = markAsPaid;
 window.printReport = printReport;
 window.loadDrawReport = loadDrawReport;
 window.logout = logout;
+window.reprintTicket = reprintTicket; // Expose la nouvelle fonction

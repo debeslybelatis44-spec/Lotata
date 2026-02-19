@@ -71,6 +71,8 @@
             <div class="tab" onclick="switchTab('draws')">🎲 Tirages & Résultats</div>
             <div class="tab" onclick="switchTab('numbers')">🔢 Boules & Limites</div>
             <div class="tab" onclick="switchTab('reports')">📊 Rapports</div>
+            <!-- NOUVEL ONGLET TICKETS -->
+            <div class="tab" onclick="switchTab('tickets')">🎫 Tickets</div>
             <div class="tab" onclick="switchTab('config')">⚙️ Configuration</div>
         </div>
 
@@ -320,6 +322,95 @@
             </div>
         </div>
 
+        <!-- ========== TICKETS (GESTION PAR PROPRIÉTAIRE) ========== -->
+        <div id="tab-tickets" class="tab-content">
+            <div class="section-title"><i class="fas fa-ticket-alt"></i> Gestion des tickets</div>
+
+            <!-- Filtres -->
+            <div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));">
+                <div class="form-group">
+                    <label>Superviseur</label>
+                    <select id="ticket-filter-supervisor">
+                        <option value="all">Tous</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Agent</label>
+                    <select id="ticket-filter-agent">
+                        <option value="all">Tous</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Tirage</label>
+                    <select id="ticket-filter-draw">
+                        <option value="all">Tous</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Période</label>
+                    <select id="ticket-filter-period" onchange="toggleTicketCustomDates()">
+                        <option value="today">Aujourd'hui</option>
+                        <option value="yesterday">Hier</option>
+                        <option value="week">Cette semaine</option>
+                        <option value="month">Ce mois</option>
+                        <option value="custom">Personnalisée</option>
+                    </select>
+                </div>
+                <div id="ticket-custom-dates" style="display:none; grid-column:span 2; grid-template-columns:1fr 1fr; gap:10px;">
+                    <div class="form-group">
+                        <label>Du</label>
+                        <input type="date" id="ticket-filter-from">
+                    </div>
+                    <div class="form-group">
+                        <label>Au</label>
+                        <input type="date" id="ticket-filter-to">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Statut gain</label>
+                    <select id="ticket-filter-gain">
+                        <option value="all">Tous</option>
+                        <option value="win">Gagnant (win_amount > 0)</option>
+                        <option value="nowin">Non gagnant</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Statut paiement</label>
+                    <select id="ticket-filter-paid">
+                        <option value="all">Tous</option>
+                        <option value="paid">Payé</option>
+                        <option value="unpaid">Non payé</option>
+                    </select>
+                </div>
+                <div style="display:flex; align-items:end; gap:10px;">
+                    <button class="btn-primary" onclick="loadTickets()"><i class="fas fa-search"></i> Filtrer</button>
+                    <button class="btn-primary" onclick="resetTicketFilters()"><i class="fas fa-undo"></i> Réinitialiser</button>
+                </div>
+            </div>
+
+            <!-- Liste des tickets -->
+            <div class="section-title"><i class="fas fa-list"></i> Liste des tickets</div>
+            <div id="tickets-list-container" class="list-container" style="max-height:500px; overflow-y:auto;">
+                <p>Chargement...</p>
+            </div>
+
+            <!-- Bouton pour charger plus (pagination simple) -->
+            <div style="text-align:center; margin-top:20px; display:none;" id="tickets-load-more">
+                <button class="btn-primary" onclick="loadMoreTickets()">Charger plus de tickets</button>
+            </div>
+
+            <!-- Modale pour afficher les détails d'un ticket -->
+            <div id="ticket-details-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000; align-items:center; justify-content:center;" onclick="if(event.target===this) closeTicketModal()">
+                <div style="background:#1e1f36; border-radius:20px; padding:25px; max-width:600px; width:90%; max-height:80%; overflow-y:auto;">
+                    <h3 style="margin-bottom:20px;">Détails du ticket <span id="modal-ticket-id"></span></h3>
+                    <div id="modal-ticket-content"></div>
+                    <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px;">
+                        <button class="btn-primary" onclick="closeTicketModal()">Fermer</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- ========== CONFIGURATION ========== -->
         <div id="tab-config" class="tab-content">
             <div class="section-title"><i class="fas fa-cog"></i> Paramètres généraux</div>
@@ -409,6 +500,11 @@
                 if (tabId === 'reports') {
                     loadSupervisorsAndAgents();
                     loadDrawsForReport();
+                }
+                // NOUVEAU : charger les filtres et tickets quand on va dans l'onglet tickets
+                if (tabId === 'tickets') {
+                    loadTicketFilters();
+                    loadTickets();
                 }
                 if (tabId === 'config') {
                     loadSettings();
@@ -1020,6 +1116,249 @@
                 w.print();
             }
 
+            // ---------- TICKETS (GESTION PROPRIÉTAIRE) ----------
+            let currentTicketPage = 0;
+            let currentTicketFilters = {};
+
+            async function loadTickets(reset = true) {
+                if (reset) {
+                    currentTicketPage = 0;
+                    document.getElementById('tickets-list-container').innerHTML = '<p>Chargement...</p>';
+                }
+
+                const token = localStorage.getItem('auth_token');
+                const params = new URLSearchParams();
+
+                // Récupérer les filtres
+                const supervisor = document.getElementById('ticket-filter-supervisor').value;
+                const agent = document.getElementById('ticket-filter-agent').value;
+                const draw = document.getElementById('ticket-filter-draw').value;
+                const period = document.getElementById('ticket-filter-period').value;
+                const from = document.getElementById('ticket-filter-from').value;
+                const to = document.getElementById('ticket-filter-to').value;
+                const gain = document.getElementById('ticket-filter-gain').value;
+                const paid = document.getElementById('ticket-filter-paid').value;
+
+                if (supervisor && supervisor !== 'all') params.append('supervisorId', supervisor);
+                if (agent && agent !== 'all') params.append('agentId', agent);
+                if (draw && draw !== 'all') params.append('drawId', draw);
+                if (period) params.append('period', period);
+                if (from) params.append('fromDate', from);
+                if (to) params.append('toDate', to);
+                if (gain && gain !== 'all') params.append('gain', gain);
+                if (paid && paid !== 'all') params.append('paid', paid);
+
+                params.append('page', currentTicketPage);
+                params.append('limit', 20); // 20 tickets par chargement
+
+                try {
+                    const res = await fetch(`${API_URL}/api/owner/tickets?${params}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (!res.ok) throw new Error('Erreur chargement tickets');
+                    const data = await res.json();
+
+                    if (reset) {
+                        displayTickets(data.tickets);
+                    } else {
+                        appendTickets(data.tickets);
+                    }
+
+                    // Afficher le bouton "Charger plus" s'il y a plus de tickets
+                    const loadMoreBtn = document.getElementById('tickets-load-more');
+                    if (data.hasMore) {
+                        loadMoreBtn.style.display = 'block';
+                    } else {
+                        loadMoreBtn.style.display = 'none';
+                    }
+                } catch (e) {
+                    document.getElementById('tickets-list-container').innerHTML = '<p class="loss">❌ Erreur lors du chargement des tickets</p>';
+                    console.error(e);
+                }
+            }
+
+            function displayTickets(tickets) {
+                const container = document.getElementById('tickets-list-container');
+                if (!tickets || tickets.length === 0) {
+                    container.innerHTML = '<p>Aucun ticket trouvé</p>';
+                    return;
+                }
+
+                let html = '<table><thead><tr><th>ID</th><th>Agent</th><th>Tirage</th><th>Date</th><th>Montant</th><th>Gain</th><th>Payé</th><th>Actions</th></tr></thead><tbody>';
+                tickets.forEach(t => {
+                    const paidStatus = t.paid ? '<span class="badge-success">Payé</span>' : '<span class="badge-danger">Non payé</span>';
+                    const gainClass = t.win_amount > 0 ? 'profit' : '';
+                    const gainDisplay = t.win_amount > 0 ? t.win_amount.toLocaleString() + ' G' : '-';
+                    html += `<tr>
+                        <td>${t.ticket_id || t.id}</td>
+                        <td>${t.agent_name || t.agent_id}</td>
+                        <td>${t.draw_name || t.draw_id}</td>
+                        <td>${new Date(t.date).toLocaleString()}</td>
+                        <td>${parseFloat(t.total_amount).toLocaleString()} G</td>
+                        <td class="${gainClass}">${gainDisplay}</td>
+                        <td>${paidStatus}</td>
+                        <td>
+                            <button class="btn-primary" style="padding:4px 8px; margin-right:5px;" onclick="viewTicketDetails('${t.id}')"><i class="fas fa-eye"></i></button>
+                            <button class="btn-danger" style="padding:4px 8px;" onclick="confirmDeleteTicket('${t.id}')"><i class="fas fa-trash"></i></button>
+                        </td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+                container.innerHTML = html;
+            }
+
+            function appendTickets(tickets) {
+                const container = document.getElementById('tickets-list-container');
+                const table = container.querySelector('table');
+                if (!table) {
+                    displayTickets(tickets);
+                    return;
+                }
+                const tbody = table.querySelector('tbody');
+                tickets.forEach(t => {
+                    const paidStatus = t.paid ? '<span class="badge-success">Payé</span>' : '<span class="badge-danger">Non payé</span>';
+                    const gainClass = t.win_amount > 0 ? 'profit' : '';
+                    const gainDisplay = t.win_amount > 0 ? t.win_amount.toLocaleString() + ' G' : '-';
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${t.ticket_id || t.id}</td>
+                        <td>${t.agent_name || t.agent_id}</td>
+                        <td>${t.draw_name || t.draw_id}</td>
+                        <td>${new Date(t.date).toLocaleString()}</td>
+                        <td>${parseFloat(t.total_amount).toLocaleString()} G</td>
+                        <td class="${gainClass}">${gainDisplay}</td>
+                        <td>${paidStatus}</td>
+                        <td>
+                            <button class="btn-primary" style="padding:4px 8px; margin-right:5px;" onclick="viewTicketDetails('${t.id}')"><i class="fas fa-eye"></i></button>
+                            <button class="btn-danger" style="padding:4px 8px;" onclick="confirmDeleteTicket('${t.id}')"><i class="fas fa-trash"></i></button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
+
+            function loadMoreTickets() {
+                currentTicketPage++;
+                loadTickets(false);
+            }
+
+            async function viewTicketDetails(ticketId) {
+                const token = localStorage.getItem('auth_token');
+                try {
+                    const res = await fetch(`${API_URL}/api/owner/tickets/${ticketId}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (!res.ok) throw new Error('Erreur chargement détails');
+                    const ticket = await res.json();
+
+                    let betsHtml = '<h4>Pari(s)</h4><table><thead><tr><th>Numéro</th><th>Jeu</th><th>Montant</th><th>Gain estimé</th></tr></thead><tbody>';
+                    if (ticket.bets && Array.isArray(ticket.bets)) {
+                        ticket.bets.forEach(bet => {
+                            const game = bet.game || bet.specialType || 'N/A';
+                            const number = bet.cleanNumber || bet.number || '';
+                            const amount = parseFloat(bet.amount || 0).toLocaleString();
+                            const win = bet.winAmount || 0;
+                            betsHtml += `<tr><td>${number}</td><td>${game}</td><td>${amount} G</td><td>${win > 0 ? win + ' G' : '-'}</td></tr>`;
+                        });
+                    }
+                    betsHtml += '</tbody></table>';
+
+                    const html = `
+                        <p><strong>Ticket ID:</strong> ${ticket.ticket_id || ticket.id}</p>
+                        <p><strong>Agent:</strong> ${ticket.agent_name} (ID: ${ticket.agent_id})</p>
+                        <p><strong>Tirage:</strong> ${ticket.draw_name}</p>
+                        <p><strong>Date:</strong> ${new Date(ticket.date).toLocaleString()}</p>
+                        <p><strong>Total misé:</strong> ${parseFloat(ticket.total_amount).toLocaleString()} G</p>
+                        <p><strong>Gain total:</strong> <span class="${ticket.win_amount > 0 ? 'profit' : ''}">${parseFloat(ticket.win_amount).toLocaleString()} G</span></p>
+                        <p><strong>Payé:</strong> ${ticket.paid ? 'Oui' : 'Non'}</p>
+                        ${betsHtml}
+                    `;
+                    document.getElementById('modal-ticket-content').innerHTML = html;
+                    document.getElementById('modal-ticket-id').innerText = ticket.ticket_id || ticket.id;
+                    document.getElementById('ticket-details-modal').style.display = 'flex';
+                } catch (e) {
+                    alert('Erreur lors du chargement des détails');
+                    console.error(e);
+                }
+            }
+
+            function closeTicketModal() {
+                document.getElementById('ticket-details-modal').style.display = 'none';
+            }
+
+            function confirmDeleteTicket(ticketId) {
+                if (confirm('Êtes-vous sûr de vouloir supprimer ce ticket définitivement ?')) {
+                    deleteTicket(ticketId);
+                }
+            }
+
+            async function deleteTicket(ticketId) {
+                const token = localStorage.getItem('auth_token');
+                try {
+                    const res = await fetch(`${API_URL}/api/owner/tickets/${ticketId}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const result = await res.json();
+                    if (result.success) {
+                        alert('Ticket supprimé avec succès');
+                        loadTickets(); // Recharger la liste
+                    } else {
+                        alert('Erreur: ' + (result.error || 'Suppression échouée'));
+                    }
+                } catch (e) {
+                    alert('Erreur réseau');
+                    console.error(e);
+                }
+            }
+
+            // Fonctions pour les filtres
+            async function loadTicketFilters() {
+                const token = localStorage.getItem('auth_token');
+                try {
+                    // Charger superviseurs
+                    const supRes = await fetch(`${API_URL}/api/owner/supervisors`, { headers: { 'Authorization': `Bearer ${token}` } });
+                    const supervisors = await supRes.json();
+                    let supOpts = '<option value="all">Tous superviseurs</option>';
+                    supervisors.forEach(s => supOpts += `<option value="${s.id}">${s.name}</option>`);
+                    document.getElementById('ticket-filter-supervisor').innerHTML = supOpts;
+
+                    // Charger agents
+                    const agentRes = await fetch(`${API_URL}/api/owner/agents`, { headers: { 'Authorization': `Bearer ${token}` } });
+                    const agents = await agentRes.json();
+                    let agentOpts = '<option value="all">Tous agents</option>';
+                    agents.forEach(a => agentOpts += `<option value="${a.id}">${a.name}</option>`);
+                    document.getElementById('ticket-filter-agent').innerHTML = agentOpts;
+
+                    // Charger tirages
+                    const drawRes = await fetch(`${API_URL}/api/owner/draws`, { headers: { 'Authorization': `Bearer ${token}` } });
+                    const draws = await drawRes.json();
+                    let drawOpts = '<option value="all">Tous tirages</option>';
+                    draws.forEach(d => drawOpts += `<option value="${d.id}">${d.name}</option>`);
+                    document.getElementById('ticket-filter-draw').innerHTML = drawOpts;
+                } catch (e) {
+                    console.error('Erreur chargement filtres:', e);
+                }
+            }
+
+            function toggleTicketCustomDates() {
+                const period = document.getElementById('ticket-filter-period').value;
+                document.getElementById('ticket-custom-dates').style.display = period === 'custom' ? 'grid' : 'none';
+            }
+
+            function resetTicketFilters() {
+                document.getElementById('ticket-filter-supervisor').value = 'all';
+                document.getElementById('ticket-filter-agent').value = 'all';
+                document.getElementById('ticket-filter-draw').value = 'all';
+                document.getElementById('ticket-filter-period').value = 'today';
+                document.getElementById('ticket-filter-from').value = '';
+                document.getElementById('ticket-filter-to').value = '';
+                document.getElementById('ticket-filter-gain').value = 'all';
+                document.getElementById('ticket-filter-paid').value = 'all';
+                toggleTicketCustomDates();
+                loadTickets();
+            }
+
             // ---------- CONFIGURATION ----------
             async function loadSettings() {
                 const token = localStorage.getItem('auth_token');
@@ -1131,6 +1470,7 @@
                 loadDrawsForSelects();
                 loadSupervisorsAndAgents();
                 loadDrawsForReport();
+                loadTicketFilters(); // Pré-remplir les filtres de l'onglet tickets
                 loadSettings();
                 toggleSupervisorField();
                 toggleCustomDates();

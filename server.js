@@ -1299,6 +1299,151 @@ ownerRouter.post('/settings', upload.single('logo'), async (req, res) => {
   }
 });
 
+// ========== NOUVELLES ROUTES POUR LA GESTION DES TICKETS (PROPRIÉTAIRE) ==========
+
+// Récupérer les tickets avec filtres (pour le propriétaire)
+ownerRouter.get('/tickets', async (req, res) => {
+  try {
+    const { supervisorId, agentId, drawId, period, fromDate, toDate, gain, paid, page = 0, limit = 20 } = req.query;
+
+    let conditions = [];
+    let params = [];
+    let paramIndex = 1;
+
+    // Filtre par agent
+    if (agentId && agentId !== 'all') {
+      conditions.push(`t.agent_id = $${paramIndex++}`);
+      params.push(agentId);
+    }
+    // Filtre par superviseur (via les agents)
+    else if (supervisorId && supervisorId !== 'all') {
+      conditions.push(`a.supervisor_id = $${paramIndex++}`);
+      params.push(supervisorId);
+    }
+
+    // Filtre par tirage
+    if (drawId && drawId !== 'all') {
+      conditions.push(`t.draw_id = $${paramIndex++}`);
+      params.push(drawId);
+    }
+
+    // Filtre par période
+    let dateCondition = '';
+    if (period === 'today') {
+      dateCondition = 'DATE(t.date) = CURRENT_DATE';
+    } else if (period === 'yesterday') {
+      dateCondition = 'DATE(t.date) = CURRENT_DATE - INTERVAL \'1 day\'';
+    } else if (period === 'week') {
+      dateCondition = 't.date >= DATE_TRUNC(\'week\', CURRENT_DATE)';
+    } else if (period === 'month') {
+      dateCondition = 't.date >= DATE_TRUNC(\'month\', CURRENT_DATE)';
+    } else if (period === 'custom' && fromDate && toDate) {
+      dateCondition = `DATE(t.date) BETWEEN $${paramIndex++} AND $${paramIndex++}`;
+      params.push(fromDate, toDate);
+    }
+    if (dateCondition) {
+      conditions.push(dateCondition);
+    }
+
+    // Filtre gain
+    if (gain === 'win') {
+      conditions.push('t.win_amount > 0');
+    } else if (gain === 'nowin') {
+      conditions.push('t.win_amount = 0');
+    }
+
+    // Filtre paiement
+    if (paid === 'paid') {
+      conditions.push('t.paid = true');
+    } else if (paid === 'unpaid') {
+      conditions.push('t.paid = false');
+    }
+
+    const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
+
+    // Compter le total pour savoir s'il y a plus de pages
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM tickets t
+      LEFT JOIN agents a ON t.agent_id = a.id
+      ${whereClause}
+    `;
+    const countResult = await pool.query(countQuery, params);
+    const total = parseInt(countResult.rows[0].total);
+    const hasMore = (page * limit + limit) < total;
+
+    // Récupérer les tickets avec pagination
+    const offset = page * limit;
+    const dataQuery = `
+      SELECT t.*
+      FROM tickets t
+      LEFT JOIN agents a ON t.agent_id = a.id
+      ${whereClause}
+      ORDER BY t.date DESC
+      LIMIT $${paramIndex++} OFFSET $${paramIndex++}
+    `;
+    params.push(limit, offset);
+    const dataResult = await pool.query(dataQuery, params);
+
+    // Convertir bets en objet JSON
+    const tickets = dataResult.rows.map(t => ({
+      ...t,
+      bets: typeof t.bets === 'string' ? JSON.parse(t.bets) : t.bets
+    }));
+
+    res.json({
+      tickets,
+      hasMore,
+      total
+    });
+  } catch (error) {
+    console.error('❌ Erreur GET /tickets (owner):', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Récupérer un ticket par son ID (pour afficher les détails)
+ownerRouter.get('/tickets/:ticketId', async (req, res) => {
+  try {
+    const { ticketId } = req.params;
+    const result = await pool.query('SELECT * FROM tickets WHERE id = $1', [ticketId]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Ticket non trouvé' });
+    }
+    const ticket = result.rows[0];
+    ticket.bets = typeof ticket.bets === 'string' ? JSON.parse(ticket.bets) : ticket.bets;
+    res.json(ticket);
+  } catch (error) {
+    console.error('❌ Erreur GET /tickets/:id:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Supprimer un ticket (propriétaire seulement, sans restriction de temps)
+ownerRouter.delete('/tickets/:ticketId', async (req, res) => {
+  try {
+    const { ticketId } = req.params;
+    // Vérifier si le ticket existe
+    const check = await pool.query('SELECT id FROM tickets WHERE id = $1', [ticketId]);
+    if (check.rows.length === 0) {
+      return res.status(404).json({ error: 'Ticket non trouvé' });
+    }
+
+    await pool.query('DELETE FROM tickets WHERE id = $1', [ticketId]);
+
+    // Optionnel: journaliser la suppression
+    await pool.query(
+      'INSERT INTO activity_log (user_id, user_role, action, details, ip_address) VALUES ($1, $2, $3, $4, $5)',
+      [req.user.id, 'owner', 'delete_ticket', `Ticket ID: ${ticketId}`, req.ip]
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Erreur DELETE /tickets/:id:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 app.use('/api/owner', ownerRouter);
 
 // ==================== Routes statiques ====================
