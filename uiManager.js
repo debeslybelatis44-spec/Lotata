@@ -1,3 +1,5 @@
+// uiManager.js
+
 // Fonction utilitaire pour récupérer les tickets depuis l'API
 async function fetchTickets() {
     const token = localStorage.getItem('auth_token');
@@ -71,18 +73,12 @@ async function loadHistory() {
 function renderHistory() {
     const container = document.getElementById('history-container');
     
-    console.log('Rendu historique, tickets disponibles:', APP_STATE.ticketsHistory);
-    
     if (!APP_STATE.ticketsHistory || APP_STATE.ticketsHistory.length === 0) {
         container.innerHTML = '<div class="empty-msg">Pa gen tikè nan istorik</div>';
         return;
     }
     
     container.innerHTML = APP_STATE.ticketsHistory.map((ticket, index) => {
-        // DEBUG: Afficher toutes les propriétés du ticket
-        console.log(`Ticket ${index + 1}:`, ticket);
-        console.log(`Propriétés ticket ${index + 1}:`, Object.keys(ticket));
-        
         const ticketId = ticket.ticket_id || ticket.id || `temp_${Date.now()}_${index}`;
         const drawName = ticket.draw_name || ticket.drawName || ticket.draw_name_fr || 'Tiraj Inkonu';
         const totalAmount = ticket.total_amount || ticket.totalAmount || ticket.amount || 0;
@@ -90,7 +86,6 @@ function renderHistory() {
         const bets = ticket.bets || ticket.numbers || [];
         const checked = ticket.checked || ticket.verified || false;
         const winAmount = ticket.win_amount || ticket.winAmount || ticket.prize_amount || 0;
-        const drawId = ticket.draw_id || ticket.drawId || '';
         
         let numberOfBets = 0;
         if (Array.isArray(bets)) {
@@ -125,8 +120,8 @@ function renderHistory() {
         const ticketDate = new Date(date);
         const now = new Date();
         const minutesDiff = (now - ticketDate) / (1000 * 60);
-        const canDelete = minutesDiff <= 2;      // Changé de 5 à 2 minutes
-        const canEdit = minutesDiff <= 3;        // 3 minutes pour modifier
+        const canDelete = minutesDiff <= 2;
+        const canEdit = minutesDiff <= 3;
         
         let formattedDate = 'Date inkonu';
         let formattedTime = '';
@@ -196,7 +191,6 @@ function editTicket(ticketId) {
         return;
     }
 
-    // Vérifier la limite de 3 minutes
     const ticketDate = new Date(ticket.date || ticket.created_at);
     const now = new Date();
     const minutesDiff = (now - ticketDate) / (1000 * 60);
@@ -205,10 +199,8 @@ function editTicket(ticketId) {
         return;
     }
 
-    // Vider le panier actuel
     APP_STATE.currentCart = [];
 
-    // Reconstruire les paris
     let bets = [];
     if (Array.isArray(ticket.bets)) {
         bets = ticket.bets;
@@ -223,7 +215,7 @@ function editTicket(ticketId) {
     bets.forEach(bet => {
         const newBet = {
             ...bet,
-            id: Date.now() + Math.random(), // nouvel ID pour éviter les conflits
+            id: Date.now() + Math.random(),
             drawId: bet.drawId || ticket.draw_id,
             drawName: bet.drawName || ticket.draw_name
         };
@@ -231,7 +223,7 @@ function editTicket(ticketId) {
     });
 
     CartManager.renderCart();
-    switchTab('home'); // Retour à l'écran de jeu
+    switchTab('home');
     alert(`Tikè #${ticket.ticket_id || ticket.id} charge nan panye. Ou kapab modifye l.`);
 }
 
@@ -241,8 +233,6 @@ async function loadReports() {
         APP_STATE.ticketsHistory = tickets;
         
         const reports = await APIService.getReports();
-        
-        console.log('Données rapport API:', reports);
         
         let totalTickets = 0;
         let totalBets = 0;
@@ -292,6 +282,12 @@ async function loadReports() {
         });
         
         await loadDrawReport('all');
+        
+        // 🔧 Forcer l'affichage du bouton d'impression des rapports
+        const printBtn = document.querySelector('.print-report-btn');
+        if (printBtn) {
+            printBtn.style.display = 'block';
+        }
         
     } catch (error) {
         console.error('Erreur chargement rapports:', error);
@@ -373,18 +369,15 @@ async function loadDrawReport(drawId = null) {
     }
 }
 
-// --- FONCTION D'IMPRESSION DES RAPPORTS AMÉLIORÉE ---
 function printReport() {
     const drawSelector = document.getElementById('draw-report-selector');
     const selectedDraw = drawSelector.options[drawSelector.selectedIndex].text;
     const selectedDrawId = drawSelector.value;
     
-    // Filtrer les tickets selon le tirage choisi
     const tickets = selectedDrawId === 'all' 
         ? APP_STATE.ticketsHistory 
         : APP_STATE.ticketsHistory.filter(t => t.draw_id === selectedDrawId || t.drawId === selectedDrawId);
     
-    // Calculs
     let totalTickets = tickets.length;
     let totalBets = 0, totalWins = 0, totalLoss = 0;
     tickets.forEach(ticket => {
@@ -398,7 +391,6 @@ function printReport() {
     });
     const balance = totalBets - totalWins;
     
-    // Génération du HTML avec style professionnel
     const lotteryConfig = APP_STATE.lotteryConfig || CONFIG;
     const content = `
     <!DOCTYPE html>
@@ -470,27 +462,20 @@ function printReport() {
     </html>
     `;
     
-    // Ouvrir une nouvelle fenêtre pour l'impression
     const printWindow = window.open('', '_blank', 'width=800,height=600');
     printWindow.document.write(content);
     printWindow.document.close();
     printWindow.focus();
     printWindow.print();
-    // Optionnel : fermer après impression
-    // printWindow.onafterprint = () => printWindow.close();
 }
-
-// --- Fin fonction d'impression des rapports ---
 
 async function loadWinners() {
     try {
         await APIService.getWinningTickets();
         await APIService.getWinningResults();
-        console.log('Winning tickets chargés:', APP_STATE.winningTickets);
         updateWinnersDisplay();
     } catch (error) {
         console.error('Erreur chargement gagnants:', error);
-        // En cas d'erreur, on vide les listes pour éviter un état incohérent
         APP_STATE.winningTickets = [];
         APP_STATE.winningResults = [];
         updateWinnersDisplay();
@@ -501,7 +486,6 @@ function updateWinnersDisplay() {
     const container = document.getElementById('winners-container');
     if (!container) return;
 
-    // Assurer que ce sont des tableaux
     const winningTickets = APP_STATE.winningTickets || [];
     const winningResults = APP_STATE.winningResults || [];
 
@@ -526,7 +510,6 @@ function updateWinnersDisplay() {
     
     container.innerHTML = winningTickets.map(ticket => {
         const isPaid = ticket.paid || false;
-        // Correction : utiliser draw_id au lieu de drawId
         const winningResults = APP_STATE.winningResults.find(r => 
             r.draw_id === (ticket.draw_id || ticket.drawId)
         );
@@ -594,9 +577,6 @@ async function markAsPaid(ticketId) {
 }
 
 function viewTicketDetails(ticketId) {
-    console.log('Recherche ticket avec ID:', ticketId);
-    console.log('Tickets disponibles:', APP_STATE.ticketsHistory);
-    
     const ticket = APP_STATE.ticketsHistory.find(t => 
         t.id === ticketId || t.ticket_id === ticketId
     );
@@ -605,8 +585,6 @@ function viewTicketDetails(ticketId) {
         alert(`Tikè pa jwenn! ID: ${ticketId}\nTotal tickets disponibles: ${APP_STATE.ticketsHistory.length}`);
         return;
     }
-    
-    console.log('Ticket trouvé pour détails:', ticket);
     
     const drawName = ticket.draw_name || ticket.drawName || ticket.draw_name_fr || 'Tiraj Inkonu';
     const totalAmount = ticket.total_amount || ticket.totalAmount || ticket.amount || 0;
@@ -753,12 +731,8 @@ async function loadLotteryConfig() {
             
             document.getElementById('lottery-name').innerHTML = `${config.name} <span class="pro-badge">vession 6</span>`;
             
-            // Mettre à jour le slogan s'il existe
             const sloganEl = document.getElementById('lottery-slogan');
             if (sloganEl) sloganEl.textContent = config.slogan || '';
-
-            // Si vous voulez afficher un logo dans le header, vous pouvez ajouter une balise <img>
-            // Exemple : document.getElementById('lottery-logo').src = config.logo || '';
 
             CONFIG.LOTTERY_NAME = config.name;
             CONFIG.LOTTERY_LOGO = config.logo || '';
@@ -770,13 +744,11 @@ async function loadLotteryConfig() {
     }
 }
 
-// ==================== FONCTION DE DÉCONNEXION ====================
 function logout() {
     if (!confirm('Èske ou sèten ou vle dekonekte?')) return;
 
     const token = localStorage.getItem('auth_token');
     
-    // Appel à l'API de déconnexion pour journaliser (optionnel)
     fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.LOGOUT}`, {
         method: 'POST',
         headers: {
@@ -785,18 +757,15 @@ function logout() {
     })
     .catch(err => console.error('Erreur lors de la déconnexion côté serveur:', err))
     .finally(() => {
-        // Nettoyer le stockage local
         localStorage.removeItem('auth_token');
         localStorage.removeItem('agent_id');
         localStorage.removeItem('agent_name');
         localStorage.removeItem('user_role');
         
-        // Rediriger vers la page de connexion
         window.location.href = 'index.html';
     });
 }
 
-// Exposer les fonctions globalement
 window.editTicket = editTicket;
 window.deleteTicket = deleteTicket;
 window.viewTicketDetails = viewTicketDetails;

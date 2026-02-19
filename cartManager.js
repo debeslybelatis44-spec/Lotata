@@ -75,7 +75,6 @@ var CartManager = {
 
             const draws = APP_STATE.multiDrawMode ? APP_STATE.selectedDraws : [APP_STATE.selectedDraw];
             
-            // Vérifier chaque numéro
             for (const drawId of draws) {
                 for (const bet of nBets) {
                     if (isNumberBlocked(bet.cleanNumber, drawId)) {
@@ -113,7 +112,6 @@ var CartManager = {
 
             const draws = APP_STATE.multiDrawMode ? APP_STATE.selectedDraws : [APP_STATE.selectedDraw];
             
-            // Vérifier
             for (const drawId of draws) {
                 for (const bet of grapBets) {
                     if (isNumberBlocked(bet.cleanNumber, drawId)) {
@@ -163,7 +161,6 @@ var CartManager = {
 
             const draws = APP_STATE.multiDrawMode ? APP_STATE.selectedDraws : [APP_STATE.selectedDraw];
             
-            // Vérifier chaque numéro généré
             for (const drawId of draws) {
                 for (const bet of autoBets) {
                     if (isNumberBlocked(bet.cleanNumber, drawId)) {
@@ -214,7 +211,6 @@ var CartManager = {
 
             const draws = APP_STATE.multiDrawMode ? APP_STATE.selectedDraws : [APP_STATE.selectedDraw];
             
-            // Vérifier le numéro nettoyé (premier bet suffit car même numéro)
             const cleanNum = GameEngine.getCleanNumber(num);
             for (const drawId of draws) {
                 if (isNumberBlocked(cleanNum, drawId)) {
@@ -223,7 +219,6 @@ var CartManager = {
                 }
             }
 
-            // Vérifier les limites (avertissement)
             for (const drawId of draws) {
                 if (APP_STATE.drawNumberLimits && APP_STATE.drawNumberLimits[drawId]) {
                     const limits = APP_STATE.drawNumberLimits[drawId];
@@ -233,7 +228,6 @@ var CartManager = {
                     const newTotal = currentTotalInCart + amt;
                     if (limits[cleanNum] && newTotal > limits[cleanNum]) {
                         alert(`Atansyon: Limite pou nimewo ${cleanNum} se ${limits[cleanNum]} Gdes. Ou ap depase si w ajoute sa.`);
-                        // La validation finale sera faite par le serveur
                     }
                 }
             }
@@ -277,7 +271,6 @@ var CartManager = {
 
         const draws = APP_STATE.multiDrawMode ? APP_STATE.selectedDraws : [APP_STATE.selectedDraw];
         
-        // Vérifier que le numéro n'est pas bloqué pour chaque tirage
         for (const drawId of draws) {
             if (isNumberBlocked(num, drawId)) {
                 alert(`Nimewo ${num} bloke pou tiraj sa a. Ou pa ka jwe li.`);
@@ -285,7 +278,6 @@ var CartManager = {
             }
         }
 
-        // Vérifier les limites (avertissement)
         for (const drawId of draws) {
             if (APP_STATE.drawNumberLimits && APP_STATE.drawNumberLimits[drawId]) {
                 const limits = APP_STATE.drawNumberLimits[drawId];
@@ -324,7 +316,6 @@ var CartManager = {
     },
 
     removeBet(id) {
-        // CORRECTION : convertir les IDs en chaîne pour une comparaison fiable
         APP_STATE.currentCart = APP_STATE.currentCart.filter(item => item.id.toString() !== id.toString());
         this.renderCart();
     },
@@ -401,7 +392,6 @@ async function processFinalTicket() {
         return;
     }
 
-    // Grouper les paris par tirage
     const betsByDraw = {};
     APP_STATE.currentCart.forEach(bet => {
         if (!betsByDraw[bet.drawId]) betsByDraw[bet.drawId] = [];
@@ -412,7 +402,6 @@ async function processFinalTicket() {
     let savedTickets = [];
 
     try {
-        // Sauvegarder chaque ticket individuellement
         for (const drawId of drawIds) {
             const drawBets = betsByDraw[drawId];
             const draw = CONFIG.DRAWS.find(d => d.id === drawId);
@@ -444,9 +433,7 @@ async function processFinalTicket() {
             APP_STATE.ticketsHistory.unshift(savedTicket.ticket);
         }
 
-        // Impression : un seul ticket si multi-tirage
         if (savedTickets.length > 1) {
-            // Créer un ticket composite pour l'impression uniquement
             const compositeTicket = {
                 id: `COMPOSITE-${Date.now()}`,
                 ticket_id: `MULTI-${Date.now()}`,
@@ -454,14 +441,13 @@ async function processFinalTicket() {
                 date: new Date().toISOString(),
                 agent_name: APP_STATE.agentName,
                 total_amount: savedTickets.reduce((sum, t) => sum + (parseFloat(t.total_amount) || 0), 0),
-                bets: savedTickets.flatMap(t => t.bets || []), // Fusionner tous les paris
+                bets: savedTickets.flatMap(t => t.bets || []),
                 multiDraw: true,
                 subTickets: savedTickets.map(t => ({ id: t.ticket_id || t.id, drawName: t.draw_name }))
             };
             printThermalTicket(compositeTicket);
             alert(`✅ ${savedTickets.length} fich sove ak siksè! Yon sèl papye enprime.`);
         } else {
-            // Un seul tirage
             printThermalTicket(savedTickets[0]);
             alert(`✅ Fich #${savedTickets[0].id || savedTickets[0].ticket_id} sove ak siksè epi enprime!`);
         }
@@ -475,42 +461,22 @@ async function processFinalTicket() {
     }
 }
 
+// 🔧 NOUVELLE VERSION : impression via pop-up (fiable)
 function printThermalTicket(ticket) {
     try {
         const printContent = generateTicketHTML(ticket);
-        
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'absolute';
-        iframe.style.width = '0px';
-        iframe.style.height = '0px';
-        iframe.style.border = 'none';
-        iframe.style.left = '-1000px';
-        iframe.style.top = '-1000px';
-        
-        document.body.appendChild(iframe);
-        
-        let iframeDoc = iframe.contentWindow || iframe.contentDocument;
-        if (iframeDoc.document) {
-            iframeDoc = iframeDoc.document;
+        const printWindow = window.open('', '_blank', 'width=400,height=600');
+        if (!printWindow) {
+            alert("Tanpri pèmèt pop-up pou enprime tikè a.");
+            return;
         }
-        
-        iframeDoc.open();
-        iframeDoc.write(printContent);
-        iframeDoc.close();
-        
-        setTimeout(() => {
-            iframe.contentWindow.focus();
-            iframe.contentWindow.print();
-            
-            setTimeout(() => {
-                document.body.removeChild(iframe);
-            }, 1000);
-            
-        }, 500);
-        
+        printWindow.document.write(printContent);
+        printWindow.document.close();
+        printWindow.focus();
+        // L'impression est automatique grâce au onload dans le HTML généré
     } catch (error) {
         console.error('Erreur impression:', error);
-        fallbackPrintTicket(ticket);
+        alert('Erè pandan enpresyon an.');
     }
 }
 
@@ -543,7 +509,6 @@ function generateTicketHTML(ticket) {
         }).join('');
     }
     
-    // Si c'est un ticket composite, on peut ajouter une mention
     const multiDrawNote = ticket.multiDraw ? 
         '<div style="text-align:center; font-weight:bold; margin:5px 0;">--- MULTI-TIRAJ ---</div>' : '';
 

@@ -25,7 +25,6 @@
             <div class="user-profile">
                 <i class="fas fa-user-circle"></i>
                 <span id="agent-name">Agent-01</span>
-                <!-- Bouton Déconnexion ajouté ici -->
                 <button onclick="logout()" class="logout-btn" title="Dekonekte">
                     <i class="fas fa-sign-out-alt"></i>
                 </button>
@@ -52,13 +51,9 @@
                     </button>
                 </div>
 
-                <div id="multi-draw-container" class="multi-draw-selector" style="display: none;">
-                    <!-- Multi-draw checkboxes will be inserted here -->
-                </div>
+                <div id="multi-draw-container" class="multi-draw-selector" style="display: none;"></div>
 
-                <div class="draw-grid" id="draws-container">
-                    <!-- Draw cards will be inserted here -->
-                </div>
+                <div class="draw-grid" id="draws-container"></div>
             </section>
 
             <!-- Screen 2: Betting Interface -->
@@ -171,9 +166,7 @@
                             </button>
                         </div>
                     </div>
-                    <div class="cart-list" id="cart-display">
-                        <!-- Cart items will be inserted here -->
-                    </div>
+                    <div class="cart-list" id="cart-display"></div>
                     
                     <div id="cart-summary" style="display: none;">
                         <div class="total-row">
@@ -188,9 +181,7 @@
             <section id="history-screen" class="screen">
                 <div style="padding: 20px;">
                     <h2 class="section-title">Istorik Tikè</h2>
-                    <div class="history-list" id="history-container">
-                        <!-- History items will be inserted here -->
-                    </div>
+                    <div class="history-list" id="history-container"></div>
                 </div>
             </section>
 
@@ -252,13 +243,14 @@
                         </div>
                     </div>
                     
-                    <button onclick="printReport()" class="print-report-btn">
+                    <!-- 🔧 Bouton avec style en ligne pour garantir visibilité -->
+                    <button onclick="printReport()" class="print-report-btn" style="display: block; margin: 20px auto; width: fit-content;">
                         <i class="fas fa-print"></i> Enprime Rapò
                     </button>
                 </div>
             </section>
 
-            <!-- Screen 5: Winners (Tickets Gagnants) -->
+            <!-- Screen 5: Winners -->
             <section id="winners-screen" class="screen">
                 <div style="padding: 20px;">
                     <h2 class="section-title">Tikè Genyen yo</h2>
@@ -280,9 +272,7 @@
                     </div>
 
                     <h3 style="margin-bottom: 15px; margin-top: 30px;">Lis Tikè Genyen yo</h3>
-                    <div id="winners-container">
-                        <div class="empty-msg">Pa gen tikè genyen pou kounye a</div>
-                    </div>
+                    <div id="winners-container"></div>
                 </div>
             </section>
         </main>
