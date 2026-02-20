@@ -1,6 +1,5 @@
 require('dotenv').config();
 const express = require('express');
-const compression = require('compression');   // <-- AJOUT
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
@@ -10,13 +9,12 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const moment = require('moment');
 const path = require('path');
-const multer = require('multer');
+const multer = require('multer');               // ← ajout pour gérer les fichiers
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
 // ==================== Middlewares ====================
-app.use(compression());   // <-- AJOUT (juste après app, avant tout autre middleware)
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false
