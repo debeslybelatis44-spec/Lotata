@@ -122,53 +122,75 @@ window.logout = logout;
 // ========== CODE POUR L'INSTALLATION PWA (pour tous les utilisateurs connectés) ==========
 let deferredPrompt;
 
-// Intercepter l'événement beforeinstallprompt
 window.addEventListener('beforeinstallprompt', (e) => {
-    // Empêcher l'affichage automatique de la bannière
+    console.log('📦 Événement beforeinstallprompt capturé !');
     e.preventDefault();
-    // Stocker l'événement pour l'utiliser plus tard
     deferredPrompt = e;
-    // Afficher le message après un court délai
-    setTimeout(showInstallPromotion, 2000);
+    // Afficher le message après un délai (pour laisser la page se stabiliser)
+    setTimeout(() => {
+        console.log('📢 Tentative d\'affichage du message d\'installation');
+        showInstallPromotion();
+    }, 3000);
 });
 
-// Fonction pour afficher le message d'installation
 function showInstallPromotion() {
+    // Éviter les doublons
     if (document.getElementById('install-message')) return;
 
     const installMessage = document.createElement('div');
     installMessage.id = 'install-message';
+    installMessage.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        right: 20px;
+        background: #fbbf24;
+        color: #000;
+        padding: 15px 20px;
+        border-radius: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        z-index: 10000;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-weight: bold;
+        border: 2px solid #000;
+    `;
+
     installMessage.innerHTML = `
-        <div style="position: fixed; bottom: 20px; left: 20px; right: 20px; background: #fbbf24; color: #000; padding: 15px 20px; border-radius: 50px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 10px 25px rgba(0,0,0,0.3); z-index: 9999; font-family: 'Plus Jakarta Sans', sans-serif;">
-            <span style="font-weight: 700; font-size: 14px;">📱 Installe LOTATO PRO sur ton écran d'accueil !</span>
-            <div style="display: flex; gap: 10px;">
-                <button id="install-btn" style="background: #000; color: #fff; border: none; padding: 8px 20px; border-radius: 30px; font-weight: bold; cursor: pointer; font-size: 14px;">Installer</button>
-                <span id="close-install" style="cursor:pointer; font-size: 18px; line-height: 1;">✕</span>
-            </div>
+        <span style="font-size: 16px;">📱 Installe LOTATO PRO sur ton écran d'accueil !</span>
+        <div style="display: flex; gap: 10px;">
+            <button id="install-btn" style="background: #000; color: #fff; border: none; padding: 8px 20px; border-radius: 30px; font-weight: bold; cursor: pointer; font-size: 14px;">Installer</button>
+            <span id="close-install" style="cursor:pointer; font-size: 22px; line-height: 1;">✕</span>
         </div>
     `;
+
     document.body.appendChild(installMessage);
+    console.log('✅ Message d\'installation ajouté au DOM');
 
     document.getElementById('install-btn').addEventListener('click', async () => {
         if (!deferredPrompt) {
+            console.log('⚠️ deferredPrompt est null, suppression du message');
             installMessage.remove();
             return;
         }
+        console.log('🖱️ Clic sur Installer, déclenchement de prompt()');
         deferredPrompt.prompt();
         const { outcome } = await deferredPrompt.userChoice;
-        console.log(`Résultat installation : ${outcome}`);
+        console.log(`📊 Résultat de l'installation : ${outcome}`);
         deferredPrompt = null;
         installMessage.remove();
     });
 
     document.getElementById('close-install').addEventListener('click', () => {
+        console.log('❌ Message fermé par l\'utilisateur');
         installMessage.remove();
     });
 }
 
-// Nettoyer si l'application est déjà installée
 window.addEventListener('appinstalled', () => {
-    console.log('Application installée avec succès');
+    console.log('🎉 Application installée avec succès !');
     const msg = document.getElementById('install-message');
     if (msg) msg.remove();
 });
