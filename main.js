@@ -94,13 +94,11 @@ async function loadBlockedNumbers() {
 
 // ========== FONCTION DE DÉCONNEXION ==========
 async function logout() {
-    // Demander confirmation (optionnel)
     if (!confirm('Èske ou sèten ou vle dekonekte?')) return;
 
     const token = localStorage.getItem('auth_token');
     if (token) {
         try {
-            // Informer le serveur de la déconnexion (optionnel)
             await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.LOGOUT}`, {
                 method: 'POST',
                 headers: {
@@ -113,19 +111,15 @@ async function logout() {
         }
     }
 
-    // Nettoyer le stockage local
     localStorage.removeItem('auth_token');
     localStorage.removeItem('agent_id');
     localStorage.removeItem('agent_name');
 
-    // Rediriger vers la page de connexion
     window.location.href = 'index.html';
 }
-
-// Rendre la fonction accessible depuis le HTML
 window.logout = logout;
 
-// ========== CODE POUR L'INSTALLATION PWA ==========
+// ========== CODE POUR L'INSTALLATION PWA (pour tous les utilisateurs connectés) ==========
 let deferredPrompt;
 
 // Intercepter l'événement beforeinstallprompt
@@ -134,16 +128,14 @@ window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     // Stocker l'événement pour l'utiliser plus tard
     deferredPrompt = e;
-    // Afficher le message d'invitation après un court délai (pour laisser la page se charger)
+    // Afficher le message après un court délai
     setTimeout(showInstallPromotion, 2000);
 });
 
 // Fonction pour afficher le message d'installation
 function showInstallPromotion() {
-    // Éviter de montrer si déjà installé ou si le message existe déjà
     if (document.getElementById('install-message')) return;
 
-    // Créer l'élément du message
     const installMessage = document.createElement('div');
     installMessage.id = 'install-message';
     installMessage.innerHTML = `
@@ -157,35 +149,29 @@ function showInstallPromotion() {
     `;
     document.body.appendChild(installMessage);
 
-    // Gérer le clic sur le bouton d'installation
     document.getElementById('install-btn').addEventListener('click', async () => {
         if (!deferredPrompt) {
             installMessage.remove();
             return;
         }
-        // Afficher la boîte de dialogue d'installation native
         deferredPrompt.prompt();
         const { outcome } = await deferredPrompt.userChoice;
         console.log(`Résultat installation : ${outcome}`);
-        // Réinitialiser la variable
         deferredPrompt = null;
-        // Cacher le message
         installMessage.remove();
     });
 
-    // Gérer la fermeture manuelle
     document.getElementById('close-install').addEventListener('click', () => {
         installMessage.remove();
     });
 }
 
-// Cacher le message si l'application est déjà installée
+// Nettoyer si l'application est déjà installée
 window.addEventListener('appinstalled', () => {
     console.log('Application installée avec succès');
     const msg = document.getElementById('install-message');
     if (msg) msg.remove();
 });
-
 // ========== FIN CODE PWA ==========
 
 document.addEventListener('DOMContentLoaded', initApp);
