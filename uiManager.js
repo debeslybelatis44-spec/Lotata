@@ -303,12 +303,6 @@ async function loadReports() {
         
         await loadDrawReport('all');
         
-        // 🔧 Forcer l'affichage du bouton d'impression des rapports
-        const printBtn = document.querySelector('.print-report-btn');
-        if (printBtn) {
-            printBtn.style.display = 'block';
-        }
-        
     } catch (error) {
         console.error('Erreur chargement rapports:', error);
         document.getElementById('total-tickets').textContent = '0';
@@ -481,12 +475,32 @@ function printReport() {
     </body>
     </html>
     `;
-    
-    const printWindow = window.open('', '_blank', 'width=800,height=600');
-    printWindow.document.write(content);
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
+
+    // Utilisation d'une iframe cachée pour l'impression
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = 'none';
+    iframe.style.left = '-1000px';
+    iframe.style.top = '-1000px';
+    document.body.appendChild(iframe);
+
+    const iframeDoc = iframe.contentWindow.document;
+    iframeDoc.open();
+    iframeDoc.write(content);
+    iframeDoc.close();
+
+    iframe.onload = function() {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+        setTimeout(() => {
+            document.body.removeChild(iframe);
+        }, 1000);
+    };
+    if (iframe.contentDocument.readyState === 'complete') {
+        iframe.onload();
+    }
 }
 
 async function loadWinners() {
@@ -786,6 +800,7 @@ function logout() {
     });
 }
 
+// Exposer les fonctions globalement
 window.editTicket = editTicket;
 window.deleteTicket = deleteTicket;
 window.viewTicketDetails = viewTicketDetails;
@@ -793,4 +808,4 @@ window.markAsPaid = markAsPaid;
 window.printReport = printReport;
 window.loadDrawReport = loadDrawReport;
 window.logout = logout;
-window.reprintTicket = reprintTicket; // Expose la nouvelle fonction
+window.reprintTicket = reprintTicket;
