@@ -5,17 +5,14 @@ async function initApp() {
     const agentName = localStorage.getItem('agent_name');
 
     if (!token || !agentId) {
-        // Rediriger vers la page de connexion
         window.location.href = 'index.html';
         return;
     }
 
-    // Mettre à jour APP_STATE avec les valeurs du localStorage
     APP_STATE.agentId = agentId;
     APP_STATE.agentName = agentName;
 
     await loadLotteryConfig();
-    // Charger les tirages et les numéros bloqués depuis le serveur
     await loadDrawsFromServer();
     await loadBlockedNumbers();
     await APIService.getTickets();
@@ -31,13 +28,11 @@ async function initApp() {
     updateGameSelector();
     updateSyncStatus();
 
-    // ✅ Afficher le nom de l'agent connecté
     document.getElementById('agent-name').textContent = agentName;
     
     console.log("LOTATO PRO Ready - Authentification OK");
 }
 
-// Charger les tirages depuis le serveur
 async function loadDrawsFromServer() {
     try {
         const response = await fetch(`${API_CONFIG.BASE_URL}/draws`, {
@@ -48,15 +43,12 @@ async function loadDrawsFromServer() {
         APP_STATE.draws = data.draws;
     } catch (error) {
         console.error('❌ Erreur chargement tirages, utilisation des tirages par défaut:', error);
-        // Fallback : utiliser CONFIG.DRAWS avec active = true par défaut
         APP_STATE.draws = CONFIG.DRAWS.map(d => ({ ...d, active: true }));
     }
 }
 
-// Charger les numéros bloqués (global et par tirage)
 async function loadBlockedNumbers() {
     try {
-        // Numéros globaux
         const globalRes = await fetch(`${API_CONFIG.BASE_URL}/blocked-numbers/global`, {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
         });
@@ -67,7 +59,6 @@ async function loadBlockedNumbers() {
             APP_STATE.globalBlockedNumbers = [];
         }
 
-        // Pour chaque tirage, charger ses numéros bloqués
         const draws = APP_STATE.draws || CONFIG.DRAWS;
         APP_STATE.drawBlockedNumbers = {};
         for (const draw of draws) {
@@ -92,7 +83,6 @@ async function loadBlockedNumbers() {
     }
 }
 
-// ========== FONCTION DE DÉCONNEXION ==========
 async function logout() {
     if (!confirm('Èske ou sèten ou vle dekonekte?')) return;
 
@@ -119,29 +109,38 @@ async function logout() {
 }
 window.logout = logout;
 
-// ========== CODE POUR L'INSTALLATION PWA (pour tous les utilisateurs connectés) ==========
+// ========== CODE POUR L'INVITATION À L'INSTALLATION (UNIVERSEL) ==========
 let deferredPrompt;
 
+// Intercepter l'événement beforeinstallprompt (pour Chrome/Android/Edge)
 window.addEventListener('beforeinstallprompt', (e) => {
-    console.log('📦 Événement beforeinstallprompt capturé !');
+    console.log('📦 Événement beforeinstallprompt reçu');
     e.preventDefault();
     deferredPrompt = e;
-    // Afficher le message après un délai (pour laisser la page se stabiliser)
-    setTimeout(() => {
-        console.log('📢 Tentative d\'affichage du message d\'installation');
-        showInstallPromotion();
-    }, 3000);
+    // Le message sera de toute façon affiché par le setTimeout ci-dessous,
+    // mais on peut ajuster son contenu si besoin.
 });
 
-function showInstallPromotion() {
+// Afficher un message d'invitation après 3 secondes, indépendamment de l'événement
+setTimeout(() => {
+    showInstallMessage();
+}, 3000);
+
+function showInstallMessage() {
     // Éviter les doublons
     if (document.getElementById('install-message')) return;
+
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    
+    // Ne pas afficher si déjà installé
+    if (isStandalone) return;
 
     const installMessage = document.createElement('div');
     installMessage.id = 'install-message';
     installMessage.style.cssText = `
         position: fixed;
-        bottom: 20px;
+        top: 60px;  /* pour être visible, juste en dessous du header */
         left: 20px;
         right: 20px;
         background: #fbbf24;
@@ -156,45 +155,75 @@ function showInstallPromotion() {
         font-family: 'Plus Jakarta Sans', sans-serif;
         font-weight: bold;
         border: 2px solid #000;
+        animation: slideDown 0.3s ease;
     `;
 
-    installMessage.innerHTML = `
-        <span style="font-size: 16px;">📱 Installe LOTATO PRO sur ton écran d'accueil !</span>
-        <div style="display: flex; gap: 10px;">
-            <button id="install-btn" style="background: #000; color: #fff; border: none; padding: 8px 20px; border-radius: 30px; font-weight: bold; cursor: pointer; font-size: 14px;">Installer</button>
-            <span id="close-install" style="cursor:pointer; font-size: 22px; line-height: 1;">✕</span>
-        </div>
-    `;
+    let content = '';
+    if (deferredPrompt) {
+        // Installation automatique possible
+        content = `
+            <span style="font-size: 16px;">📱 Installe LOTATO PRO sur ton écran d'accueil !</span>
+            <div style="display: flex; gap: 10px;">
+                <button id="install-btn" style="background: #000; color: #fff; border: none; padding: 8px 20px; border-radius: 30px; font-weight: bold; cursor: pointer; font-size: 14px;">Installer</button>
+                <span id="close-install" style="cursor:pointer; font-size: 22px; line-height: 1;">✕</span>
+            </div>
+        `;
+    } else {
+        // Installation manuelle (iOS ou navigateur non supporté)
+        const instructions = isIOS 
+            ? "Sur iOS, appuie sur Partager ➔ Sur l'écran d'accueil" 
+            : "Utilise le menu du navigateur pour ajouter à l'écran d'accueil";
+        content = `
+            <span style="font-size: 14px;">📱 Installe LOTATO PRO : ${instructions}</span>
+            <span id="close-install" style="cursor:pointer; font-size: 22px; line-height: 1; margin-left: 10px;">✕</span>
+        `;
+    }
 
+    installMessage.innerHTML = content;
     document.body.appendChild(installMessage);
-    console.log('✅ Message d\'installation ajouté au DOM');
 
-    document.getElementById('install-btn').addEventListener('click', async () => {
-        if (!deferredPrompt) {
-            console.log('⚠️ deferredPrompt est null, suppression du message');
+    // Ajouter une animation keyframes si elle n'existe pas
+    if (!document.querySelector('#install-animation')) {
+        const style = document.createElement('style');
+        style.id = 'install-animation';
+        style.textContent = `
+            @keyframes slideDown {
+                from { transform: translateY(-100%); opacity: 0; }
+                to { transform: translateY(0); opacity: 1; }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // Gestionnaire pour le bouton d'installation automatique
+    const installBtn = document.getElementById('install-btn');
+    if (installBtn) {
+        installBtn.addEventListener('click', async () => {
+            if (!deferredPrompt) {
+                installMessage.remove();
+                return;
+            }
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            console.log(`Résultat installation : ${outcome}`);
+            deferredPrompt = null;
             installMessage.remove();
-            return;
-        }
-        console.log('🖱️ Clic sur Installer, déclenchement de prompt()');
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        console.log(`📊 Résultat de l'installation : ${outcome}`);
-        deferredPrompt = null;
-        installMessage.remove();
-    });
+        });
+    }
 
+    // Fermeture manuelle
     document.getElementById('close-install').addEventListener('click', () => {
-        console.log('❌ Message fermé par l\'utilisateur');
         installMessage.remove();
     });
 }
 
+// Nettoyer le message si l'application est installée
 window.addEventListener('appinstalled', () => {
-    console.log('🎉 Application installée avec succès !');
+    console.log('Application installée');
     const msg = document.getElementById('install-message');
     if (msg) msg.remove();
 });
-// ========== FIN CODE PWA ==========
+// ========== FIN CODE INVITATION ==========
 
 document.addEventListener('DOMContentLoaded', initApp);
 setInterval(updateClock, 1000);
