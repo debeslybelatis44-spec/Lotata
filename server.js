@@ -9,7 +9,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const moment = require('moment');
 const path = require('path');
-const multer = require('multer');               // ← ajout pour gérer les fichiers
+const multer = require('multer');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -29,7 +29,6 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(morgan('dev'));
 
-// Configuration de multer pour l'upload de logo (stockage en mémoire, on pourra le convertir en base64 ou sauvegarder sur disque)
 const storage = multer.memoryStorage();
 const upload = multer({ 
   storage: storage,
@@ -69,18 +68,14 @@ async function addColumnIfNotExists(table, column, definition) {
   }
 }
 
-// Initialisation des tables (ajout des colonnes manquantes pour la config)
+// Initialisation des tables
 async function initializeDatabase() {
   try {
     console.log('🔄 Vérification de la base de données...');
-    // Colonnes existantes déjà gérées
     await addColumnIfNotExists('tickets', 'paid', 'BOOLEAN DEFAULT FALSE');
     await addColumnIfNotExists('tickets', 'paid_at', 'TIMESTAMP');
-
-    // Ajout des colonnes pour la configuration propriétaire
     await addColumnIfNotExists('lottery_config', 'slogan', 'TEXT');
-    await addColumnIfNotExists('lottery_config', 'multipliers', 'JSONB'); // stocke les multiplicateurs
-
+    await addColumnIfNotExists('lottery_config', 'multipliers', 'JSONB');
     console.log('✅ Base de données prête');
   } catch (error) {
     console.error('❌ Erreur initialisation:', error);
@@ -242,41 +237,32 @@ app.post('/api/tickets/save', async (req, res) => {
       return res.status(403).json({ error: 'Vous ne pouvez enregistrer que vos propres tickets' });
     }
 
-    // Vérifier que le tirage est actif
     const drawCheck = await pool.query('SELECT active FROM draws WHERE id = $1', [drawId]);
     if (drawCheck.rows.length === 0 || !drawCheck.rows[0].active) {
       return res.status(403).json({ error: 'Tirage bloqué ou inexistant' });
     }
 
-    // Récupérer les blocages globaux
     const globalBlocked = await pool.query('SELECT number FROM blocked_numbers');
     const globalBlockedSet = new Set(globalBlocked.rows.map(r => r.number));
 
-    // Récupérer les blocages par tirage
     const drawBlocked = await pool.query('SELECT number FROM draw_blocked_numbers WHERE draw_id = $1', [drawId]);
     const drawBlockedSet = new Set(drawBlocked.rows.map(r => r.number));
 
-    // Récupérer les limites
     const limits = await pool.query('SELECT number, limit_amount FROM draw_number_limits WHERE draw_id = $1', [drawId]);
     const limitsMap = new Map(limits.rows.map(r => [r.number, parseFloat(r.limit_amount)]));
 
-    // Vérifier chaque pari
     for (const bet of bets) {
       const cleanNumber = bet.cleanNumber || (bet.number ? bet.number.replace(/[^0-9]/g, '') : '');
       if (!cleanNumber) continue;
 
-      // Blocage global
       if (globalBlockedSet.has(cleanNumber)) {
         return res.status(403).json({ error: `Numéro ${cleanNumber} est bloqué globalement` });
       }
-      // Blocage par tirage
       if (drawBlockedSet.has(cleanNumber)) {
         return res.status(403).json({ error: `Numéro ${cleanNumber} est bloqué pour ce tirage` });
       }
-      // Limite de mise
       if (limitsMap.has(cleanNumber)) {
         const limit = limitsMap.get(cleanNumber);
-        // Calculer le total déjà mis aujourd'hui sur ce numéro
         const todayBetsResult = await pool.query(
           `SELECT SUM((bets->>'amount')::numeric) as total
            FROM tickets, jsonb_array_elements(bets::jsonb) as bet
@@ -335,16 +321,65 @@ app.get('/api/tickets', async (req, res) => {
   }
 });
 
-app.delete('/api/tickets/:ticketId', authenticateToken, authorize('supervisor', 'owner'), async (req, res) => {
+/**
+ * SUPPRESSION D'UN TICKET
+ * Accessible à : agent (ses propres tickets dans les 10 min), superviseur (tickets des agents supervisés, 10 min), propriétaire (sans restriction)
+ */
+app.delete('/api/tickets/:ticketId', authenticateToken, async (req, res) => {
   try {
     const { ticketId } = req.params;
-    const ticket = await pool.query('SELECT date FROM tickets WHERE id = $1', [ticketId]);
-    if (ticket.rows.length === 0) return res.status(404).json({ error: 'Ticket non trouvé' });
-    const diffMinutes = moment().diff(moment(ticket.rows[0].date), 'minutes');
-    if (diffMinutes > 10) {
-      return res.status(403).json({ error: 'Suppression impossible après 10 minutes' });
+    const user = req.user;
+
+    // 1. Vérifier que l'utilisateur a un rôle autorisé
+    if (!['supervisor', 'owner', 'agent'].includes(user.role)) {
+      return res.status(403).json({ error: 'Accès interdit' });
     }
+
+    // 2. Récupérer le ticket (date et agent_id)
+    const ticketResult = await pool.query(
+      'SELECT date, agent_id FROM tickets WHERE id = $1',
+      [ticketId]
+    );
+    if (ticketResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Ticket non trouvé' });
+    }
+    const ticket = ticketResult.rows[0];
+
+    // 3. Délai de 10 minutes (sauf pour le propriétaire)
+    if (user.role !== 'owner') {
+      const diffMinutes = moment().diff(moment(ticket.date), 'minutes');
+      if (diffMinutes > 10) {
+        return res.status(403).json({ error: 'Suppression impossible après 10 minutes' });
+      }
+    }
+
+    // 4. Vérifications selon le rôle
+    if (user.role === 'agent') {
+      // L'agent ne peut supprimer que ses propres tickets
+      if (ticket.agent_id !== user.id) {
+        return res.status(403).json({ error: 'Vous ne pouvez supprimer que vos propres tickets' });
+      }
+    } else if (user.role === 'supervisor') {
+      // Le superviseur ne peut supprimer que les tickets des agents qu'il supervise
+      const agentCheck = await pool.query(
+        'SELECT id FROM agents WHERE id = $1 AND supervisor_id = $2',
+        [ticket.agent_id, user.id]
+      );
+      if (agentCheck.rows.length === 0) {
+        return res.status(403).json({ error: 'Ce ticket n\'est pas sous votre supervision' });
+      }
+    }
+    // Propriétaire : pas de restriction supplémentaire
+
+    // 5. Suppression effective
     await pool.query('DELETE FROM tickets WHERE id = $1', [ticketId]);
+
+    // 6. Journalisation
+    await pool.query(
+      'INSERT INTO activity_log (user_id, user_role, action, details, ip_address) VALUES ($1, $2, $3, $4, $5)',
+      [user.id, user.role, 'delete_ticket', `Ticket ID: ${ticketId}`, req.ip]
+    );
+
     res.json({ success: true });
   } catch (error) {
     console.error('❌ Erreur suppression ticket:', error);
