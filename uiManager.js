@@ -79,8 +79,9 @@ function renderHistory() {
     }
     
     container.innerHTML = APP_STATE.ticketsHistory.map((ticket, index) => {
-        const numericId = ticket.id;                     // ID numérique pour les appels API
-        const displayId = ticket.ticket_id || ticket.id; // ID affiché à l'utilisateur
+        // ID numérique pour l'API, ID d'affichage pour l'utilisateur
+        const numericId = ticket.id;                     // Clé primaire (nombre)
+        const displayId = ticket.ticket_id || ticket.id; // Identifiant lisible
         const drawName = ticket.draw_name || ticket.drawName || ticket.draw_name_fr || 'Tiraj Inkonu';
         const totalAmount = ticket.total_amount || ticket.totalAmount || ticket.amount || 0;
         const date = ticket.date || ticket.created_at || ticket.created_date || new Date().toISOString();
@@ -122,7 +123,7 @@ function renderHistory() {
         const now = new Date();
         const minutesDiff = (now - ticketDate) / (1000 * 60);
         // Délai de suppression : 10 minutes (comme défini côté serveur pour les agents)
-        const canDelete = minutesDiff <= 10;
+        const canDelete = minutesDiff <= 10 && numericId != null;
         const canEdit = minutesDiff <= 3;
         
         let formattedDate = 'Date inkonu';
@@ -137,7 +138,7 @@ function renderHistory() {
         }
         
         return `
-            <div class="history-card" data-ticket-id="${displayId}" data-numeric-id="${numericId}">
+            <div class="history-card" data-numeric-id="${numericId}" data-display-id="${displayId}">
                 <div class="card-header">
                     <span class="ticket-id">#${displayId}</span>
                     <span class="ticket-date">${formattedDate} ${formattedTime}</span>
@@ -161,7 +162,7 @@ function renderHistory() {
                         <button class="btn-small print-btn" onclick="reprintTicket('${displayId}')">
                             <i class="fas fa-print"></i> Enprime
                         </button>
-                        <button class="delete-history-btn" onclick="deleteTicket('${numericId}')" ${canDelete ? '' : 'disabled'}>
+                        <button class="delete-history-btn" onclick="deleteTicketFromCard(this)" ${canDelete ? '' : 'disabled'}>
                             <i class="fas fa-trash"></i> Efase
                         </button>
                     </div>
@@ -169,6 +170,18 @@ function renderHistory() {
             </div>
         `;
     }).join('');
+}
+
+// Nouvelle fonction : récupère l'ID numérique depuis la carte et appelle deleteTicket
+function deleteTicketFromCard(button) {
+    const card = button.closest('.history-card');
+    if (!card) return;
+    const numericId = card.dataset.numericId;
+    if (!numericId) {
+        alert('ID tikè invalide (pa gen id nimerik)');
+        return;
+    }
+    deleteTicket(numericId);
 }
 
 async function deleteTicket(ticketId) {
@@ -787,11 +800,13 @@ function logout() {
     });
 }
 
+// Exposer les fonctions globales
 window.editTicket = editTicket;
 window.deleteTicket = deleteTicket;
+window.deleteTicketFromCard = deleteTicketFromCard;
 window.viewTicketDetails = viewTicketDetails;
 window.markAsPaid = markAsPaid;
 window.printReport = printReport;
 window.loadDrawReport = loadDrawReport;
 window.logout = logout;
-window.reprintTicket = reprintTicket; // Expose la nouvelle fonction
+window.reprintTicket = reprintTicket;
