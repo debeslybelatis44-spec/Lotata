@@ -335,30 +335,15 @@ app.get('/api/tickets', async (req, res) => {
   }
 });
 
-// --- MODIFICATION ICI : suppression de ticket avec délai variable selon le rôle ---
-app.delete('/api/tickets/:ticketId', authenticateToken, authorize('supervisor', 'owner', 'agent'), async (req, res) => {
+app.delete('/api/tickets/:ticketId', authenticateToken, authorize('supervisor', 'owner'), async (req, res) => {
   try {
     const { ticketId } = req.params;
-
-    // Récupérer la date et l'agent_id du ticket
-    const ticket = await pool.query('SELECT date, agent_id FROM tickets WHERE id = $1', [ticketId]);
-    if (ticket.rows.length === 0) {
-      return res.status(404).json({ error: 'Ticket non trouvé' });
-    }
-
-    // Si l'utilisateur est un agent, vérifier que c'est bien son ticket
-    if (req.user.role === 'agent' && ticket.rows[0].agent_id !== req.user.id) {
-      return res.status(403).json({ error: 'Vous ne pouvez supprimer que vos propres tickets' });
-    }
-
+    const ticket = await pool.query('SELECT date FROM tickets WHERE id = $1', [ticketId]);
+    if (ticket.rows.length === 0) return res.status(404).json({ error: 'Ticket non trouvé' });
     const diffMinutes = moment().diff(moment(ticket.rows[0].date), 'minutes');
-
-    // Délai : 3 minutes pour les agents, 10 minutes pour les superviseurs/propriétaires
-    const maxDelay = req.user.role === 'agent' ? 3 : 10;
-    if (diffMinutes > maxDelay) {
-      return res.status(403).json({ error: `Suppression impossible après ${maxDelay} minutes` });
+    if (diffMinutes > 10) {
+      return res.status(403).json({ error: 'Suppression impossible après 10 minutes' });
     }
-
     await pool.query('DELETE FROM tickets WHERE id = $1', [ticketId]);
     res.json({ success: true });
   } catch (error) {
