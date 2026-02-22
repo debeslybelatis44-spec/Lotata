@@ -79,7 +79,8 @@ function renderHistory() {
     }
     
     container.innerHTML = APP_STATE.ticketsHistory.map((ticket, index) => {
-        const ticketId = ticket.ticket_id || ticket.id || `temp_${Date.now()}_${index}`;
+        const numericId = ticket.id;                     // ID numérique pour les appels API
+        const displayId = ticket.ticket_id || ticket.id; // ID affiché à l'utilisateur
         const drawName = ticket.draw_name || ticket.drawName || ticket.draw_name_fr || 'Tiraj Inkonu';
         const totalAmount = ticket.total_amount || ticket.totalAmount || ticket.amount || 0;
         const date = ticket.date || ticket.created_at || ticket.created_date || new Date().toISOString();
@@ -120,7 +121,8 @@ function renderHistory() {
         const ticketDate = new Date(date);
         const now = new Date();
         const minutesDiff = (now - ticketDate) / (1000 * 60);
-        const canDelete = minutesDiff <= 2;
+        // Délai de suppression : 10 minutes (comme défini côté serveur pour les agents)
+        const canDelete = minutesDiff <= 10;
         const canEdit = minutesDiff <= 3;
         
         let formattedDate = 'Date inkonu';
@@ -135,9 +137,9 @@ function renderHistory() {
         }
         
         return `
-            <div class="history-card" data-ticket-id="${ticketId}">
+            <div class="history-card" data-ticket-id="${displayId}" data-numeric-id="${numericId}">
                 <div class="card-header">
-                    <span class="ticket-id">#${ticket.ticket_id || ticket.id || 'N/A'}</span>
+                    <span class="ticket-id">#${displayId}</span>
                     <span class="ticket-date">${formattedDate} ${formattedTime}</span>
                 </div>
                 <div class="ticket-info">
@@ -148,19 +150,18 @@ function renderHistory() {
                 <div class="card-footer">
                     <span class="badge ${statusClass}">${status}</span>
                     <div class="action-buttons">
-                        <button class="btn-small view-details-btn" onclick="viewTicketDetails('${ticketId}')">
+                        <button class="btn-small view-details-btn" onclick="viewTicketDetails('${displayId}')">
                             <i class="fas fa-eye"></i> Detay
                         </button>
                         ${canEdit ? `
-                            <button class="btn-small edit-btn" onclick="editTicket('${ticketId}')">
+                            <button class="btn-small edit-btn" onclick="editTicket('${displayId}')">
                                 <i class="fas fa-edit"></i> Modifye
                             </button>
                         ` : ''}
-                        <!-- Bouton pour réimprimer le ticket -->
-                        <button class="btn-small print-btn" onclick="reprintTicket('${ticketId}')">
+                        <button class="btn-small print-btn" onclick="reprintTicket('${displayId}')">
                             <i class="fas fa-print"></i> Enprime
                         </button>
-                        <button class="delete-history-btn" onclick="deleteTicket('${ticketId}')" ${canDelete ? '' : 'disabled'}>
+                        <button class="delete-history-btn" onclick="deleteTicket('${numericId}')" ${canDelete ? '' : 'disabled'}>
                             <i class="fas fa-trash"></i> Efase
                         </button>
                     </div>
