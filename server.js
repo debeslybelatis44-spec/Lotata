@@ -330,22 +330,28 @@ app.delete('/api/tickets/:ticketId', authenticateToken, async (req, res) => {
     const { ticketId } = req.params;
     const user = req.user;
 
-    // 1. Vérifier que l'utilisateur a un rôle autorisé
+    // 1. Valider que l'ID est un nombre (clé primaire)
+    const id = parseInt(ticketId);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: 'ID de ticket invalide' });
+    }
+
+    // 2. Vérifier que l'utilisateur a un rôle autorisé
     if (!['supervisor', 'owner', 'agent'].includes(user.role)) {
       return res.status(403).json({ error: 'Accès interdit' });
     }
 
-    // 2. Récupérer le ticket (date et agent_id)
+    // 3. Récupérer le ticket (date et agent_id)
     const ticketResult = await pool.query(
       'SELECT date, agent_id FROM tickets WHERE id = $1',
-      [ticketId]
+      [id]
     );
     if (ticketResult.rows.length === 0) {
       return res.status(404).json({ error: 'Ticket non trouvé' });
     }
     const ticket = ticketResult.rows[0];
 
-    // 3. Délai de 10 minutes (sauf pour le propriétaire)
+    // 4. Délai de 10 minutes (sauf pour le propriétaire)
     if (user.role !== 'owner') {
       const diffMinutes = moment().diff(moment(ticket.date), 'minutes');
       if (diffMinutes > 10) {
@@ -353,7 +359,7 @@ app.delete('/api/tickets/:ticketId', authenticateToken, async (req, res) => {
       }
     }
 
-    // 4. Vérifications selon le rôle
+    // 5. Vérifications selon le rôle
     if (user.role === 'agent') {
       // L'agent ne peut supprimer que ses propres tickets
       if (ticket.agent_id !== user.id) {
@@ -371,13 +377,13 @@ app.delete('/api/tickets/:ticketId', authenticateToken, async (req, res) => {
     }
     // Propriétaire : pas de restriction supplémentaire
 
-    // 5. Suppression effective
-    await pool.query('DELETE FROM tickets WHERE id = $1', [ticketId]);
+    // 6. Suppression effective
+    await pool.query('DELETE FROM tickets WHERE id = $1', [id]);
 
-    // 6. Journalisation
+    // 7. Journalisation (sans colonne "details" qui n'existe pas)
     await pool.query(
-      'INSERT INTO activity_log (user_id, user_role, action, details, ip_address) VALUES ($1, $2, $3, $4, $5)',
-      [user.id, user.role, 'delete_ticket', `Ticket ID: ${ticketId}`, req.ip]
+      'INSERT INTO activity_log (user_id, user_role, action, ip_address) VALUES ($1, $2, $3, $4)',
+      [user.id, user.role, 'delete_ticket', req.ip]
     );
 
     res.json({ success: true });
@@ -1468,8 +1474,8 @@ ownerRouter.delete('/tickets/:ticketId', async (req, res) => {
 
     // Optionnel: journaliser la suppression
     await pool.query(
-      'INSERT INTO activity_log (user_id, user_role, action, details, ip_address) VALUES ($1, $2, $3, $4, $5)',
-      [req.user.id, 'owner', 'delete_ticket', `Ticket ID: ${ticketId}`, req.ip]
+      'INSERT INTO activity_log (user_id, user_role, action, ip_address) VALUES ($1, $2, $3, $4)',
+      [req.user.id, 'owner', 'delete_ticket', req.ip]
     );
 
     res.json({ success: true });
