@@ -1,6 +1,5 @@
 require('dotenv').config();
 const express = require('express');
-const compression = require('compression');   // <-- AJOUT
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
@@ -10,13 +9,12 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const moment = require('moment');
 const path = require('path');
-const multer = require('multer');
+const multer = require('multer');               // ← ajout pour gérer les fichiers
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
 // ==================== Middlewares ====================
-app.use(compression());   // <-- AJOUT (juste après app, avant tout autre middleware)
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false
@@ -337,15 +335,30 @@ app.get('/api/tickets', async (req, res) => {
   }
 });
 
-app.delete('/api/tickets/:ticketId', authenticateToken, authorize('supervisor', 'owner'), async (req, res) => {
+// --- MODIFICATION ICI : suppression de ticket avec délai variable selon le rôle ---
+app.delete('/api/tickets/:ticketId', authenticateToken, authorize('supervisor', 'owner', 'agent'), async (req, res) => {
   try {
     const { ticketId } = req.params;
-    const ticket = await pool.query('SELECT date FROM tickets WHERE id = $1', [ticketId]);
-    if (ticket.rows.length === 0) return res.status(404).json({ error: 'Ticket non trouvé' });
-    const diffMinutes = moment().diff(moment(ticket.rows[0].date), 'minutes');
-    if (diffMinutes > 10) {
-      return res.status(403).json({ error: 'Suppression impossible après 10 minutes' });
+
+    // Récupérer la date et l'agent_id du ticket
+    const ticket = await pool.query('SELECT date, agent_id FROM tickets WHERE id = $1', [ticketId]);
+    if (ticket.rows.length === 0) {
+      return res.status(404).json({ error: 'Ticket non trouvé' });
     }
+
+    // Si l'utilisateur est un agent, vérifier que c'est bien son ticket
+    if (req.user.role === 'agent' && ticket.rows[0].agent_id !== req.user.id) {
+      return res.status(403).json({ error: 'Vous ne pouvez supprimer que vos propres tickets' });
+    }
+
+    const diffMinutes = moment().diff(moment(ticket.rows[0].date), 'minutes');
+
+    // Délai : 3 minutes pour les agents, 10 minutes pour les superviseurs/propriétaires
+    const maxDelay = req.user.role === 'agent' ? 3 : 10;
+    if (diffMinutes > maxDelay) {
+      return res.status(403).json({ error: `Suppression impossible après ${maxDelay} minutes` });
+    }
+
     await pool.query('DELETE FROM tickets WHERE id = $1', [ticketId]);
     res.json({ success: true });
   } catch (error) {
