@@ -79,10 +79,7 @@ function renderHistory() {
     }
     
     container.innerHTML = APP_STATE.ticketsHistory.map((ticket, index) => {
-        // ID numérique pour les actions (suppression, modification, etc.)
-        const numericId = ticket.id;
-        // ID à afficher (format T... ou numérique)
-        const displayId = ticket.ticket_id || ticket.id || `temp_${Date.now()}_${index}`;
+        const ticketId = ticket.ticket_id || ticket.id || `temp_${Date.now()}_${index}`;
         const drawName = ticket.draw_name || ticket.drawName || ticket.draw_name_fr || 'Tiraj Inkonu';
         const totalAmount = ticket.total_amount || ticket.totalAmount || ticket.amount || 0;
         const date = ticket.date || ticket.created_at || ticket.created_date || new Date().toISOString();
@@ -138,9 +135,9 @@ function renderHistory() {
         }
         
         return `
-            <div class="history-card" data-ticket-id="${numericId}">
+            <div class="history-card" data-ticket-id="${ticketId}">
                 <div class="card-header">
-                    <span class="ticket-id">#${displayId}</span>
+                    <span class="ticket-id">#${ticket.ticket_id || ticket.id || 'N/A'}</span>
                     <span class="ticket-date">${formattedDate} ${formattedTime}</span>
                 </div>
                 <div class="ticket-info">
@@ -151,18 +148,19 @@ function renderHistory() {
                 <div class="card-footer">
                     <span class="badge ${statusClass}">${status}</span>
                     <div class="action-buttons">
-                        <button class="btn-small view-details-btn" onclick="viewTicketDetails('${numericId}')">
+                        <button class="btn-small view-details-btn" onclick="viewTicketDetails('${ticketId}')">
                             <i class="fas fa-eye"></i> Detay
                         </button>
                         ${canEdit ? `
-                            <button class="btn-small edit-btn" onclick="editTicket('${numericId}')">
+                            <button class="btn-small edit-btn" onclick="editTicket('${ticketId}')">
                                 <i class="fas fa-edit"></i> Modifye
                             </button>
                         ` : ''}
-                        <button class="btn-small print-btn" onclick="reprintTicket('${numericId}')">
+                        <!-- Bouton pour réimprimer le ticket -->
+                        <button class="btn-small print-btn" onclick="reprintTicket('${ticketId}')">
                             <i class="fas fa-print"></i> Enprime
                         </button>
-                        <button class="delete-history-btn" onclick="deleteTicket('${numericId}')" ${canDelete ? '' : 'disabled'}>
+                        <button class="delete-history-btn" onclick="deleteTicket('${ticketId}')" ${canDelete ? '' : 'disabled'}>
                             <i class="fas fa-trash"></i> Efase
                         </button>
                     </div>
@@ -304,6 +302,12 @@ async function loadReports() {
         });
         
         await loadDrawReport('all');
+        
+        // 🔧 Forcer l'affichage du bouton d'impression des rapports
+        const printBtn = document.querySelector('.print-report-btn');
+        if (printBtn) {
+            printBtn.style.display = 'block';
+        }
         
     } catch (error) {
         console.error('Erreur chargement rapports:', error);
@@ -477,32 +481,12 @@ function printReport() {
     </body>
     </html>
     `;
-
-    // Utilisation d'une iframe cachée pour l'impression
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'absolute';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = 'none';
-    iframe.style.left = '-1000px';
-    iframe.style.top = '-1000px';
-    document.body.appendChild(iframe);
-
-    const iframeDoc = iframe.contentWindow.document;
-    iframeDoc.open();
-    iframeDoc.write(content);
-    iframeDoc.close();
-
-    iframe.onload = function() {
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
-        setTimeout(() => {
-            document.body.removeChild(iframe);
-        }, 1000);
-    };
-    if (iframe.contentDocument.readyState === 'complete') {
-        iframe.onload();
-    }
+    
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    printWindow.document.write(content);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
 }
 
 async function loadWinners() {
@@ -802,7 +786,6 @@ function logout() {
     });
 }
 
-// Exposer les fonctions globalement
 window.editTicket = editTicket;
 window.deleteTicket = deleteTicket;
 window.viewTicketDetails = viewTicketDetails;
@@ -810,4 +793,4 @@ window.markAsPaid = markAsPaid;
 window.printReport = printReport;
 window.loadDrawReport = loadDrawReport;
 window.logout = logout;
-window.reprintTicket = reprintTicket;
+window.reprintTicket = reprintTicket; // Expose la nouvelle fonction
