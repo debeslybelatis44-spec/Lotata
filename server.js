@@ -1322,6 +1322,140 @@ ownerRouter.get('/blocked-draws', async (req, res) => {
 
 // Rapports avec filtres (supprimé car remonté dans routes communes)
 // ownerRouter.get('/reports', ...) // ← retiré
+// ==================== Routes superviseur (suite) ====================
+
+// Rapports détaillés avec filtres (pour le superviseur)
+supervisorRouter.get('/reports', async (req, res) => {
+  try {
+    const { agentId, drawId, period, fromDate, toDate } = req.query;
+    const supervisorId = req.user.id;
+
+    let conditions = [];
+    let params = [];
+    let paramIndex = 1;
+
+    // Filtrer automatiquement sur les agents du superviseur connecté
+    conditions.push(`a.supervisor_id = $${paramIndex++}`);
+    params.push(supervisorId);
+
+    // Si un agent spécifique est demandé, vérifier qu'il appartient bien au superviseur
+    if (agentId && agentId !== 'all') {
+      conditions.push(`t.agent_id = $${paramIndex++}`);
+      params.push(agentId);
+    }
+
+    if (drawId && drawId !== 'all') {
+      conditions.push(`t.draw_id = $${paramIndex++}`);
+      params.push(drawId);
+    }
+
+    // Gestion de la période
+    let dateCondition = '';
+    if (period === 'today') {
+      dateCondition = 'DATE(t.date) = CURRENT_DATE';
+    } else if (period === 'yesterday') {
+      dateCondition = 'DATE(t.date) = CURRENT_DATE - INTERVAL \'1 day\'';
+    } else if (period === 'week') {
+      dateCondition = 't.date >= DATE_TRUNC(\'week\', CURRENT_DATE)';
+    } else if (period === 'month') {
+      dateCondition = 't.date >= DATE_TRUNC(\'month\', CURRENT_DATE)';
+    } else if (period === 'custom' && fromDate && toDate) {
+      dateCondition = `DATE(t.date) BETWEEN $${paramIndex++} AND $${paramIndex++}`;
+      params.push(fromDate, toDate);
+    }
+    if (dateCondition) {
+      conditions.push(dateCondition);
+    }
+
+    const whereClause = 'WHERE ' + conditions.join(' AND ');
+
+    // Résumé global
+    const summaryQuery = `
+      SELECT 
+        COUNT(DISTINCT t.id) as total_tickets,
+        COALESCE(SUM(t.total_amount), 0) as total_bets,
+        COALESCE(SUM(t.win_amount), 0) as total_wins,
+        COALESCE(SUM(t.win_amount) - SUM(t.total_amount), 0) as net_result
+      FROM tickets t
+      JOIN agents a ON t.agent_id = a.id
+      ${whereClause}
+    `;
+    const summary = await pool.query(summaryQuery, params);
+
+    // Détail (par agent ou par tirage selon qu'on a filtré par draw ou non)
+    let detailQuery;
+    if (drawId && drawId !== 'all') {
+      // Si un tirage spécifique est choisi, détail par agent
+      detailQuery = `
+        SELECT a.id as agent_id, a.name as agent_name,
+               COUNT(t.id) as tickets,
+               COALESCE(SUM(t.total_amount), 0) as bets,
+               COALESCE(SUM(t.win_amount), 0) as wins,
+               COALESCE(SUM(t.win_amount) - SUM(t.total_amount), 0) as result
+        FROM tickets t
+        JOIN agents a ON t.agent_id = a.id
+        ${whereClause}
+        GROUP BY a.id, a.name
+        ORDER BY result DESC
+      `;
+    } else {
+      // Sinon, détail par tirage
+      detailQuery = `
+        SELECT d.id as draw_id, d.name as draw_name,
+               COUNT(t.id) as tickets,
+               COALESCE(SUM(t.total_amount), 0) as bets,
+               COALESCE(SUM(t.win_amount), 0) as wins,
+               COALESCE(SUM(t.win_amount) - SUM(t.total_amount), 0) as result
+        FROM tickets t
+        JOIN draws d ON t.draw_id = d.id
+        JOIN agents a ON t.agent_id = a.id
+        ${whereClause}
+        GROUP BY d.id, d.name
+        ORDER BY result DESC
+      `;
+    }
+
+    const detail = await pool.query(detailQuery, params);
+
+    res.json({
+      summary: summary.rows[0],
+      detail: detail.rows
+    });
+  } catch (error) {
+    console.error('❌ Erreur rapport superviseur:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Activité en temps réel : tickets récents (moins de 10 minutes) des agents du superviseur
+supervisorRouter.get('/activity', async (req, res) => {
+  try {
+    const supervisorId = req.user.id;
+    const minutes = req.query.minutes || 10; // paramètre optionnel
+
+    const result = await pool.query(
+      `SELECT t.*, a.name as agent_name
+       FROM tickets t
+       JOIN agents a ON t.agent_id = a.id
+       WHERE a.supervisor_id = $1
+         AND t.date > NOW() - ($2 || ' minutes')::INTERVAL
+       ORDER BY t.date DESC
+       LIMIT 50`,
+      [supervisorId, minutes]
+    );
+
+    // Convertir bets en objet JSON
+    const tickets = result.rows.map(t => ({
+      ...t,
+      bets: typeof t.bets === 'string' ? JSON.parse(t.bets) : t.bets
+    }));
+
+    res.json({ tickets });
+  } catch (error) {
+    console.error('❌ Erreur activité superviseur:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
 
 // ========== NOUVELLES ROUTES POUR LA CONFIGURATION PROPRIÉTAIRE ==========
 // GET /api/owner/settings - Récupérer les paramètres généraux (nom, slogan, logo, multiplicateurs)
