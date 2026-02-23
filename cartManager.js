@@ -379,7 +379,35 @@ var CartManager = {
     }
 };
 
-// --- Fonctions d'impression améliorées avec iframe ---
+// --- Fonctions d'impression améliorées ---
+
+/**
+ * Imprime un contenu HTML dans un iframe caché (identique à la méthode utilisée pour les rapports)
+ */
+function printHTML(htmlContent) {
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = 'none';
+    iframe.style.left = '-1000px';
+    iframe.style.top = '-1000px';
+    document.body.appendChild(iframe);
+
+    const iframeDoc = iframe.contentWindow.document;
+    iframeDoc.open();
+    iframeDoc.write(htmlContent);
+    iframeDoc.close();
+
+    iframe.onload = () => {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+        // Nettoyer après impression
+        setTimeout(() => {
+            document.body.removeChild(iframe);
+        }, 1000);
+    };
+}
 
 async function processFinalTicket() {
     if (APP_STATE.currentCart.length === 0) {
@@ -461,40 +489,22 @@ async function processFinalTicket() {
     }
 }
 
-// 🔧 Impression via iframe cachée (fiable sur mobile)
+/**
+ * Génère le HTML du ticket et l'imprime via iframe (méthode fiable)
+ */
 function printThermalTicket(ticket) {
     try {
-        const printContent = generateTicketHTML(ticket);
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'absolute';
-        iframe.style.width = '0';
-        iframe.style.height = '0';
-        iframe.style.border = 'none';
-        iframe.style.left = '-1000px';
-        iframe.style.top = '-1000px';
-        document.body.appendChild(iframe);
-
-        const iframeDoc = iframe.contentWindow.document;
-        iframeDoc.open();
-        iframeDoc.write(printContent);
-        iframeDoc.close();
-
-        iframe.onload = function() {
-            iframe.contentWindow.focus();
-            iframe.contentWindow.print();
-            setTimeout(() => {
-                document.body.removeChild(iframe);
-            }, 1000);
-        };
-        if (iframe.contentDocument.readyState === 'complete') {
-            iframe.onload();
-        }
+        const htmlContent = generateTicketHTML(ticket);
+        printHTML(htmlContent);
     } catch (error) {
         console.error('Erreur impression:', error);
-        alert('Erè pandan enpresyon an. Vérifye ke ou gen yon imprimant konfigire.');
+        alert('Erè pandan enpresyon an.');
     }
 }
 
+/**
+ * Génère le contenu HTML du ticket (sans déclencheur automatique d'impression)
+ */
 function generateTicketHTML(ticket) {
     const lotteryConfig = APP_STATE.lotteryConfig || CONFIG;
     const lotteryName = lotteryConfig.LOTTERY_NAME || lotteryConfig.name || 'LOTTERIE';
@@ -676,9 +686,18 @@ function generateTicketHTML(ticket) {
     `;
 }
 
+/**
+ * Méthode de secours (ancienne version, conservée pour compatibilité)
+ */
 function fallbackPrintTicket(ticket) {
-    // Ancienne méthode gardée en secours, mais on utilise maintenant l'iframe
-    printThermalTicket(ticket);
+    const printWindow = window.open('', '_blank', 'width=300,height=600');
+    if (!printWindow) {
+        alert("Tanpri pèmèt pop-up pou enprime tikè a.");
+        return;
+    }
+    
+    printWindow.document.write(generateTicketHTML(ticket));
+    printWindow.document.close();
 }
 
 // --- Rapports et autres fonctions d'impression ---
@@ -797,7 +816,7 @@ function generateReportHTML(tickets, date, totalAmount) {
                 }
             </style>
         </head>
-        <body>
+        <body onload="window.print(); setTimeout(() => window.close(), 1000);">
             <div class="report-header">
                 <h1>${lotteryName}</h1>
                 <h2>Rapò Vann Jounalye</h2>
@@ -861,34 +880,20 @@ function exportPDFReport() {
         todayTickets.reduce((sum, t) => sum + (parseFloat(t.total_amount) || 0), 0)
     );
     
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'absolute';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = 'none';
-    iframe.style.left = '-1000px';
-    iframe.style.top = '-1000px';
-    document.body.appendChild(iframe);
-
-    const iframeDoc = iframe.contentWindow.document;
-    iframeDoc.open();
-    iframeDoc.write(content);
-    iframeDoc.close();
-
-    iframe.onload = function() {
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
-        setTimeout(() => {
-            document.body.removeChild(iframe);
-        }, 1000);
-    };
-    if (iframe.contentDocument.readyState === 'complete') {
-        iframe.onload();
-    }
+    const win = window.open('', '_blank');
+    win.document.write(content);
+    win.document.close();
+    
+    setTimeout(() => {
+        win.print();
+    }, 500);
 }
 
+// Exposer les fonctions globales
 window.printDailyReport = printDailyReport;
 window.exportPDFReport = exportPDFReport;
+window.printThermalTicket = printThermalTicket; // pour réimpression depuis uiManager.js
+window.fallbackPrintTicket = fallbackPrintTicket; // gardé pour compatibilité
 
 function closeWinnerModal() {
     document.getElementById('winner-overlay').style.display = 'none';
