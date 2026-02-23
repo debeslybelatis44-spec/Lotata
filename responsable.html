@@ -6,6 +6,7 @@
     <title>LOTATO PRO · Superviseur</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        /* (Styles inchangés, identiques à ceux du fichier d'origine) */
         * {
             margin: 0;
             padding: 0;
@@ -64,6 +65,7 @@
             margin-bottom: 30px;
             border-bottom: 1px solid rgba(255,255,255,0.1);
             padding-bottom: 10px;
+            flex-wrap: wrap;
         }
         .tab {
             padding: 12px 24px;
@@ -237,6 +239,14 @@
             font-weight: 600;
             cursor: pointer;
         }
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 30px;
+            padding: 8px 16px;
+            color: white;
+            cursor: pointer;
+        }
         .modal {
             display: none;
             position: fixed;
@@ -314,6 +324,70 @@
             color: #a0a0b8;
             font-size: 0.9rem;
         }
+        .tickets-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(255,255,255,0.02);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .tickets-table th {
+            background: rgba(0,0,0,0.3);
+            color: #a0a0b8;
+            font-weight: 500;
+            padding: 12px;
+            text-align: left;
+        }
+        .tickets-table td {
+            padding: 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .paid-badge {
+            background: #00f190;
+            color: black;
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+        .unpaid-badge {
+            background: #ff4d4d;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .pagination button {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .pagination button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+        .alert-box {
+            background: rgba(255,77,77,0.1);
+            border-left: 4px solid #ff4d4d;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 0.9rem;
+        }
+        .alert-box.success {
+            background: rgba(0,241,144,0.1);
+            border-left-color: #00f190;
+        }
     </style>
 </head>
 <body>
@@ -332,7 +406,8 @@
         <div class="tabs">
             <div class="tab active" onclick="switchTab('dashboard')" id="tab-dashboard">📊 Tableau de bord</div>
             <div class="tab" onclick="switchTab('reports')" id="tab-reports">📈 Rapports</div>
-            <div class="tab" onclick="switchTab('activity')" id="tab-activity">⏱️ Activité en temps réel</div>
+            <div class="tab" onclick="switchTab('activity')" id="tab-activity">⏱️ Activité</div>
+            <div class="tab" onclick="switchTab('tickets')" id="tab-tickets">🎫 Tickets</div>
         </div>
 
         <!-- ==================== TABLEAU DE BORD ==================== -->
@@ -438,6 +513,40 @@
             <div id="activity-container"></div>
         </div>
 
+        <!-- ==================== TICKETS ==================== -->
+        <div id="tickets-section" style="display:none;">
+            <div class="section-title"><i class="fas fa-filter"></i> Filtres des tickets</div>
+            <div class="filter-bar">
+                <select id="ticket-agent">
+                    <option value="all">Tous les agents</option>
+                </select>
+                <select id="ticket-gain">
+                    <option value="all">Tous</option>
+                    <option value="win">Gagnants</option>
+                    <option value="nowin">Perdants</option>
+                </select>
+                <select id="ticket-paid">
+                    <option value="all">Tous</option>
+                    <option value="paid">Payés</option>
+                    <option value="unpaid">Non payés</option>
+                </select>
+                <select id="ticket-period">
+                    <option value="today">Aujourd'hui</option>
+                    <option value="yesterday">Hier</option>
+                    <option value="week">Cette semaine</option>
+                    <option value="month">Ce mois</option>
+                    <option value="custom">Personnalisé</option>
+                </select>
+                <input type="date" id="ticket-from" style="display:none;">
+                <input type="date" id="ticket-to" style="display:none;">
+                <button onclick="loadTickets(0)"><i class="fas fa-search"></i> Appliquer</button>
+            </div>
+
+            <div id="tickets-error" style="display:none;" class="error-message"></div>
+            <div id="tickets-container"></div>
+            <div id="tickets-pagination" class="pagination"></div>
+        </div>
+
         <!-- MODAL DÉTAILS AGENT -->
         <div id="agent-modal" class="modal">
             <div class="modal-content">
@@ -447,7 +556,7 @@
                 </div>
                 <div id="modal-agent-stats" style="background:rgba(0,0,0,0.2); padding:15px; border-radius:16px;"></div>
                 
-                <h3 style="margin:25px 0 10px;"><i class="fas fa-ticket"></i> Derniers tickets</h3>
+                <h3 style="margin:25px 0 10px;"><i class="fas fa-ticket"></i> Derniers tickets (10 min)</h3>
                 <div id="modal-agent-tickets" style="max-height:250px; overflow-y:auto;"></div>
                 
                 <div style="display:flex; gap:15px; margin-top:25px; justify-content:space-between;">
@@ -469,6 +578,9 @@
         let draws = [];
         let currentModalAgentId = null;
         let activityInterval = null;
+        let currentTicketPage = 0;
+        let ticketHasMore = false;
+        let ticketTotal = 0;
 
         // Vérification authentification
         (function() {
@@ -500,11 +612,15 @@
             document.getElementById('dashboard-section').style.display = tab === 'dashboard' ? 'block' : 'none';
             document.getElementById('reports-section').style.display = tab === 'reports' ? 'block' : 'none';
             document.getElementById('activity-section').style.display = tab === 'activity' ? 'block' : 'none';
+            document.getElementById('tickets-section').style.display = tab === 'tickets' ? 'block' : 'none';
             
             if (tab === 'reports') {
                 loadDrawsForFilter();
             } else if (tab === 'activity') {
                 refreshActivity();
+            } else if (tab === 'tickets') {
+                loadTicketFilters();
+                loadTickets(0);
             }
         }
 
@@ -564,13 +680,24 @@
             }
             container.innerHTML = list.map(agent => {
                 const blocked = agent.blocked || false;
-                const balance = (agent.total_bets || 0) - (agent.total_wins || 0);
-                const profitLoss = agent.balance || 0;
+                const balance = agent.balance || 0; // wins - bets
+                const unpaidWins = agent.unpaid_wins || 0;
+                const totalBets = agent.total_bets || 0;
+                const totalWins = agent.total_wins || 0;
+                
                 let statusText = '';
                 let statusClass = '';
-                if (profitLoss > 0) { statusText = 'Gain'; statusClass = 'profit'; }
-                else if (profitLoss < 0) { statusText = 'Perte'; statusClass = 'loss'; }
+                if (balance > 0) { statusText = 'Perte (agent doit)'; statusClass = 'loss'; }
+                else if (balance < 0) { statusText = 'Gain (propriétaire doit)'; statusClass = 'profit'; }
                 else { statusText = 'Équilibre'; statusClass = ''; }
+                
+                // Message d'alerte basé sur la balance
+                let alertMessage = '';
+                if (balance > 0) {
+                    alertMessage = `<div class="alert-box"><i class="fas fa-exclamation-triangle"></i> ⚠️ L'agent doit <strong>${balance} G</strong> au propriétaire (déficit).</div>`;
+                } else if (balance < 0) {
+                    alertMessage = `<div class="alert-box success"><i class="fas fa-check-circle"></i> ✅ Le propriétaire doit <strong>${-balance} G</strong> à l'agent (surplus).</div>`;
+                }
                 
                 return `
                     <div class="agent-card ${blocked ? 'blocked' : ''}" data-name="${agent.name.toLowerCase()}" data-status="${blocked ? 'blocked' : 'active'}">
@@ -579,24 +706,31 @@
                             <span class="badge ${blocked ? 'badge-blocked' : 'badge-active'}">${blocked ? 'BLOQUÉ' : 'ACTIF'}</span>
                         </div>
                         <div style="display:flex; justify-content:space-between; margin:10px 0;">
-                            <span>Vendu:</span><span>${(agent.total_bets||0).toLocaleString()} G</span>
+                            <span>Vendu:</span><span>${totalBets.toLocaleString()} G</span>
                         </div>
                         <div style="display:flex; justify-content:space-between;">
-                            <span>Gains:</span><span class="winning-amount">${(agent.total_wins||0).toLocaleString()} G</span>
+                            <span>Gains:</span><span class="winning-amount">${totalWins.toLocaleString()} G</span>
                         </div>
                         <div style="display:flex; justify-content:space-between; margin:10px 0;">
                             <span>Balance:</span>
-                            <span class="${profitLoss>=0?'profit':'loss'}">
-                                ${profitLoss.toLocaleString()} G
+                            <span class="${balance>=0?'loss':'profit'}">
+                                ${balance.toLocaleString()} G
                                 ${statusText ? `<span class="status-badge ${statusClass}">${statusText}</span>` : ''}
                             </span>
                         </div>
+                        <div style="margin-top:10px; padding:8px; background:rgba(255,255,255,0.05); border-radius:8px;">
+                            <span>💰 Gains non payés: <strong>${unpaidWins.toLocaleString()} G</strong></span>
+                        </div>
+                        ${alertMessage}
                         <div style="display:flex; gap:10px; margin-top:15px;">
                             <button class="toggle-block ${blocked ? 'unblock' : 'block'}" onclick="toggleBlockAgent('${agent.id}', ${!blocked})">
                                 <i class="fas ${blocked ? 'fa-unlock' : 'fa-lock'}"></i> ${blocked ? 'Débloquer' : 'Bloquer'}
                             </button>
                             <button class="toggle-block" style="background:rgba(0,212,255,0.1); border-color:#00d4ff;" onclick="showAgentDetails('${agent.id}')">
                                 <i class="fas fa-chart-simple"></i> Détails
+                            </button>
+                            <button class="toggle-block" style="background:rgba(255,255,255,0.1);" onclick="filterTicketsByAgent('${agent.id}')">
+                                <i class="fas fa-ticket"></i> Voir tickets
                             </button>
                         </div>
                     </div>
@@ -672,11 +806,11 @@
                 <div class="detail-stat"><span>🎫 Nombre de tickets :</span> <strong>${totalTickets}</strong></div>
                 <div class="detail-stat"><span>📉 Mise moyenne :</span> <strong>${avgBet} G</strong></div>
                 <div class="detail-stat"><span>📈 Taux de gain :</span> <strong>${winRate}%</strong></div>
-                <div class="detail-stat"><span>💸 À payer à l'agent :</span> <strong class="profit">${totalWins.toLocaleString()} G</strong></div>
+                <div class="detail-stat"><span>💸 Gains non payés :</span> <strong class="loss">${(agent.unpaid_wins || 0).toLocaleString()} G</strong></div>
             `;
             document.getElementById('modal-agent-stats').innerHTML = statsHtml;
 
-            // Tickets récents (suppression si <10min)
+            // Tickets récents (moins de 10 min)
             try {
                 const res = await fetch(`${API_URL}/supervisor/tickets/recent?agentId=${agentId}`, {
                     headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
@@ -787,7 +921,6 @@
                 }
             }
 
-            // Construction de l'URL avec paramètres
             let url = `${API_URL}/owner/reports?period=${period}`;
             if (agentId !== 'all') url += `&agentId=${agentId}`;
             if (drawId !== 'all') url += `&drawId=${drawId}`;
@@ -802,7 +935,6 @@
                 if (!res.ok) throw new Error('Erreur serveur');
                 const data = await res.json();
 
-                // Afficher le résumé
                 document.getElementById('report-summary').style.display = 'grid';
                 document.getElementById('report-total-tickets').innerText = data.summary.total_tickets || 0;
                 document.getElementById('report-total-bets').innerText = (data.summary.total_bets || 0).toLocaleString() + ' G';
@@ -811,7 +943,6 @@
                 document.getElementById('report-net-result').innerText = net.toLocaleString() + ' G';
                 document.getElementById('report-net-result').className = 'stat-value ' + (net >= 0 ? 'profit' : 'loss');
 
-                // Afficher le détail
                 let detailHtml = '<h3>Détail</h3><table class="report-table"><thead><tr><th>Élément</th><th>Tickets</th><th>Paris</th><th>Gains</th><th>Résultat</th></tr></thead><tbody>';
                 data.detail.forEach(row => {
                     const name = row.draw_name || row.agent_name;
@@ -841,24 +972,11 @@
         // === ACTIVITÉ EN TEMPS RÉEL ===
         function startActivityRefresh() {
             if (activityInterval) clearInterval(activityInterval);
-            activityInterval = setInterval(refreshActivity, 30000); // toutes les 30s
+            activityInterval = setInterval(refreshActivity, 30000);
         }
 
         async function refreshActivity() {
             try {
-                // Récupérer les tickets récents de tous les agents du superviseur
-                // On utilise l'endpoint /supervisor/tickets/recent sans agentId pour tous ?
-                // Pour l'instant, on va récupérer les tickets des 10 dernières minutes pour tous les agents du superviseur
-                // Mais l'API n'a pas de route pour ça. On va créer une requête multiple ou utiliser une nouvelle route.
-                // On peut utiliser la route /api/tickets avec filtre superviseur ? Pas encore.
-                // Solution temporaire : on récupère les tickets récents pour chaque agent (mais trop de requêtes)
-                // Idéalement, le backend devrait fournir une route /api/supervisor/activity qui retourne tous les tickets récents des agents du superviseur.
-                // En attendant, on va utiliser la route /api/tickets?agentId=... pour chaque agent (mais attention aux performances)
-                // Pour simplifier, on va afficher un message indiquant que la fonctionnalité nécessite une amélioration du backend.
-                // Mais pour répondre à la demande, je vais implémenter une route côté backend dans le fichier server.js (à faire séparément)
-                // Ici, on va appeler une route que nous allons créer : /api/supervisor/activity
-                // Pour que ça fonctionne, il faut ajouter cette route dans server.js. Nous le ferons plus tard.
-                // En attendant, on utilise une boucle sur les agents (limité à 5 pour l'exemple)
                 let allTickets = [];
                 for (let agent of agents.slice(0, 5)) {
                     const res = await fetch(`${API_URL}/supervisor/tickets/recent?agentId=${agent.id}`, {
@@ -869,7 +987,6 @@
                         allTickets = allTickets.concat(tickets.map(t => ({ ...t, agentName: agent.name })));
                     }
                 }
-                // Trier par date décroissante
                 allTickets.sort((a,b) => new Date(b.date) - new Date(a.date));
                 displayActivity(allTickets.slice(0, 20));
                 document.getElementById('activity-error').style.display = 'none';
@@ -900,6 +1017,125 @@
                 `;
             });
             container.innerHTML = html;
+        }
+
+        // === TICKETS ===
+        function loadTicketFilters() {
+            const agentSelect = document.getElementById('ticket-agent');
+            agentSelect.innerHTML = '<option value="all">Tous les agents</option>';
+            agents.forEach(a => {
+                agentSelect.innerHTML += `<option value="${a.id}">${a.name}</option>`;
+            });
+        }
+
+        function filterTicketsByAgent(agentId) {
+            document.getElementById('ticket-agent').value = agentId;
+            switchTab('tickets');
+        }
+
+        document.getElementById('ticket-period').addEventListener('change', function(e) {
+            const custom = e.target.value === 'custom';
+            document.getElementById('ticket-from').style.display = custom ? 'inline-block' : 'none';
+            document.getElementById('ticket-to').style.display = custom ? 'inline-block' : 'none';
+        });
+
+        async function loadTickets(page = 0) {
+            currentTicketPage = page;
+            const agentId = document.getElementById('ticket-agent').value;
+            const gain = document.getElementById('ticket-gain').value;
+            const paid = document.getElementById('ticket-paid').value;
+            const period = document.getElementById('ticket-period').value;
+            let fromDate = '', toDate = '';
+            if (period === 'custom') {
+                fromDate = document.getElementById('ticket-from').value;
+                toDate = document.getElementById('ticket-to').value;
+                if (!fromDate || !toDate) {
+                    alert('Veuillez sélectionner les dates');
+                    return;
+                }
+            }
+
+            let url = `${API_URL}/supervisor/tickets?page=${page}&limit=20`;
+            if (agentId !== 'all') url += `&agentId=${agentId}`;
+            if (gain !== 'all') url += `&gain=${gain}`;
+            if (paid !== 'all') url += `&paid=${paid}`;
+            url += `&period=${period}`;
+            if (period === 'custom') {
+                url += `&fromDate=${fromDate}&toDate=${toDate}`;
+            }
+
+            try {
+                const res = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
+                });
+                if (!res.ok) throw new Error('Erreur chargement');
+                const data = await res.json();
+                displayTickets(data.tickets, data.hasMore, data.total);
+                document.getElementById('tickets-error').style.display = 'none';
+            } catch(e) {
+                console.error(e);
+                document.getElementById('tickets-error').innerText = 'Impossible de charger les tickets.';
+                document.getElementById('tickets-error').style.display = 'block';
+            }
+        }
+
+        function displayTickets(tickets, hasMore, total) {
+            ticketHasMore = hasMore;
+            ticketTotal = total;
+            const container = document.getElementById('tickets-container');
+            if (!tickets.length) {
+                container.innerHTML = '<p style="text-align:center; color:#a0a0b8;">Aucun ticket trouvé.</p>';
+                document.getElementById('tickets-pagination').innerHTML = '';
+                return;
+            }
+
+            let html = '<table class="tickets-table"><thead><tr><th>Agent</th><th>Tirage</th><th>Date</th><th>Montant</th><th>Gain</th><th>Statut</th><th>Actions</th></tr></thead><tbody>';
+            tickets.forEach(t => {
+                const agent = agents.find(a => a.id == t.agent_id) || { name: t.agent_name };
+                const date = new Date(t.date).toLocaleString();
+                const gainClass = t.win_amount > 0 ? 'winning-amount' : '';
+                const paidBadge = t.paid ? '<span class="paid-badge">Payé</span>' : '<span class="unpaid-badge">Non payé</span>';
+                const payButton = (!t.paid && t.win_amount > 0) ? `<button class="btn-secondary" onclick="markTicketPaid(${t.id})"><i class="fas fa-check"></i> Marquer payé</button>` : '';
+                html += `<tr>
+                    <td>${agent.name}</td>
+                    <td>${t.draw_name}</td>
+                    <td>${date}</td>
+                    <td>${t.total_amount} G</td>
+                    <td class="${gainClass}">${t.win_amount > 0 ? t.win_amount + ' G' : '-'}</td>
+                    <td>${paidBadge}</td>
+                    <td>${payButton}</td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+
+            // Pagination
+            let paginationHtml = '';
+            if (total > 0) {
+                const totalPages = Math.ceil(total / 20);
+                paginationHtml = `<button onclick="loadTickets(0)" ${currentTicketPage === 0 ? 'disabled' : ''}>Première</button>
+                                  <button onclick="loadTickets(${currentTicketPage - 1})" ${currentTicketPage === 0 ? 'disabled' : ''}>Précédent</button>
+                                  <span>Page ${currentTicketPage + 1} / ${totalPages}</span>
+                                  <button onclick="loadTickets(${currentTicketPage + 1})" ${!hasMore ? 'disabled' : ''}>Suivant</button>
+                                  <button onclick="loadTickets(${totalPages - 1})" ${!hasMore ? 'disabled' : ''}>Dernière</button>`;
+            }
+
+            container.innerHTML = html;
+            document.getElementById('tickets-pagination').innerHTML = paginationHtml;
+        }
+
+        async function markTicketPaid(ticketId) {
+            try {
+                const res = await fetch(`${API_URL}/supervisor/tickets/${ticketId}/pay`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
+                });
+                if (!res.ok) throw new Error('Erreur');
+                await loadTickets(currentTicketPage);
+                await loadAgents(); // Pour mettre à jour unpaid_wins
+            } catch(e) {
+                console.error(e);
+                alert('Impossible de marquer le ticket comme payé.');
+            }
         }
 
         // === DÉCONNEXION ===
