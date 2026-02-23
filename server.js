@@ -610,6 +610,148 @@ app.get('/api/reports/draw', async (req, res) => {
   }
 });
 
+// ==================== Routes communes owner/supervisor ====================
+// Ces routes sont placées ici pour être accessibles à la fois au propriétaire et au superviseur,
+// sans modifier le frontend qui appelle /api/owner/...
+
+// GET /api/owner/draws – accessible à owner et supervisor
+app.get('/api/owner/draws', authenticateToken, async (req, res) => {
+  try {
+    // Vérification des rôles autorisés
+    if (!['owner', 'supervisor'].includes(req.user.role)) {
+      return res.status(403).json({ error: 'Accès interdit' });
+    }
+    const result = await pool.query('SELECT id, name, active FROM draws ORDER BY name');
+    res.json(result.rows);
+  } catch (error) {
+    console.error('❌ Erreur récupération tirages:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// GET /api/owner/reports – accessible à owner et supervisor avec filtrage adapté
+app.get('/api/owner/reports', authenticateToken, async (req, res) => {
+  try {
+    const user = req.user;
+    if (!['owner', 'supervisor'].includes(user.role)) {
+      return res.status(403).json({ error: 'Accès interdit' });
+    }
+
+    const { supervisorId, agentId, drawId, period, fromDate, toDate, gainLoss } = req.query;
+
+    let conditions = [];
+    let params = [];
+    let paramIndex = 1;
+
+    // Filtre superviseur (seulement pour owner)
+    if (supervisorId && supervisorId !== 'all') {
+      if (user.role === 'owner') {
+        conditions.push(`a.supervisor_id = $${paramIndex++}`);
+        params.push(supervisorId);
+      } else {
+        return res.status(403).json({ error: 'Vous ne pouvez pas filtrer par superviseur' });
+      }
+    }
+
+    // Filtre agent
+    if (agentId && agentId !== 'all') {
+      conditions.push(`t.agent_id = $${paramIndex++}`);
+      params.push(agentId);
+    }
+
+    // Si superviseur, on limite automatiquement à ses agents
+    if (user.role === 'supervisor') {
+      conditions.push(`a.supervisor_id = $${paramIndex++}`);
+      params.push(user.id);
+    }
+
+    // Filtre tirage
+    if (drawId && drawId !== 'all') {
+      conditions.push(`t.draw_id = $${paramIndex++}`);
+      params.push(drawId);
+    }
+
+    // Période
+    let dateCondition = '';
+    if (period === 'today') {
+      dateCondition = 'DATE(t.date) = CURRENT_DATE';
+    } else if (period === 'yesterday') {
+      dateCondition = 'DATE(t.date) = CURRENT_DATE - INTERVAL \'1 day\'';
+    } else if (period === 'week') {
+      dateCondition = 't.date >= DATE_TRUNC(\'week\', CURRENT_DATE)';
+    } else if (period === 'month') {
+      dateCondition = 't.date >= DATE_TRUNC(\'month\', CURRENT_DATE)';
+    } else if (period === 'custom' && fromDate && toDate) {
+      dateCondition = `DATE(t.date) BETWEEN $${paramIndex++} AND $${paramIndex++}`;
+      params.push(fromDate, toDate);
+    }
+    if (dateCondition) conditions.push(dateCondition);
+
+    // Gain/perte
+    if (gainLoss === 'gain') {
+      conditions.push('t.win_amount > t.total_amount');
+    } else if (gainLoss === 'loss') {
+      conditions.push('t.win_amount < t.total_amount');
+    }
+
+    const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
+
+    // Résumé
+    const summaryQuery = `
+      SELECT 
+        COUNT(DISTINCT t.id) as total_tickets,
+        COALESCE(SUM(t.total_amount), 0) as total_bets,
+        COALESCE(SUM(t.win_amount), 0) as total_wins,
+        COALESCE(SUM(t.win_amount) - SUM(t.total_amount), 0) as net_result,
+        COUNT(DISTINCT CASE WHEN t.win_amount > t.total_amount THEN t.agent_id END) as gain_count,
+        COUNT(DISTINCT CASE WHEN t.win_amount < t.total_amount THEN t.agent_id END) as loss_count
+      FROM tickets t
+      LEFT JOIN agents a ON t.agent_id = a.id
+      ${whereClause}
+    `;
+    const summary = await pool.query(summaryQuery, params);
+
+    // Détail
+    let detailQuery = '';
+    if (drawId && drawId !== 'all') {
+      detailQuery = `
+        SELECT a.name as agent_name, a.id as agent_id,
+               COUNT(t.id) as tickets,
+               COALESCE(SUM(t.total_amount), 0) as bets,
+               COALESCE(SUM(t.win_amount), 0) as wins,
+               COALESCE(SUM(t.win_amount) - SUM(t.total_amount), 0) as result
+        FROM tickets t
+        JOIN agents a ON t.agent_id = a.id
+        ${whereClause}
+        GROUP BY a.id, a.name
+        ORDER BY result DESC
+      `;
+    } else {
+      detailQuery = `
+        SELECT d.name as draw_name, d.id as draw_id,
+               COUNT(t.id) as tickets,
+               COALESCE(SUM(t.total_amount), 0) as bets,
+               COALESCE(SUM(t.win_amount), 0) as wins,
+               COALESCE(SUM(t.win_amount) - SUM(t.total_amount), 0) as result
+        FROM tickets t
+        JOIN draws d ON t.draw_id = d.id
+        ${whereClause}
+        GROUP BY d.id, d.name
+        ORDER BY result DESC
+      `;
+    }
+    const detail = await pool.query(detailQuery, params);
+
+    res.json({
+      summary: summary.rows[0],
+      detail: detail.rows
+    });
+  } catch (error) {
+    console.error('❌ Erreur rapports:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 // ==================== Routes superviseur ====================
 const supervisorRouter = express.Router();
 supervisorRouter.use(authorize('supervisor'));
@@ -712,6 +854,40 @@ supervisorRouter.get('/tickets/recent', async (req, res) => {
     res.json(tickets.rows);
   } catch (error) {
     console.error('❌ Erreur tickets récents:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Ajout de routes supplémentaires pour le superviseur (optionnelles)
+supervisorRouter.get('/draws', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, name, active FROM draws ORDER BY name');
+    res.json(result.rows);
+  } catch (error) {
+    console.error('❌ Erreur récupération tirages (superviseur):', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+supervisorRouter.get('/activity', async (req, res) => {
+  try {
+    const supervisorId = req.user.id;
+    const tenMinutesAgo = moment().subtract(10, 'minutes').toDate();
+    const result = await pool.query(
+      `SELECT t.*, a.name as agent_name
+       FROM tickets t
+       JOIN agents a ON t.agent_id = a.id
+       WHERE a.supervisor_id = $1 AND t.date > $2
+       ORDER BY t.date DESC`,
+      [supervisorId, tenMinutesAgo]
+    );
+    const tickets = result.rows.map(t => ({
+      ...t,
+      bets: typeof t.bets === 'string' ? JSON.parse(t.bets) : t.bets
+    }));
+    res.json(tickets);
+  } catch (error) {
+    console.error('❌ Erreur récupération activité:', error);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -875,16 +1051,8 @@ ownerRouter.put('/change-supervisor', async (req, res) => {
   }
 });
 
-// Liste des tirages
-ownerRouter.get('/draws', async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM draws ORDER BY name');
-    res.json(result.rows);
-  } catch (error) {
-    console.error('❌ Erreur tirages:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
+// Liste des tirages (supprimée car remontée dans les routes communes)
+// ownerRouter.get('/draws', ...) // ← retiré
 
 // Publier les résultats
 ownerRouter.post('/publish-results', async (req, res) => {
@@ -1152,111 +1320,10 @@ ownerRouter.get('/blocked-draws', async (req, res) => {
   }
 });
 
-// Rapports avec filtres
-ownerRouter.get('/reports', async (req, res) => {
-  try {
-    const { supervisorId, agentId, drawId, period, fromDate, toDate, gainLoss } = req.query;
-
-    let conditions = [];
-    let params = [];
-    let paramIndex = 1;
-
-    if (agentId && agentId !== 'all') {
-      conditions.push(`t.agent_id = $${paramIndex++}`);
-      params.push(agentId);
-    } else if (supervisorId && supervisorId !== 'all') {
-      conditions.push(`a.supervisor_id = $${paramIndex++}`);
-      params.push(supervisorId);
-    }
-
-    if (drawId && drawId !== 'all') {
-      conditions.push(`t.draw_id = $${paramIndex++}`);
-      params.push(drawId);
-    }
-
-    let dateCondition = '';
-    if (period === 'today') {
-      dateCondition = 'DATE(t.date) = CURRENT_DATE';
-    } else if (period === 'yesterday') {
-      dateCondition = 'DATE(t.date) = CURRENT_DATE - INTERVAL \'1 day\'';
-    } else if (period === 'week') {
-      dateCondition = 't.date >= DATE_TRUNC(\'week\', CURRENT_DATE)';
-    } else if (period === 'month') {
-      dateCondition = 't.date >= DATE_TRUNC(\'month\', CURRENT_DATE)';
-    } else if (period === 'custom' && fromDate && toDate) {
-      dateCondition = `DATE(t.date) BETWEEN $${paramIndex++} AND $${paramIndex++}`;
-      params.push(fromDate, toDate);
-    }
-    if (dateCondition) {
-      conditions.push(dateCondition);
-    }
-
-    if (gainLoss === 'gain') {
-      conditions.push('t.win_amount > t.total_amount');
-    } else if (gainLoss === 'loss') {
-      conditions.push('t.win_amount < t.total_amount');
-    }
-
-    const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
-
-    const summaryQuery = `
-      SELECT 
-        COUNT(DISTINCT t.id) as total_tickets,
-        COALESCE(SUM(t.total_amount), 0) as total_bets,
-        COALESCE(SUM(t.win_amount), 0) as total_wins,
-        COALESCE(SUM(t.win_amount) - SUM(t.total_amount), 0) as net_result,
-        COUNT(DISTINCT CASE WHEN t.win_amount > t.total_amount THEN t.agent_id END) as gain_count,
-        COUNT(DISTINCT CASE WHEN t.win_amount < t.total_amount THEN t.agent_id END) as loss_count
-      FROM tickets t
-      LEFT JOIN agents a ON t.agent_id = a.id
-      ${whereClause}
-    `;
-
-    const summary = await pool.query(summaryQuery, params);
-
-    let detailQuery = '';
-    if (drawId && drawId !== 'all') {
-      detailQuery = `
-        SELECT a.name as agent_name, a.id as agent_id,
-               COUNT(t.id) as tickets,
-               COALESCE(SUM(t.total_amount), 0) as bets,
-               COALESCE(SUM(t.win_amount), 0) as wins,
-               COALESCE(SUM(t.win_amount) - SUM(t.total_amount), 0) as result
-        FROM tickets t
-        JOIN agents a ON t.agent_id = a.id
-        ${whereClause}
-        GROUP BY a.id, a.name
-        ORDER BY result DESC
-      `;
-    } else {
-      detailQuery = `
-        SELECT d.name as draw_name, d.id as draw_id,
-               COUNT(t.id) as tickets,
-               COALESCE(SUM(t.total_amount), 0) as bets,
-               COALESCE(SUM(t.win_amount), 0) as wins,
-               COALESCE(SUM(t.win_amount) - SUM(t.total_amount), 0) as result
-        FROM tickets t
-        JOIN draws d ON t.draw_id = d.id
-        ${whereClause}
-        GROUP BY d.id, d.name
-        ORDER BY result DESC
-      `;
-    }
-
-    const detail = await pool.query(detailQuery, params);
-
-    res.json({
-      summary: summary.rows[0],
-      detail: detail.rows
-    });
-  } catch (error) {
-    console.error('❌ Erreur rapport owner:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
+// Rapports avec filtres (supprimé car remonté dans routes communes)
+// ownerRouter.get('/reports', ...) // ← retiré
 
 // ========== NOUVELLES ROUTES POUR LA CONFIGURATION PROPRIÉTAIRE ==========
-
 // GET /api/owner/settings - Récupérer les paramètres généraux (nom, slogan, logo, multiplicateurs)
 ownerRouter.get('/settings', async (req, res) => {
   try {
@@ -1358,7 +1425,6 @@ ownerRouter.post('/settings', upload.single('logo'), async (req, res) => {
 });
 
 // ========== NOUVELLES ROUTES POUR LA GESTION DES TICKETS (PROPRIÉTAIRE) ==========
-
 // Récupérer les tickets avec filtres (pour le propriétaire)
 ownerRouter.get('/tickets', async (req, res) => {
   try {
