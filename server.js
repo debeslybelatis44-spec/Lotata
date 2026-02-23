@@ -643,7 +643,8 @@ supervisorRouter.get('/agents', async (req, res) => {
               COALESCE(SUM(t.total_amount), 0) as total_bets,
               COALESCE(SUM(t.win_amount), 0) as total_wins,
               COUNT(t.id) as total_tickets,
-              COALESCE(SUM(t.win_amount) - SUM(t.total_amount), 0) as balance
+              COALESCE(SUM(t.win_amount) - SUM(t.total_amount), 0) as balance,
+              COALESCE(SUM(t.win_amount) FILTER (WHERE t.paid = false), 0) as unpaid_wins
        FROM agents a
        LEFT JOIN tickets t ON a.id = t.agent_id AND DATE(t.date) = CURRENT_DATE
        WHERE a.supervisor_id = $1
@@ -712,6 +713,120 @@ supervisorRouter.get('/tickets/recent', async (req, res) => {
     res.json(tickets.rows);
   } catch (error) {
     console.error('❌ Erreur tickets récents:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// ==================== NOUVELLES ROUTES SUPERVISEUR ====================
+
+// Liste des tickets avec filtres (superviseur)
+supervisorRouter.get('/tickets', async (req, res) => {
+  try {
+    const supervisorId = req.user.id;
+    const { agentId, drawId, period, fromDate, toDate, gain, paid, page = 0, limit = 20 } = req.query;
+
+    let conditions = ['a.supervisor_id = $1'];
+    let params = [supervisorId];
+    let paramIndex = 2;
+
+    if (agentId && agentId !== 'all') {
+      conditions.push(`t.agent_id = $${paramIndex++}`);
+      params.push(agentId);
+    }
+
+    if (drawId && drawId !== 'all') {
+      conditions.push(`t.draw_id = $${paramIndex++}`);
+      params.push(drawId);
+    }
+
+    let dateCondition = '';
+    if (period === 'today') {
+      dateCondition = 'DATE(t.date) = CURRENT_DATE';
+    } else if (period === 'yesterday') {
+      dateCondition = 'DATE(t.date) = CURRENT_DATE - INTERVAL \'1 day\'';
+    } else if (period === 'week') {
+      dateCondition = 't.date >= DATE_TRUNC(\'week\', CURRENT_DATE)';
+    } else if (period === 'month') {
+      dateCondition = 't.date >= DATE_TRUNC(\'month\', CURRENT_DATE)';
+    } else if (period === 'custom' && fromDate && toDate) {
+      dateCondition = `DATE(t.date) BETWEEN $${paramIndex++} AND $${paramIndex++}`;
+      params.push(fromDate, toDate);
+    }
+    if (dateCondition) {
+      conditions.push(dateCondition);
+    }
+
+    if (gain === 'win') {
+      conditions.push('t.win_amount > 0');
+    } else if (gain === 'nowin') {
+      conditions.push('t.win_amount = 0');
+    }
+
+    if (paid === 'paid') {
+      conditions.push('t.paid = true');
+    } else if (paid === 'unpaid') {
+      conditions.push('t.paid = false');
+    }
+
+    const whereClause = 'WHERE ' + conditions.join(' AND ');
+
+    // Compter le total
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM tickets t
+      JOIN agents a ON t.agent_id = a.id
+      ${whereClause}
+    `;
+    const countResult = await pool.query(countQuery, params);
+    const total = parseInt(countResult.rows[0].total);
+    const hasMore = (page * limit + limit) < total;
+
+    // Récupérer les tickets avec pagination
+    const offset = page * limit;
+    const dataQuery = `
+      SELECT t.*
+      FROM tickets t
+      JOIN agents a ON t.agent_id = a.id
+      ${whereClause}
+      ORDER BY t.date DESC
+      LIMIT $${paramIndex++} OFFSET $${paramIndex++}
+    `;
+    params.push(limit, offset);
+    const dataResult = await pool.query(dataQuery, params);
+
+    const tickets = dataResult.rows.map(t => ({
+      ...t,
+      bets: typeof t.bets === 'string' ? JSON.parse(t.bets) : t.bets
+    }));
+
+    res.json({ tickets, hasMore, total });
+  } catch (error) {
+    console.error('❌ Erreur GET /supervisor/tickets:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Marquer un ticket comme payé (superviseur)
+supervisorRouter.post('/tickets/:ticketId/pay', async (req, res) => {
+  try {
+    const { ticketId } = req.params;
+    const supervisorId = req.user.id;
+
+    const check = await pool.query(
+      `SELECT t.id FROM tickets t
+       JOIN agents a ON t.agent_id = a.id
+       WHERE t.id = $1 AND a.supervisor_id = $2`,
+      [ticketId, supervisorId]
+    );
+    if (check.rows.length === 0) {
+      return res.status(404).json({ error: 'Ticket non trouvé ou non autorisé' });
+    }
+
+    await pool.query('UPDATE tickets SET paid = true, paid_at = NOW() WHERE id = $1', [ticketId]);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Erreur POST /supervisor/tickets/:ticketId/pay:', error);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
