@@ -337,7 +337,10 @@ app.get('/api/tickets', async (req, res) => {
 
 /**
  * SUPPRESSION D'UN TICKET
- * Accessible à : agent (ses propres tickets dans les 10 min), superviseur (tickets des agents supervisés, 10 min), propriétaire (sans restriction)
+ * Accessible à : 
+ *   - agent : ses propres tickets dans les 3 minutes
+ *   - superviseur : tickets des agents supervisés dans les 10 minutes
+ *   - propriétaire : sans restriction
  */
 app.delete('/api/tickets/:ticketId', authenticateToken, async (req, res) => {
   try {
@@ -365,21 +368,21 @@ app.delete('/api/tickets/:ticketId', authenticateToken, async (req, res) => {
     }
     const ticket = ticketResult.rows[0];
 
-    // 4. Délai de 10 minutes (sauf pour le propriétaire)
-    if (user.role !== 'owner') {
-      const diffMinutes = moment().diff(moment(ticket.date), 'minutes');
-      if (diffMinutes > 10) {
-        return res.status(403).json({ error: 'Suppression impossible après 10 minutes' });
-      }
-    }
+    // 4. Vérifier le délai selon le rôle
+    const diffMinutes = moment().diff(moment(ticket.date), 'minutes');
 
-    // 5. Vérifications selon le rôle
     if (user.role === 'agent') {
+      if (diffMinutes > 3) {
+        return res.status(403).json({ error: 'Suppression impossible après 3 minutes' });
+      }
       // L'agent ne peut supprimer que ses propres tickets
       if (ticket.agent_id !== user.id) {
         return res.status(403).json({ error: 'Vous ne pouvez supprimer que vos propres tickets' });
       }
     } else if (user.role === 'supervisor') {
+      if (diffMinutes > 10) {
+        return res.status(403).json({ error: 'Suppression impossible après 10 minutes' });
+      }
       // Le superviseur ne peut supprimer que les tickets des agents qu'il supervise
       const agentCheck = await pool.query(
         'SELECT id FROM agents WHERE id = $1 AND supervisor_id = $2',
@@ -389,12 +392,12 @@ app.delete('/api/tickets/:ticketId', authenticateToken, async (req, res) => {
         return res.status(403).json({ error: 'Ce ticket n\'est pas sous votre supervision' });
       }
     }
-    // Propriétaire : pas de restriction supplémentaire
+    // Propriétaire : pas de restriction de délai ni de vérification supplémentaire
 
-    // 6. Suppression effective
+    // 5. Suppression effective
     await pool.query('DELETE FROM tickets WHERE id = $1', [id]);
 
-    // 7. Journalisation (sans colonne "details" qui n'existe pas)
+    // 6. Journalisation (sans colonne "details" qui n'existe pas)
     await pool.query(
       'INSERT INTO activity_log (user_id, user_role, action, ip_address) VALUES ($1, $2, $3, $4)',
       [user.id, user.role, 'delete_ticket', req.ip]

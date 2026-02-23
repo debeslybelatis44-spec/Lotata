@@ -122,8 +122,8 @@ function renderHistory() {
         const ticketDate = new Date(date);
         const now = new Date();
         const minutesDiff = (now - ticketDate) / (1000 * 60);
-        // Délai de suppression : 10 minutes (comme défini côté serveur pour les agents)
-        const canDelete = minutesDiff <= 10 && numericId != null;
+        // Délai de suppression : 3 minutes pour l'agent
+        const canDelete = minutesDiff <= 3 && numericId != null;
         const canEdit = minutesDiff <= 3;
         
         let formattedDate = 'Date inkonu';
