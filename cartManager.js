@@ -1,26 +1,20 @@
-// cartManager.js - VERSION CORRIGÉE POUR L'IMPRESSION
+// cartManager.js - VERSION PROFESSIONNELLE ET STABLE
 
-var CartManager = {
-    // ... (Gardez vos fonctions addBet, removeBet, renderCart telles quelles)
-};
-
-/**
- * Cette fonction remplace l'ancienne logique. 
- * Elle imite la méthode de uiManager mais avec une sécurité anti-blocage.
- */
 function printThermalTicket(ticket) {
     const lotteryConfig = APP_STATE.lotteryConfig || {
         LOTTERY_NAME: "BOUL PAW",
-        LOTTERY_LOGO: ""
+        LOTTERY_ADDRESS: "Haïti",
+        LOTTERY_PHONE: ""
     };
     
-    // Préparation des paris (formatage texte)
+    // Génération des lignes de paris bien alignées
     let betsHtml = '';
     const bets = ticket.bets || [];
     betsHtml = bets.map(b => `
-        <div style="display: flex; justify-content: space-between; margin: 3px 0; font-family: monospace;">
-            <span>${(b.game || '').toUpperCase()} ${(b.number || b.numero)}</span>
-            <span style="font-weight: bold;">${(b.amount || 0)} G</span>
+        <div class="bet-row">
+            <span class="bet-game">${(b.game || '').toUpperCase()} ${(b.number || b.numero)}</span>
+            <span class="bet-dots">..........................</span>
+            <span class="bet-amount">${(b.amount || 0)} G</span>
         </div>
     `).join('');
 
@@ -33,52 +27,65 @@ function printThermalTicket(ticket) {
     <head>
         <meta charset="UTF-8">
         <style>
-            @page { size: auto; margin: 0mm; }
+            @page { size: 80mm auto; margin: 0; }
             body { 
                 font-family: 'Courier New', Courier, monospace; 
-                width: 80mm; 
-                margin: 0; 
-                padding: 10px;
-                font-size: 13px;
-                line-height: 1.2;
+                width: 72mm; /* Largeur standard imprimante thermique */
+                margin: 0 auto; 
+                padding: 5px;
+                color: #000;
             }
-            .header { text-align: center; margin-bottom: 10px; border-bottom: 1px dashed #000; padding-bottom: 5px; }
-            .ticket-info { margin-bottom: 10px; font-size: 12px; }
-            .divider { border-top: 1px dashed #000; margin: 5px 0; }
-            .total { 
-                display: flex; 
-                justify-content: space-between; 
-                font-weight: bold; 
-                font-size: 16px; 
-                margin-top: 10px;
-                border-top: 1px solid #000;
+            .header { text-align: center; margin-bottom: 10px; }
+            .header h2 { margin: 5px 0; font-size: 18px; text-transform: uppercase; }
+            
+            .info-box { font-size: 12px; margin-bottom: 10px; border-bottom: 1px dashed #000; padding-bottom: 5px; }
+            .info-line { display: flex; justify-content: space-between; margin: 2px 0; }
+            
+            .bets-container { margin: 10px 0; min-height: 50px; }
+            .bet-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; margin: 4px 0; }
+            .bet-game { font-weight: bold; white-space: nowrap; }
+            .bet-dots { flex-grow: 1; overflow: hidden; margin: 0 5px; color: #555; font-size: 10px; }
+            .bet-amount { font-weight: bold; white-space: nowrap; }
+
+            .total-section { 
+                margin-top: 10px; 
+                border-top: 2px solid #000; 
                 padding-top: 5px;
             }
-            .footer { text-align: center; margin-top: 15px; font-size: 11px; }
-            .barcode { text-align: center; margin-top: 10px; font-size: 10px; }
+            .total-row { display: flex; justify-content: space-between; font-size: 18px; font-weight: 900; }
+            
+            .footer { text-align: center; margin-top: 15px; font-size: 11px; font-style: italic; }
+            .barcode { margin-top: 10px; font-size: 10px; letter-spacing: 2px; border-top: 1px dashed #000; padding-top: 5px; }
+            
+            /* Cacher à l'écran lors du débogage si nécessaire */
+            @media print {
+                .no-print { display: none; }
+            }
         </style>
     </head>
     <body>
         <div class="header">
-            <h2 style="margin:0; text-transform: uppercase;">${lotteryConfig.LOTTERY_NAME}</h2>
-            <div style="font-size: 11px;">${lotteryConfig.LOTTERY_ADDRESS || ''}</div>
-            <div style="font-size: 11px;">${lotteryConfig.LOTTERY_PHONE || ''}</div>
+            <h2>${lotteryConfig.LOTTERY_NAME}</h2>
+            <div style="font-size: 11px;">${lotteryConfig.LOTTERY_ADDRESS}</div>
+            <div style="font-size: 11px;">Tél: ${lotteryConfig.LOTTERY_PHONE}</div>
         </div>
         
-        <div class="ticket-info">
-            <div>Date: ${dateStr}</div>
-            <div>Ticket #: <strong>${ticketId}</strong></div>
-            <div>Tiraj: <strong>${ticket.draw_name || 'N/A'}</strong></div>
-            <div>Ajan: ${ticket.agent_name || APP_STATE.agentName || ''}</div>
+        <div class="info-box">
+            <div class="info-line"><span>Date:</span> <span>${dateStr}</span></div>
+            <div class="info-line"><span>Tiraj:</span> <strong>${ticket.draw_name || 'N/A'}</strong></div>
+            <div class="info-line"><span>Ticket #:</span> <strong>${ticketId}</strong></div>
+            <div class="info-line"><span>Ajan:</span> <span>${ticket.agent_name || APP_STATE.agentName || ''}</span></div>
         </div>
 
-        <div class="divider"></div>
         <div class="bets-container">
             ${betsHtml}
         </div>
-        <div class="total">
-            <span>TOTAL</span>
-            <span>${(ticket.total_amount || ticket.total || 0)} Gdes</span>
+
+        <div class="total-section">
+            <div class="total-row">
+                <span>TOTAL</span>
+                <span>${(ticket.total_amount || ticket.total || 0)} Gdes</span>
+            </div>
         </div>
 
         <div class="footer">
@@ -89,83 +96,31 @@ function printThermalTicket(ticket) {
     </html>
     `;
 
-    // CRÉATION DE LA FENÊTRE D'IMPRESSION (Méthode robuste)
-    const printWindow = window.open('', '_blank', 'width=600,height=800');
+    // Ouverture de la fenêtre
+    const printWindow = window.open('', '_blank', 'width=450,height=600');
     
     if (!printWindow) {
-        alert("Erreur: Le bloqueur de publicités empêche l'impression. Veuillez autoriser les popups pour ce site.");
+        alert("Tanpri pèmèt 'Pop-ups' nan navigatè ou a pou enprime tikè a.");
         return;
     }
 
     printWindow.document.write(content);
     printWindow.document.close();
 
-    // Attendre que le contenu soit "prêt" dans le DOM de la nouvelle fenêtre
+    // On attend que le contenu soit rendu
     printWindow.focus();
     
-    // On utilise un délai légèrement plus long pour garantir que le moteur de rendu a fini
+    // Correction du problème de disparition : 
+    // On laisse la fenêtre ouverte. L'utilisateur la fermera après l'impression physique.
     setTimeout(() => {
         printWindow.print();
-        // On ne ferme la fenêtre que si l'utilisateur a fini (certains navigateurs ferment trop vite)
-        printWindow.onafterprint = () => printWindow.close();
-    }, 500);
+        // On ne met PAS de printWindow.close() ici pour éviter que ça disparaisse trop vite
+    }, 600);
 }
 
-// Fonction de sauvegarde modifiée pour appeler l'impression
+// Assurez-vous que cette fonction est appelée dans processFinalTicket
 async function processFinalTicket() {
-    if (APP_STATE.currentCart.length === 0) {
-        alert("Panyen an vid!");
-        return;
-    }
-
-    try {
-        const ticketData = {
-            agentId: APP_STATE.agentId,
-            drawId: APP_STATE.selectedDraw,
-            drawName: CONFIG.DRAWS.find(d => d.id === APP_STATE.selectedDraw).name,
-            bets: APP_STATE.currentCart,
-            total: APP_STATE.currentCart.reduce((sum, b) => sum + b.amount, 0)
-        };
-
-        const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.SAVE_TICKET}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-            },
-            body: JSON.stringify(ticketData)
-        });
-
-        const result = await response.json();
-
-        if (response.ok && result.success) {
-            // L'objet ticket retourné par votre API
-            const savedTicket = result.ticket;
-            
-            // 1. Ajouter à l'historique local
-            if (APP_STATE.ticketsHistory) {
-                APP_STATE.ticketsHistory.unshift(savedTicket);
-            }
-
-            // 2. LANCER L'IMPRESSION
-            printThermalTicket(savedTicket);
-
-            // 3. Vider le panier et notifier
-            APP_STATE.currentCart = [];
-            CartManager.renderCart();
-            
-            // Optionnel : un petit message de succès
-            console.log("Ticket imprimé avec succès");
-        } else {
-            alert("Erè: " + (result.message || "Impossible de sauver le ticket"));
-        }
-
-    } catch (error) {
-        console.error('Erreur lors du traitement:', error);
-        alert("Erè rezo. Verifye koneksyon ou.");
-    }
+    // ... (votre code de sauvegarde existant)
+    // À la fin du succès :
+    // printThermalTicket(savedTicket);
 }
-
-// Exposer les fonctions au window pour les boutons HTML
-window.processFinalTicket = processFinalTicket;
-window.printThermalTicket = printThermalTicket;
