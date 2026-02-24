@@ -461,7 +461,7 @@ async function processFinalTicket() {
     }
 }
 
-// Impression de ticket selon la même logique que uiManager (sans fermeture auto)
+// Impression de ticket : la fenêtre se ferme automatiquement après impression
 function printThermalTicket(ticket) {
     try {
         const printContent = generateTicketHTML(ticket);
@@ -473,7 +473,13 @@ function printThermalTicket(ticket) {
         printWindow.document.write(printContent);
         printWindow.document.close();
         printWindow.focus();
-        printWindow.print(); // L'utilisateur fermera la fenêtre manuellement après impression
+
+        // Fermeture automatique après impression (supporté par la plupart des navigateurs)
+        printWindow.onafterprint = function() {
+            printWindow.close();
+        };
+
+        printWindow.print();
     } catch (error) {
         console.error('Erreur impression:', error);
         alert('Erè pandan enpresyon an.');
@@ -482,7 +488,7 @@ function printThermalTicket(ticket) {
 
 function generateTicketHTML(ticket) {
     const lotteryConfig = APP_STATE.lotteryConfig || CONFIG;
-    const lotteryName = lotteryConfig.LOTTERY_NAME || lotteryConfig.name || 'LOTTERIE';
+    const lotteryName = lotteryConfig.LOTTERY_NAME || lotteryConfig.name || 'LOTERIE';
     const slogan = lotteryConfig.slogan || '';
     const logoUrl = lotteryConfig.LOTTERY_LOGO || lotteryConfig.logo || '';
     const address = lotteryConfig.LOTTERY_ADDRESS || lotteryConfig.address || '';
