@@ -381,29 +381,6 @@ var CartManager = {
 
 // --- Fonctions d'impression améliorées ---
 
-/**
- * Imprime un contenu HTML dans un iframe caché en utilisant srcdoc (plus fiable)
- */
-function printHTML(htmlContent) {
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'absolute';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = 'none';
-    iframe.style.left = '-1000px';
-    iframe.style.top = '-1000px';
-    iframe.srcdoc = htmlContent; // Utiliser srcdoc pour définir le contenu
-    document.body.appendChild(iframe);
-
-    iframe.onload = () => {
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
-        setTimeout(() => {
-            document.body.removeChild(iframe);
-        }, 1000);
-    };
-}
-
 async function processFinalTicket() {
     if (APP_STATE.currentCart.length === 0) {
         alert("Pa gen anyen nan panye an!");
@@ -452,20 +429,11 @@ async function processFinalTicket() {
             }
 
             const savedTicket = await response.json();
-            // 👇 PARSER LE CHAMP bets (le serveur renvoie une chaîne JSON)
-            if (savedTicket.ticket && typeof savedTicket.ticket.bets === 'string') {
-                try {
-                    savedTicket.ticket.bets = JSON.parse(savedTicket.ticket.bets);
-                } catch (e) {
-                    savedTicket.ticket.bets = [];
-                }
-            }
             savedTickets.push(savedTicket.ticket);
             APP_STATE.ticketsHistory.unshift(savedTicket.ticket);
         }
 
         if (savedTickets.length > 1) {
-            // 👇 Pour le ticket composite, on utilise les bets déjà parsés
             const compositeTicket = {
                 id: `COMPOSITE-${Date.now()}`,
                 ticket_id: `MULTI-${Date.now()}`,
@@ -473,14 +441,13 @@ async function processFinalTicket() {
                 date: new Date().toISOString(),
                 agent_name: APP_STATE.agentName,
                 total_amount: savedTickets.reduce((sum, t) => sum + (parseFloat(t.total_amount) || 0), 0),
-                bets: savedTickets.flatMap(t => t.bets || []), // maintenant t.bets est un tableau d'objets
+                bets: savedTickets.flatMap(t => t.bets || []),
                 multiDraw: true,
                 subTickets: savedTickets.map(t => ({ id: t.ticket_id || t.id, drawName: t.draw_name }))
             };
             printThermalTicket(compositeTicket);
             alert(`✅ ${savedTickets.length} fich sove ak siksè! Yon sèl papye enprime.`);
         } else {
-            // Ticket unique : bets déjà parsé
             printThermalTicket(savedTickets[0]);
             alert(`✅ Fich #${savedTickets[0].id || savedTickets[0].ticket_id} sove ak siksè epi enprime!`);
         }
@@ -494,22 +461,25 @@ async function processFinalTicket() {
     }
 }
 
-/**
- * Génère le HTML du ticket et l'imprime via iframe (méthode fiable)
- */
+// 🔧 NOUVELLE VERSION : impression via pop-up (fiable)
 function printThermalTicket(ticket) {
     try {
-        const htmlContent = generateTicketHTML(ticket);
-        printHTML(htmlContent);
+        const printContent = generateTicketHTML(ticket);
+        const printWindow = window.open('', '_blank', 'width=400,height=600');
+        if (!printWindow) {
+            alert("Tanpri pèmèt pop-up pou enprime tikè a.");
+            return;
+        }
+        printWindow.document.write(printContent);
+        printWindow.document.close();
+        printWindow.focus();
+        // L'impression est automatique grâce au onload dans le HTML généré
     } catch (error) {
         console.error('Erreur impression:', error);
         alert('Erè pandan enpresyon an.');
     }
 }
 
-/**
- * Génère le contenu HTML du ticket (sans déclencheur automatique d'impression)
- */
 function generateTicketHTML(ticket) {
     const lotteryConfig = APP_STATE.lotteryConfig || CONFIG;
     const lotteryName = lotteryConfig.LOTTERY_NAME || lotteryConfig.name || 'LOTTERIE';
@@ -518,58 +488,17 @@ function generateTicketHTML(ticket) {
     const address = lotteryConfig.LOTTERY_ADDRESS || lotteryConfig.address || '';
     const phone = lotteryConfig.LOTTERY_PHONE || lotteryConfig.phone || '';
     
-    // Récupération des données avec plusieurs variantes possibles
-    const drawName = ticket.draw_name || ticket.drawName || ticket.draw_name_fr || '';
-    const totalAmount = parseFloat(ticket.total_amount || ticket.totalAmount || ticket.amount || ticket.total || 0);
-    const agentName = ticket.agent_name || ticket.agentName || APP_STATE.agentName || 'Agent';
-    const ticketId = ticket.ticket_id || ticket.id || 'N/A';
-    const date = ticket.date || ticket.created_at || ticket.created_date || new Date().toISOString();
-    
-    // Gestion des paris (bets)
-    let bets = [];
-    if (Array.isArray(ticket.bets)) {
-        bets = ticket.bets;
-    } else if (Array.isArray(ticket.numbers)) {
-        bets = ticket.numbers;
-    } else if (typeof ticket.bets === 'string') {
-        try {
-            bets = JSON.parse(ticket.bets);
-        } catch (e) {
-            bets = [];
-        }
-    } else if (ticket.bets && typeof ticket.bets === 'object') {
-        // Si c'est un objet, on le transforme en tableau
-        bets = Object.entries(ticket.bets).map(([key, value]) => ({
-            number: key,
-            amount: value,
-            game: 'BORLETTE'
-        }));
-    } else {
-        bets = [];
-    }
-    
-    // Construction du HTML des paris
     let betsHtml = '';
-    if (bets.length === 0) {
-        betsHtml = '<div style="text-align:center; margin:10px 0;">Aucun pari</div>';
-    } else {
-        betsHtml = bets.map(b => {
-            // Si b est une chaîne (cas improbable maintenant, mais sécurité)
-            if (typeof b === 'string') {
-                return `<div style="margin:4px 0;">${b}</div>`;
-            }
+    if (Array.isArray(ticket.bets)) {
+        betsHtml = ticket.bets.map(b => {
             let gameName = '';
-            if (b.isAutoGenerated && b.specialType) {
-                gameName = b.specialType.toUpperCase();
-            } else if (b.isAutoGenerated) {
-                gameName = `${(b.game || '').replace('_', ' ').toUpperCase()}*`;
-            } else {
-                gameName = (b.game || '').toUpperCase();
-            }
+            if (b.isAutoGenerated && b.specialType) gameName = b.specialType.toUpperCase();
+            else if (b.isAutoGenerated) gameName = `${(b.game || '').replace('_', ' ').toUpperCase()}*`;
+            else gameName = (b.game || '').toUpperCase();
             if (b.option) gameName += ` (${b.option})`;
             
-            const number = b.number || b.numero || b.n || 'N/A';
-            const amount = (parseFloat(b.amount) || 0).toLocaleString('fr-FR');
+            const number = b.number || '';
+            const amount = (b.amount || 0).toLocaleString('fr-FR');
             
             return `
                 <div style="display: flex; justify-content: space-between; margin: 4px 0; font-size: 12px;">
@@ -587,7 +516,7 @@ function generateTicketHTML(ticket) {
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Ticket #${ticketId}</title>
+            <title>Ticket #${ticket.ticket_id || ticket.id}</title>
             <style>
                 @media print {
                     @page {
@@ -680,7 +609,7 @@ function generateTicketHTML(ticket) {
                 }
             </style>
         </head>
-        <body>
+        <body onload="window.print(); setTimeout(() => window.close(), 500);">
             <div class="ticket-header">
                 ${logoUrl ? `<img src="${logoUrl}" class="logo" alt="${lotteryName}">` : ''}
                 <h2>${lotteryName}</h2>
@@ -692,19 +621,19 @@ function generateTicketHTML(ticket) {
             <div class="ticket-body">
                 <div class="info-line">
                     <span class="label">Tiraj:</span>
-                    <span>${drawName.toUpperCase()}</span>
+                    <span>${(ticket.draw_name || '').toUpperCase()}</span>
                 </div>
                 <div class="info-line">
                     <span class="label">Ticket #:</span>
-                    <span>${ticketId}</span>
+                    <span>${ticket.ticket_id || ticket.id}</span>
                 </div>
                 <div class="info-line">
                     <span class="label">Date:</span>
-                    <span>${new Date(date).toLocaleString('fr-FR')}</span>
+                    <span>${new Date(ticket.date).toLocaleString('fr-FR')}</span>
                 </div>
                 <div class="info-line">
                     <span class="label">Ajan:</span>
-                    <span>${agentName}</span>
+                    <span>${ticket.agent_name || APP_STATE.agentName}</span>
                 </div>
                 
                 <div class="divider"></div>
@@ -717,7 +646,7 @@ function generateTicketHTML(ticket) {
                 
                 <div class="total-line">
                     <span>TOTAL:</span>
-                    <span>${totalAmount.toLocaleString('fr-FR')} Gdes</span>
+                    <span>${(ticket.total_amount || ticket.total || 0).toLocaleString('fr-FR')} Gdes</span>
                 </div>
             </div>
             
@@ -732,9 +661,6 @@ function generateTicketHTML(ticket) {
     `;
 }
 
-/**
- * Méthode de secours (ancienne version, conservée pour compatibilité)
- */
 function fallbackPrintTicket(ticket) {
     const printWindow = window.open('', '_blank', 'width=300,height=600');
     if (!printWindow) {
@@ -746,7 +672,7 @@ function fallbackPrintTicket(ticket) {
     printWindow.document.close();
 }
 
-// --- Rapports et autres fonctions d'impression ---
+// --- Rapports et autres fonctions d'impression (inchangées) ---
 
 function printDailyReport() {
     if (!APP_STATE.ticketsHistory || APP_STATE.ticketsHistory.length === 0) {
@@ -804,22 +730,14 @@ function generateReportHTML(tickets, date, totalAmount) {
     const lotteryName = lotteryConfig.LOTTERY_NAME || 'LOTERIE';
     const agentName = APP_STATE.agentName || 'Agent';
     
-    let ticketsHtml = tickets.map(ticket => {
-        // S'assurer que le ticket a les bonnes propriétés
-        const ticketId = ticket.ticket_id || ticket.id || 'N/A';
-        const drawName = ticket.draw_name || ticket.drawName || '';
-        const ticketDate = ticket.date || new Date().toISOString();
-        const ticketTotal = ticket.total_amount || ticket.totalAmount || ticket.amount || 0;
-        
-        return `
-            <tr>
-                <td>${ticketId}</td>
-                <td>${drawName}</td>
-                <td>${new Date(ticketDate).toLocaleTimeString('fr-FR')}</td>
-                <td style="text-align:right;">${parseFloat(ticketTotal).toLocaleString('fr-FR')}</td>
-            </tr>
-        `;
-    }).join('');
+    let ticketsHtml = tickets.map(ticket => `
+        <tr>
+            <td>${ticket.ticket_id || ticket.id}</td>
+            <td>${ticket.draw_name || ''}</td>
+            <td>${new Date(ticket.date).toLocaleTimeString('fr-FR')}</td>
+            <td style="text-align:right;">${ticket.total_amount || ticket.total}</td>
+        </tr>
+    `).join('');
     
     return `
         <!DOCTYPE html>
@@ -892,7 +810,7 @@ function generateReportHTML(tickets, date, totalAmount) {
                 <tfoot>
                     <tr class="total-row">
                         <td colspan="3">TOTAL JENERAL:</td>
-                        <td style="text-align:right;">${totalAmount.toLocaleString('fr-FR')} Gdes</td>
+                        <td style="text-align:right;">${totalAmount} Gdes</td>
                     </tr>
                 </tfoot>
             </table>
@@ -900,8 +818,8 @@ function generateReportHTML(tickets, date, totalAmount) {
             <div class="summary">
                 <h3>Rezime</h3>
                 <p>Total Tikè: ${tickets.length}</p>
-                <p>Total Vann: ${totalAmount.toLocaleString('fr-FR')} Gdes</p>
-                <p>Mwayèn pa Tikè: ${(totalAmount / tickets.length).toFixed(2).toLocaleString('fr-FR')} Gdes</p>
+                <p>Total Vann: ${totalAmount} Gdes</p>
+                <p>Mwayèn pa Tikè: ${(totalAmount / tickets.length).toFixed(2)} Gdes</p>
                 <p>Dènye tikè: ${tickets[0] ? new Date(tickets[0].date).toLocaleTimeString('fr-FR') : 'N/A'}</p>
             </div>
             
@@ -943,11 +861,8 @@ function exportPDFReport() {
     }, 500);
 }
 
-// Exposer les fonctions globales
 window.printDailyReport = printDailyReport;
 window.exportPDFReport = exportPDFReport;
-window.printThermalTicket = printThermalTicket;
-window.fallbackPrintTicket = fallbackPrintTicket;
 
 function closeWinnerModal() {
     document.getElementById('winner-overlay').style.display = 'none';
