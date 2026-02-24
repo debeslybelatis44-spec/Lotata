@@ -382,7 +382,7 @@ var CartManager = {
 // --- Fonctions d'impression améliorées ---
 
 /**
- * Imprime un contenu HTML dans un iframe caché (identique à la méthode utilisée pour les rapports)
+ * Imprime un contenu HTML dans un iframe caché en utilisant srcdoc (plus fiable)
  */
 function printHTML(htmlContent) {
     const iframe = document.createElement('iframe');
@@ -392,17 +392,12 @@ function printHTML(htmlContent) {
     iframe.style.border = 'none';
     iframe.style.left = '-1000px';
     iframe.style.top = '-1000px';
+    iframe.srcdoc = htmlContent; // Utiliser srcdoc pour définir le contenu
     document.body.appendChild(iframe);
-
-    const iframeDoc = iframe.contentWindow.document;
-    iframeDoc.open();
-    iframeDoc.write(htmlContent);
-    iframeDoc.close();
 
     iframe.onload = () => {
         iframe.contentWindow.focus();
         iframe.contentWindow.print();
-        // Nettoyer après impression
         setTimeout(() => {
             document.body.removeChild(iframe);
         }, 1000);
