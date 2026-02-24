@@ -1,126 +1,164 @@
-// cartManager.js - VERSION PROFESSIONNELLE ET STABLE
+// cartManager.js - VERSION FINALE (Impression Stable et Pro)
 
+var CartManager = {
+    // ... (Vos fonctions addBet, removeBet, renderCart restent inchangées)
+};
+
+/**
+ * Fonction d'impression calquée sur uiManager.printReport
+ * Résout le problème de disparition et de mise en page
+ */
 function printThermalTicket(ticket) {
-    const lotteryConfig = APP_STATE.lotteryConfig || {
-        LOTTERY_NAME: "BOUL PAW",
-        LOTTERY_ADDRESS: "Haïti",
-        LOTTERY_PHONE: ""
+    const lotteryConfig = {
+        name: CONFIG.LOTTERY_NAME || "LOTERIE",
+        address: CONFIG.LOTTERY_ADDRESS || "",
+        phone: CONFIG.LOTTERY_PHONE || ""
     };
-    
-    // Génération des lignes de paris bien alignées
-    let betsHtml = '';
-    const bets = ticket.bets || [];
-    betsHtml = bets.map(b => `
-        <div class="bet-row">
-            <span class="bet-game">${(b.game || '').toUpperCase()} ${(b.number || b.numero)}</span>
-            <span class="bet-dots">..........................</span>
-            <span class="bet-amount">${(b.amount || 0)} G</span>
-        </div>
-    `).join('');
 
     const ticketId = ticket.ticket_id || ticket.id || '000000';
     const dateStr = new Date(ticket.date || Date.now()).toLocaleString('fr-FR');
+    
+    // Formatage des paris avec alignement pro
+    let betsHtml = '';
+    const bets = ticket.bets || [];
+    betsHtml = bets.map(b => `
+        <div style="display: flex; justify-content: space-between; margin: 4px 0; font-size: 15px;">
+            <span style="font-weight: bold;">${(b.game || '').toUpperCase()} ${(b.number || b.numero)}</span>
+            <span>${(b.amount || 0)} G</span>
+        </div>
+    `).join('');
 
     const content = `
     <!DOCTYPE html>
     <html>
     <head>
         <meta charset="UTF-8">
+        <title>Ticket ${ticketId}</title>
         <style>
-            @page { size: 80mm auto; margin: 0; }
+            @page { size: auto; margin: 0; }
             body { 
                 font-family: 'Courier New', Courier, monospace; 
-                width: 72mm; /* Largeur standard imprimante thermique */
-                margin: 0 auto; 
-                padding: 5px;
-                color: #000;
+                width: 75mm; 
+                margin: 0; 
+                padding: 10px;
+                background-color: white;
             }
-            .header { text-align: center; margin-bottom: 10px; }
-            .header h2 { margin: 5px 0; font-size: 18px; text-transform: uppercase; }
+            .header { text-align: center; border-bottom: 2px dashed #000; padding-bottom: 8px; margin-bottom: 10px; }
+            .header h1 { margin: 0; font-size: 22px; text-transform: uppercase; }
             
-            .info-box { font-size: 12px; margin-bottom: 10px; border-bottom: 1px dashed #000; padding-bottom: 5px; }
-            .info-line { display: flex; justify-content: space-between; margin: 2px 0; }
+            .details { font-size: 13px; line-height: 1.4; margin-bottom: 10px; }
+            .details b { font-size: 14px; }
             
-            .bets-container { margin: 10px 0; min-height: 50px; }
-            .bet-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; margin: 4px 0; }
-            .bet-game { font-weight: bold; white-space: nowrap; }
-            .bet-dots { flex-grow: 1; overflow: hidden; margin: 0 5px; color: #555; font-size: 10px; }
-            .bet-amount { font-weight: bold; white-space: nowrap; }
-
-            .total-section { 
-                margin-top: 10px; 
-                border-top: 2px solid #000; 
-                padding-top: 5px;
+            .bets { border-bottom: 1px solid #000; padding-bottom: 5px; margin-bottom: 5px; }
+            
+            .total-area { 
+                display: flex; 
+                justify-content: space-between; 
+                font-size: 20px; 
+                font-weight: bold; 
+                margin-top: 5px;
+                padding: 5px 0;
             }
-            .total-row { display: flex; justify-content: space-between; font-size: 18px; font-weight: 900; }
             
-            .footer { text-align: center; margin-top: 15px; font-size: 11px; font-style: italic; }
-            .barcode { margin-top: 10px; font-size: 10px; letter-spacing: 2px; border-top: 1px dashed #000; padding-top: 5px; }
-            
-            /* Cacher à l'écran lors du débogage si nécessaire */
-            @media print {
-                .no-print { display: none; }
-            }
+            .footer { text-align: center; margin-top: 20px; font-size: 12px; border-top: 1px dashed #000; padding-top: 10px; }
+            .ticket-no { font-size: 16px; font-weight: bold; margin-top: 5px; display: block; }
         </style>
     </head>
     <body>
         <div class="header">
-            <h2>${lotteryConfig.LOTTERY_NAME}</h2>
-            <div style="font-size: 11px;">${lotteryConfig.LOTTERY_ADDRESS}</div>
-            <div style="font-size: 11px;">Tél: ${lotteryConfig.LOTTERY_PHONE}</div>
-        </div>
-        
-        <div class="info-box">
-            <div class="info-line"><span>Date:</span> <span>${dateStr}</span></div>
-            <div class="info-line"><span>Tiraj:</span> <strong>${ticket.draw_name || 'N/A'}</strong></div>
-            <div class="info-line"><span>Ticket #:</span> <strong>${ticketId}</strong></div>
-            <div class="info-line"><span>Ajan:</span> <span>${ticket.agent_name || APP_STATE.agentName || ''}</span></div>
+            <h1>${lotteryConfig.name}</h1>
+            <div style="font-size: 11px;">${lotteryConfig.address}</div>
+            <div style="font-size: 11px;">${lotteryConfig.phone}</div>
         </div>
 
-        <div class="bets-container">
+        <div class="details">
+            <div>Tiraj: <b>${ticket.draw_name || 'N/A'}</b></div>
+            <div>Dat: ${dateStr}</div>
+            <div>Ajan: ${ticket.agent_name || APP_STATE.agentName || ''}</div>
+        </div>
+
+        <div class="bets">
             ${betsHtml}
         </div>
 
-        <div class="total-section">
-            <div class="total-row">
-                <span>TOTAL</span>
-                <span>${(ticket.total_amount || ticket.total || 0)} Gdes</span>
-            </div>
+        <div class="total-area">
+            <span>TOTAL:</span>
+            <span>${(ticket.total_amount || ticket.total || 0)} Gdes</span>
         </div>
 
         <div class="footer">
-            <p>Mèsi pou konfyans ou!<br>Bòn Chans!</p>
-            <div class="barcode">* ${ticketId} *</div>
+            <span>Mèsi pou konfyans ou!</span>
+            <span class="ticket-no"># ${ticketId}</span>
         </div>
     </body>
     </html>
     `;
 
-    // Ouverture de la fenêtre
-    const printWindow = window.open('', '_blank', 'width=450,height=600');
+    // TECHNIQUE UIMANAGER : Ouverture et écriture directe
+    const printWindow = window.open('', '_blank');
     
     if (!printWindow) {
-        alert("Tanpri pèmèt 'Pop-ups' nan navigatè ou a pou enprime tikè a.");
+        alert("Erreur : Le navigateur bloque l'ouverture de la fenêtre. Autorisez les pop-ups.");
         return;
     }
 
     printWindow.document.write(content);
     printWindow.document.close();
 
-    // On attend que le contenu soit rendu
+    // On laisse le temps au rendu de se charger (comme dans uiManager)
     printWindow.focus();
     
-    // Correction du problème de disparition : 
-    // On laisse la fenêtre ouverte. L'utilisateur la fermera après l'impression physique.
+    // ATTENTION : On ne met pas de .close() immédiatement pour que le spooler d'impression reçoive tout.
     setTimeout(() => {
         printWindow.print();
-        // On ne met PAS de printWindow.close() ici pour éviter que ça disparaisse trop vite
-    }, 600);
+        // Optionnel : printWindow.close(); // Décommentez si vous voulez qu'elle se ferme après
+    }, 500);
 }
 
-// Assurez-vous que cette fonction est appelée dans processFinalTicket
+/**
+ * Fonction principale de sauvegarde modifiée
+ */
 async function processFinalTicket() {
-    // ... (votre code de sauvegarde existant)
-    // À la fin du succès :
-    // printThermalTicket(savedTicket);
+    if (APP_STATE.currentCart.length === 0) return;
+
+    try {
+        const ticketData = {
+            agentId: APP_STATE.agentId,
+            drawId: APP_STATE.selectedDraw,
+            bets: APP_STATE.currentCart,
+            total: APP_STATE.currentCart.reduce((sum, b) => sum + b.amount, 0)
+        };
+
+        const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.SAVE_TICKET}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            },
+            body: JSON.stringify(ticketData)
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            // Lancement de l'impression avec le ticket retourné par le serveur
+            printThermalTicket(result.ticket);
+
+            // Reset du panier
+            APP_STATE.currentCart = [];
+            CartManager.renderCart();
+            
+            // Mise à jour historique
+            if (window.loadHistory) loadHistory(); 
+        } else {
+            alert("Erè: " + result.message);
+        }
+    } catch (error) {
+        console.error('Erreur:', error);
+        alert("Pwoblèm koneksyon ak sèvè a.");
+    }
 }
+
+// Exportation des fonctions
+window.processFinalTicket = processFinalTicket;
+window.printThermalTicket = printThermalTicket;
