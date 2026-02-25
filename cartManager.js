@@ -1,5 +1,5 @@
 // ==========================
-// cartManager.js (FIXED)
+// cartManager.js (STABLE + QR + PRINT FIX)
 // ==========================
 
 // ---------- Utils ----------
@@ -97,7 +97,7 @@ var CartManager = {
     }
 };
 
-// ---------- Save & Print Ticket ----------
+// ---------- Save & Print ----------
 async function processFinalTicket() {
     if (!APP_STATE.currentCart.length) {
         alert("Panye vid");
@@ -124,25 +124,27 @@ async function processFinalTicket() {
                 total
             };
 
-            const res = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.SAVE_TICKET}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-                },
-                body: JSON.stringify(payload)
-            });
+            const res = await fetch(
+                `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.SAVE_TICKET}`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+                    },
+                    body: JSON.stringify(payload)
+                }
+            );
 
             if (!res.ok) throw new Error("Erreur serveur");
 
             const data = await res.json();
-            printThermalTicket(data.ticket);
             APP_STATE.ticketsHistory.unshift(data.ticket);
+            printThermalTicket(data.ticket);
         }
 
         APP_STATE.currentCart = [];
         CartManager.renderCart();
-
         alert("✅ Tikè sove & enprime");
 
     } catch (err) {
@@ -151,7 +153,7 @@ async function processFinalTicket() {
     }
 }
 
-// ---------- PRINT (SAME STRATEGY AS uiManager) ----------
+// ---------- PRINT (FIXED – NO onload dependency) ----------
 function printThermalTicket(ticket) {
     const html = generateTicketHTML(ticket);
 
@@ -179,22 +181,26 @@ function printThermalTicket(ticket) {
         </head>
         <body>
             ${html}
-            <script>
-                window.onload = function () {
-                    window.focus();
-                    window.print();
-                    setTimeout(() => window.close(), 500);
-                }
-            </script>
         </body>
         </html>
     `);
     win.document.close();
+
+    // ✅ Impression forcée (même logique que uiManager)
+    setTimeout(() => {
+        win.focus();
+        win.print();
+        setTimeout(() => win.close(), 800);
+    }, 600);
 }
 
-// ---------- Ticket HTML ----------
+// ---------- Ticket HTML + QR ----------
 function generateTicketHTML(ticket) {
     const cfg = APP_STATE.lotteryConfig || CONFIG;
+
+    const qrData = `TICKET:${ticket.ticket_id || ticket.id}`;
+    const qrURL =
+        `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrData)}`;
 
     const betsHTML = (ticket.bets || []).map(b => `
         <div style="display:flex;justify-content:space-between;">
@@ -205,16 +211,13 @@ function generateTicketHTML(ticket) {
 
     return `
         <div style="text-align:center;border-bottom:1px solid #000;">
-            <strong>${cfg.LOTTERY_NAME || 'LOTATO'}</strong><br>
-            <small>${cfg.slogan || ''}</small>
+            <strong>${cfg.LOTTERY_NAME || 'LOTATO'}</strong>
         </div>
 
-        <div>
-            <p>Ticket #: ${ticket.ticket_id || ticket.id}</p>
-            <p>Tiraj: ${ticket.draw_name}</p>
-            <p>Date: ${new Date(ticket.date).toLocaleString('fr-FR')}</p>
-            <p>Ajan: ${ticket.agent_name}</p>
-        </div>
+        <p>Ticket #: ${ticket.ticket_id || ticket.id}</p>
+        <p>Tiraj: ${ticket.draw_name}</p>
+        <p>Date: ${new Date(ticket.date).toLocaleString('fr-FR')}</p>
+        <p>Ajan: ${ticket.agent_name || APP_STATE.agentName}</p>
 
         <hr>
         ${betsHTML}
@@ -225,8 +228,9 @@ function generateTicketHTML(ticket) {
             <span>${ticket.total_amount || ticket.total} Gdes</span>
         </div>
 
-        <div style="text-align:center;margin-top:10px;">
-            <p>Mèsi & Bòn Chans</p>
+        <div style="text-align:center;margin-top:8px;">
+            <img src="${qrURL}" style="width:100px;height:100px;">
+            <div style="font-size:9px;">Scan pou verifye tikè</div>
         </div>
     `;
 }
