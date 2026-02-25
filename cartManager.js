@@ -1,5 +1,5 @@
 // ==========================
-// cartManager.js (STABLE + QR)
+// cartManager.js (FIXED)
 // ==========================
 
 // ---------- Utils ----------
@@ -124,27 +124,25 @@ async function processFinalTicket() {
                 total
             };
 
-            const res = await fetch(
-                `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.SAVE_TICKET}`,
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-                    },
-                    body: JSON.stringify(payload)
-                }
-            );
+            const res = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.SAVE_TICKET}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+                },
+                body: JSON.stringify(payload)
+            });
 
             if (!res.ok) throw new Error("Erreur serveur");
 
             const data = await res.json();
-            APP_STATE.ticketsHistory.unshift(data.ticket);
             printThermalTicket(data.ticket);
+            APP_STATE.ticketsHistory.unshift(data.ticket);
         }
 
         APP_STATE.currentCart = [];
         CartManager.renderCart();
+
         alert("✅ Tikè sove & enprime");
 
     } catch (err) {
@@ -153,7 +151,7 @@ async function processFinalTicket() {
     }
 }
 
-// ---------- PRINT (same strategy as uiManager) ----------
+// ---------- PRINT (SAME STRATEGY AS uiManager) ----------
 function printThermalTicket(ticket) {
     const html = generateTicketHTML(ticket);
 
@@ -194,20 +192,9 @@ function printThermalTicket(ticket) {
     win.document.close();
 }
 
-// ---------- Ticket HTML + QR CODE ----------
+// ---------- Ticket HTML ----------
 function generateTicketHTML(ticket) {
     const cfg = APP_STATE.lotteryConfig || CONFIG;
-
-    const qrData = `
-TICKET:${ticket.ticket_id || ticket.id}
-DRAW:${ticket.draw_name}
-TOTAL:${ticket.total_amount || ticket.total}
-DATE:${new Date(ticket.date).toISOString()}
-AGENT:${ticket.agent_name || APP_STATE.agentName}
-`.trim();
-
-    const qrURL =
-        `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrData)}`;
 
     const betsHTML = (ticket.bets || []).map(b => `
         <div style="display:flex;justify-content:space-between;">
@@ -226,7 +213,7 @@ AGENT:${ticket.agent_name || APP_STATE.agentName}
             <p>Ticket #: ${ticket.ticket_id || ticket.id}</p>
             <p>Tiraj: ${ticket.draw_name}</p>
             <p>Date: ${new Date(ticket.date).toLocaleString('fr-FR')}</p>
-            <p>Ajan: ${ticket.agent_name || APP_STATE.agentName}</p>
+            <p>Ajan: ${ticket.agent_name}</p>
         </div>
 
         <hr>
@@ -238,12 +225,7 @@ AGENT:${ticket.agent_name || APP_STATE.agentName}
             <span>${ticket.total_amount || ticket.total} Gdes</span>
         </div>
 
-        <div style="text-align:center;margin-top:8px;">
-            <img src="${qrURL}" alt="QR Ticket" style="width:110px;height:110px;">
-            <div style="font-size:9px;">Scan pou verifye tikè</div>
-        </div>
-
-        <div style="text-align:center;margin-top:8px;">
+        <div style="text-align:center;margin-top:10px;">
             <p>Mèsi & Bòn Chans</p>
         </div>
     `;
