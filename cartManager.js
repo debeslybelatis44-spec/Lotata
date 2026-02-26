@@ -151,45 +151,58 @@ async function processFinalTicket() {
     }
 }
 
-// ---------- PRINT (SAME STRATEGY AS uiManager) ----------
+// ---------- PRINT (FIXED: using hidden iframe to avoid popup blocker) ----------
 function printThermalTicket(ticket) {
     const html = generateTicketHTML(ticket);
 
-    const win = window.open('', '_blank', 'width=400,height=600');
-    if (!win) {
-        alert("Autorize popup pou enprime");
-        return;
-    }
+    // Créer une iframe cachée
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = 'none';
+    iframe.style.top = '-1000px';
+    iframe.style.left = '-1000px';
+    document.body.appendChild(iframe);
 
-    win.document.open();
-    win.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Ticket</title>
-            <style>
-                @page { size: 80mm auto; margin: 2mm; }
-                body {
-                    font-family: monospace;
-                    font-size: 11px;
-                    width: 76mm;
-                    margin: 0 auto;
-                }
-            </style>
-        </head>
-        <body>
-            ${html}
-            <script>
-                window.onload = function () {
-                    window.focus();
-                    window.print();
-                    setTimeout(() => window.close(), 500);
-                }
-            </script>
-        </body>
-        </html>
-    `);
-    win.document.close();
+    // Attendre que l'iframe soit prête
+    iframe.onload = function () {
+        const doc = iframe.contentDocument || iframe.contentWindow.document;
+        doc.open();
+        doc.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Ticket</title>
+                <style>
+                    @page { size: 80mm auto; margin: 2mm; }
+                    body {
+                        font-family: monospace;
+                        font-size: 11px;
+                        width: 76mm;
+                        margin: 0 auto;
+                    }
+                </style>
+            </head>
+            <body>
+                ${html}
+            </body>
+            </html>
+        `);
+        doc.close();
+
+        // Lancer l'impression
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+
+        // Supprimer l'iframe après impression (avec un délai pour éviter la suppression trop rapide)
+        setTimeout(() => {
+            document.body.removeChild(iframe);
+        }, 1000);
+    };
+
+    // Déclencher l'écriture (l'événement onload se chargera du reste)
+    iframe.src = 'about:blank';
 }
 
 // ---------- Ticket HTML ----------
