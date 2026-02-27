@@ -1,5 +1,5 @@
 // ==========================
-// cartManager.js (FINAL - centrage garanti)
+// cartManager.js (FINAL - police 20px, logo 120px)
 // ==========================
 
 // ---------- Utils ----------
@@ -173,7 +173,7 @@ function printThermalTicket(ticket) {
                 }
                 body {
                     font-family: 'Courier New', monospace;
-                    font-size: 14px; /* Augmenté de 11px à 14px */
+                    font-size: 20px;
                     width: 76mm;
                     margin: 0 auto;
                     padding: 2mm;
@@ -189,16 +189,16 @@ function printThermalTicket(ticket) {
                 .header img {
                     display: block !important;
                     margin: 0 auto 5px auto !important;
-                    max-height: 80px; /* Augmenté de 50px à 80px */
+                    max-height: 120px; /* Augmenté à 120px */
                     max-width: 100%;
                 }
                 .header strong {
                     display: block;
-                    font-size: 18px; /* Légèrement augmenté pour harmonie */
+                    font-size: 24px;
                 }
                 .header small {
                     display: block;
-                    font-size: 12px; /* Légèrement augmenté */
+                    font-size: 16px;
                     color: #555;
                 }
                 .info {
@@ -282,7 +282,7 @@ function generateTicketHTML(ticket) {
         </div>
 
         <div class="footer">
-            <p>tickets valable jusqu'à 90 jours</p> <!-- Message modifié -->
+            <p>tickets valable jusqu'à 90 jours</p>
         </div>
     `;
 }
