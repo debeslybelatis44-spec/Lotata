@@ -79,9 +79,8 @@ function renderHistory() {
     }
     
     container.innerHTML = APP_STATE.ticketsHistory.map((ticket, index) => {
-        // ID numérique pour l'API, ID d'affichage pour l'utilisateur
-        const numericId = ticket.id;                     // Clé primaire (nombre)
-        const displayId = ticket.ticket_id || ticket.id; // Identifiant lisible
+        const numericId = ticket.id;
+        const displayId = ticket.ticket_id || ticket.id;
         const drawName = ticket.draw_name || ticket.drawName || ticket.draw_name_fr || 'Tiraj Inkonu';
         const totalAmount = ticket.total_amount || ticket.totalAmount || ticket.amount || 0;
         const date = ticket.date || ticket.created_at || ticket.created_date || new Date().toISOString();
@@ -122,7 +121,6 @@ function renderHistory() {
         const ticketDate = new Date(date);
         const now = new Date();
         const minutesDiff = (now - ticketDate) / (1000 * 60);
-        // Délai de suppression : 3 minutes pour l'agent
         const canDelete = minutesDiff <= 3 && numericId != null;
         const canEdit = minutesDiff <= 3;
         
@@ -172,7 +170,6 @@ function renderHistory() {
     }).join('');
 }
 
-// Nouvelle fonction : récupère l'ID numérique depuis la carte et appelle deleteTicket
 function deleteTicketFromCard(button) {
     const card = button.closest('.history-card');
     if (!card) return;
@@ -190,9 +187,7 @@ async function deleteTicket(ticketId) {
     try {
         const response = await APIService.deleteTicket(ticketId);
         
-        // Vérifier si la suppression a réussi (selon la structure de votre API)
         if (response && (response.success === true || response.status === 'ok' || response.message)) {
-            // Supprimer localement
             APP_STATE.ticketsHistory = APP_STATE.ticketsHistory.filter(t => 
                 (t.id !== ticketId && t.ticket_id !== ticketId)
             );
@@ -250,14 +245,14 @@ function editTicket(ticketId) {
     alert(`Tikè #${ticket.ticket_id || ticket.id} charge nan panye. Ou kapab modifye l.`);
 }
 
-// Nouvelle fonction pour réimprimer un ticket depuis l'historique
+// Réimpression d'un ticket depuis l'historique
 function reprintTicket(ticketId) {
     const ticket = APP_STATE.ticketsHistory.find(t => t.id === ticketId || t.ticket_id === ticketId);
     if (!ticket) {
         alert("Tikè pa jwenn!");
         return;
     }
-    // Réutilise la fonction d'impression définie dans cartManager.js
+    // Utilise la fonction d'impression globale définie dans cartManager.js
     printThermalTicket(ticket);
 }
 
@@ -317,7 +312,6 @@ async function loadReports() {
         
         await loadDrawReport('all');
         
-        // 🔧 Forcer l'affichage du bouton d'impression des rapports
         const printBtn = document.querySelector('.print-report-btn');
         if (printBtn) {
             printBtn.style.display = 'block';
@@ -403,6 +397,7 @@ async function loadDrawReport(drawId = null) {
     }
 }
 
+// Impression des rapports (version corrigée)
 function printReport() {
     const drawSelector = document.getElementById('draw-report-selector');
     const selectedDraw = drawSelector.options[drawSelector.selectedIndex].text;
@@ -433,11 +428,11 @@ function printReport() {
         <title>Rapò ${selectedDraw}</title>
         <style>
             @page { size: A4; margin: 2cm; }
-            body { font-family: 'Arial', sans-serif; line-height: 1.5; color: #222; }
+            body { font-family: 'Arial', sans-serif; line-height: 1.5; color: #222; font-size: 12pt; }
             .header { text-align: center; margin-bottom: 30px; }
-            .header h1 { font-size: 24px; margin: 5px 0; color: #000; }
-            .header h2 { font-size: 18px; font-weight: normal; color: #333; }
-            .header p { margin: 2px 0; font-size: 14px; }
+            .header h1 { font-size: 24pt; margin: 5px 0; color: #000; }
+            .header h2 { font-size: 18pt; font-weight: normal; color: #333; }
+            .header p { margin: 2px 0; font-size: 12pt; }
             .section { margin: 20px 0; }
             .section h3 { border-bottom: 2px solid #000; padding-bottom: 5px; }
             table { width: 100%; border-collapse: collapse; margin: 15px 0; }
@@ -445,13 +440,14 @@ function printReport() {
             th { background-color: #eee; font-weight: bold; }
             .total-row { font-weight: bold; background-color: #f9f9f9; }
             .summary { background: #f5f5f5; padding: 15px; border-radius: 5px; margin-top: 20px; }
-            .summary p { margin: 5px 0; font-size: 16px; }
-            .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #ccc; padding-top: 10px; }
+            .summary p { margin: 5px 0; font-size: 12pt; }
+            .footer { margin-top: 30px; text-align: center; font-size: 10pt; color: #666; border-top: 1px solid #ccc; padding-top: 10px; }
         </style>
     </head>
     <body>
         <div class="header">
             <h1>${lotteryConfig.LOTTERY_NAME || 'LOTERIE'}</h1>
+            ${lotteryConfig.LOTTERY_LOGO ? `<img src="${lotteryConfig.LOTTERY_LOGO}" style="max-height: 50px;">` : ''}
             <h2>Rapò Vann ${selectedDraw}</h2>
             <p>Dat: ${new Date().toLocaleDateString('fr-FR')}</p>
             <p>Ajan: ${APP_STATE.agentName}</p>
@@ -490,7 +486,7 @@ function printReport() {
         
         <div class="footer">
             <p>Rapò jenere le: ${new Date().toLocaleString('fr-FR')}</p>
-            <p>© ${lotteryConfig.LOTTERY_NAME} - Tout dwa rezève</p>
+            <p>© ${lotteryConfig.LOTTERY_NAME || 'LOTERIE'} - Tout dwa rezève</p>
         </div>
     </body>
     </html>

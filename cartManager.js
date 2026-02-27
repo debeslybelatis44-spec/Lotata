@@ -151,58 +151,87 @@ async function processFinalTicket() {
     }
 }
 
-// ---------- PRINT (FIXED: using hidden iframe to avoid popup blocker) ----------
+// ---------- PRINT (NOUVELLE VERSION : fenêtre pop-up) ----------
 function printThermalTicket(ticket) {
     const html = generateTicketHTML(ticket);
 
-    // Créer une iframe cachée
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'absolute';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = 'none';
-    iframe.style.top = '-1000px';
-    iframe.style.left = '-1000px';
-    document.body.appendChild(iframe);
+    // Ouvrir une nouvelle fenêtre
+    const printWindow = window.open('', '_blank', 'width=400,height=600');
+    if (!printWindow) {
+        alert("Veuillez autoriser les pop-ups pour imprimer le ticket.");
+        return;
+    }
 
-    // Attendre que l'iframe soit prête
-    iframe.onload = function () {
-        const doc = iframe.contentDocument || iframe.contentWindow.document;
-        doc.open();
-        doc.write(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Ticket</title>
-                <style>
-                    @page { size: 80mm auto; margin: 2mm; }
-                    body {
-                        font-family: monospace;
-                        font-size: 11px;
-                        width: 76mm;
-                        margin: 0 auto;
-                    }
-                </style>
-            </head>
-            <body>
-                ${html}
-            </body>
-            </html>
-        `);
-        doc.close();
+    // Écrire le contenu HTML avec le style adapté
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Ticket</title>
+            <style>
+                @page {
+                    size: 80mm auto;
+                    margin: 2mm;
+                }
+                body {
+                    font-family: 'Courier New', monospace;
+                    font-size: 11px;
+                    width: 76mm;
+                    margin: 0 auto;
+                    padding: 2mm;
+                    background: white;
+                    color: black;
+                }
+                .header {
+                    text-align: center;
+                    border-bottom: 1px dashed #000;
+                    padding-bottom: 5px;
+                    margin-bottom: 5px;
+                }
+                .header strong {
+                    font-size: 14px;
+                }
+                .info {
+                    margin: 5px 0;
+                }
+                .info p {
+                    margin: 2px 0;
+                }
+                hr {
+                    border: none;
+                    border-top: 1px dashed #000;
+                    margin: 5px 0;
+                }
+                .bet-row {
+                    display: flex;
+                    justify-content: space-between;
+                    margin: 2px 0;
+                }
+                .total-row {
+                    display: flex;
+                    justify-content: space-between;
+                    font-weight: bold;
+                    margin-top: 5px;
+                }
+                .footer {
+                    text-align: center;
+                    margin-top: 10px;
+                    font-style: italic;
+                }
+            </style>
+        </head>
+        <body>
+            ${html}
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
 
-        // Lancer l'impression
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
-
-        // Supprimer l'iframe après impression (avec un délai pour éviter la suppression trop rapide)
-        setTimeout(() => {
-            document.body.removeChild(iframe);
-        }, 1000);
+    // Attendre que le contenu soit chargé puis imprimer
+    printWindow.onload = function() {
+        printWindow.focus();
+        printWindow.print();
     };
-
-    // Déclencher l'écriture (l'événement onload se chargera du reste)
-    iframe.src = 'about:blank';
 }
 
 // ---------- Ticket HTML ----------
@@ -210,19 +239,19 @@ function generateTicketHTML(ticket) {
     const cfg = APP_STATE.lotteryConfig || CONFIG;
 
     const betsHTML = (ticket.bets || []).map(b => `
-        <div style="display:flex;justify-content:space-between;">
+        <div class="bet-row">
             <span>${b.game.toUpperCase()} ${b.number}</span>
             <span>${b.amount} G</span>
         </div>
     `).join('');
 
     return `
-        <div style="text-align:center;border-bottom:1px solid #000;">
+        <div class="header">
             <strong>${cfg.LOTTERY_NAME || 'LOTATO'}</strong><br>
             <small>${cfg.slogan || ''}</small>
         </div>
 
-        <div>
+        <div class="info">
             <p>Ticket #: ${ticket.ticket_id || ticket.id}</p>
             <p>Tiraj: ${ticket.draw_name}</p>
             <p>Date: ${new Date(ticket.date).toLocaleString('fr-FR')}</p>
@@ -233,12 +262,12 @@ function generateTicketHTML(ticket) {
         ${betsHTML}
         <hr>
 
-        <div style="display:flex;justify-content:space-between;font-weight:bold;">
+        <div class="total-row">
             <span>TOTAL</span>
             <span>${ticket.total_amount || ticket.total} Gdes</span>
         </div>
 
-        <div style="text-align:center;margin-top:10px;">
+        <div class="footer">
             <p>Mèsi & Bòn Chans</p>
         </div>
     `;
