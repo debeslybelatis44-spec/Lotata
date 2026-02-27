@@ -1,5 +1,5 @@
 // ==========================
-// cartManager.js (FIXED)
+// cartManager.js (FIXED + DEBUG)
 // ==========================
 
 // ---------- Utils ----------
@@ -151,18 +151,20 @@ async function processFinalTicket() {
     }
 }
 
-// ---------- PRINT (NOUVELLE VERSION : fenêtre pop-up) ----------
+// ---------- PRINT (fenêtre pop-up) ----------
 function printThermalTicket(ticket) {
+    // DEBUG : afficher la configuration utilisée
+    console.log('🖨️ Impression ticket - APP_STATE.lotteryConfig:', APP_STATE.lotteryConfig);
+    console.log('🖨️ Impression ticket - CONFIG:', CONFIG);
+
     const html = generateTicketHTML(ticket);
 
-    // Ouvrir une nouvelle fenêtre
     const printWindow = window.open('', '_blank', 'width=400,height=600');
     if (!printWindow) {
         alert("Veuillez autoriser les pop-ups pour imprimer le ticket.");
         return;
     }
 
-    // Écrire le contenu HTML avec le style adapté
     printWindow.document.write(`
         <!DOCTYPE html>
         <html>
@@ -227,21 +229,24 @@ function printThermalTicket(ticket) {
     `);
     printWindow.document.close();
 
-    // Attendre que le contenu soit chargé puis imprimer
     printWindow.onload = function() {
         printWindow.focus();
         printWindow.print();
     };
 }
 
-// ---------- Ticket HTML (CORRIGÉ : logo, nom, slogan) ----------
+// ---------- Ticket HTML (CORRIGÉ avec fallbacks) ----------
 function generateTicketHTML(ticket) {
+    // Fusionner les sources de configuration
     const cfg = APP_STATE.lotteryConfig || CONFIG;
 
-    // Accès sécurisé aux propriétés
+    // Essayer différentes propriétés possibles
     const lotteryName = cfg.LOTTERY_NAME || cfg.name || 'LOTATO';
     const slogan = cfg.slogan || '';
     const logoUrl = cfg.LOTTERY_LOGO || cfg.logo || cfg.logoUrl || '';
+
+    // Log pour voir ce qui est réellement utilisé
+    console.log('🎫 generateTicketHTML ->', { lotteryName, slogan, logoUrl });
 
     const betsHTML = (ticket.bets || []).map(b => `
         <div class="bet-row">

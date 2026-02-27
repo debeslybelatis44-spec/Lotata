@@ -252,7 +252,6 @@ function reprintTicket(ticketId) {
         alert("Tikè pa jwenn!");
         return;
     }
-    // Utilise la fonction d'impression globale définie dans cartManager.js
     printThermalTicket(ticket);
 }
 
@@ -397,7 +396,7 @@ async function loadDrawReport(drawId = null) {
     }
 }
 
-// Impression des rapports (CORRIGÉ : logo, nom, slogan)
+// Impression des rapports (CORRIGÉ avec fallbacks)
 function printReport() {
     const drawSelector = document.getElementById('draw-report-selector');
     const selectedDraw = drawSelector.options[drawSelector.selectedIndex].text;
@@ -424,6 +423,10 @@ function printReport() {
     const lotteryName = cfg.LOTTERY_NAME || cfg.name || 'LOTERIE';
     const logoUrl = cfg.LOTTERY_LOGO || cfg.logo || cfg.logoUrl || '';
     const slogan = cfg.slogan || '';
+
+    // Log pour déboguer
+    console.log('📊 printReport - cfg utilisé:', cfg);
+    console.log('📊 printReport - valeurs extraites:', { lotteryName, logoUrl, slogan });
     
     const content = `
     <!DOCTYPE html>
@@ -763,19 +766,25 @@ async function loadLotteryConfig() {
         const config = await APIService.getLotteryConfig();
         if (config) {
             APP_STATE.lotteryConfig = config;
-            
-            document.getElementById('lottery-name').innerHTML = `${config.name} <span class="pro-badge">vession 6</span>`;
-            
+
+            // Mettre à jour CONFIG avec toutes les propriétés (pour compatibilité)
+            CONFIG.LOTTERY_NAME = config.name || 'LOTATO';
+            CONFIG.LOTTERY_LOGO = config.logo || config.logoUrl || '';
+            CONFIG.slogan = config.slogan || '';
+            CONFIG.LOTTERY_ADDRESS = config.address || '';
+            CONFIG.LOTTERY_PHONE = config.phone || '';
+
+            // Mettre à jour l'affichage
+            document.getElementById('lottery-name').innerHTML = `${config.name} <span class="pro-badge">version 6</span>`;
             const sloganEl = document.getElementById('lottery-slogan');
             if (sloganEl) sloganEl.textContent = config.slogan || '';
 
-            CONFIG.LOTTERY_NAME = config.name;
-            CONFIG.LOTTERY_LOGO = config.logo || '';
-            CONFIG.LOTTERY_ADDRESS = config.address || '';
-            CONFIG.LOTTERY_PHONE = config.phone || '';
+            console.log('✅ Configuration chargée :', config);
+        } else {
+            console.warn('⚠️ Aucune configuration reçue, utilisation des valeurs par défaut.');
         }
     } catch (error) {
-        console.error('Erreur chargement configuration:', error);
+        console.error('❌ Erreur chargement configuration:', error);
     }
 }
 
