@@ -1,5 +1,5 @@
 // ==========================
-// cartManager.js (FIXED + DEBUG)
+// cartManager.js (FINAL - logo centré)
 // ==========================
 
 // ---------- Utils ----------
@@ -153,9 +153,9 @@ async function processFinalTicket() {
 
 // ---------- PRINT (fenêtre pop-up) ----------
 function printThermalTicket(ticket) {
-    // DEBUG : afficher la configuration utilisée
-    console.log('🖨️ Impression ticket - APP_STATE.lotteryConfig:', APP_STATE.lotteryConfig);
-    console.log('🖨️ Impression ticket - CONFIG:', CONFIG);
+    // (logs optionnels, peut être retiré en production)
+    // console.log('🖨️ Impression ticket - APP_STATE.lotteryConfig:', APP_STATE.lotteryConfig);
+    // console.log('🖨️ Impression ticket - CONFIG:', CONFIG);
 
     const html = generateTicketHTML(ticket);
 
@@ -187,11 +187,22 @@ function printThermalTicket(ticket) {
                 .header {
                     text-align: center;
                     border-bottom: 1px dashed #000;
-                    padding-bottom: 5px;
-                    margin-bottom: 5px;
+                    padding-bottom: 8px;
+                    margin-bottom: 8px;
+                }
+                .header img {
+                    display: block;
+                    margin: 0 auto 5px auto;
+                    max-height: 50px;
+                    max-width: 100%;
                 }
                 .header strong {
-                    font-size: 14px;
+                    font-size: 16px;
+                    display: block;
+                }
+                .header small {
+                    font-size: 10px;
+                    color: #555;
                 }
                 .info {
                     margin: 5px 0;
@@ -235,18 +246,13 @@ function printThermalTicket(ticket) {
     };
 }
 
-// ---------- Ticket HTML (CORRIGÉ avec fallbacks) ----------
+// ---------- Ticket HTML ----------
 function generateTicketHTML(ticket) {
-    // Fusionner les sources de configuration
     const cfg = APP_STATE.lotteryConfig || CONFIG;
 
-    // Essayer différentes propriétés possibles
     const lotteryName = cfg.LOTTERY_NAME || cfg.name || 'LOTATO';
     const slogan = cfg.slogan || '';
     const logoUrl = cfg.LOTTERY_LOGO || cfg.logo || cfg.logoUrl || '';
-
-    // Log pour voir ce qui est réellement utilisé
-    console.log('🎫 generateTicketHTML ->', { lotteryName, slogan, logoUrl });
 
     const betsHTML = (ticket.bets || []).map(b => `
         <div class="bet-row">
@@ -257,9 +263,9 @@ function generateTicketHTML(ticket) {
 
     return `
         <div class="header">
-            ${logoUrl ? `<img src="${logoUrl}" style="max-height: 40px; margin-bottom: 5px;">` : ''}
-            <strong>${lotteryName}</strong><br>
-            <small>${slogan}</small>
+            ${logoUrl ? `<img src="${logoUrl}" alt="Logo">` : ''}
+            <strong>${lotteryName}</strong>
+            ${slogan ? `<small>${slogan}</small>` : ''}
         </div>
 
         <div class="info">

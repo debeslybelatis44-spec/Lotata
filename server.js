@@ -4,17 +4,19 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const compression = require('compression'); // <-- AJOUT
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const moment = require('moment');
 const path = require('path');
-const multer = require('multer');               // ← ajout pour gérer les fichiers
+const multer = require('multer');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
 // ==================== Middlewares ====================
+app.use(compression()); // <-- ACTIVATION DE LA COMPRESSION GZIP
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false
@@ -80,6 +82,9 @@ async function initializeDatabase() {
     // Ajout des colonnes pour la configuration propriétaire
     await addColumnIfNotExists('lottery_config', 'slogan', 'TEXT');
     await addColumnIfNotExists('lottery_config', 'multipliers', 'JSONB'); // stocke les multiplicateurs
+
+    // AJOUT : colonne time dans draws pour stocker l'heure du tirage (format 'HH:MM')
+    await addColumnIfNotExists('draws', 'time', 'VARCHAR(5)');
 
     console.log('✅ Base de données prête');
   } catch (error) {
@@ -242,11 +247,31 @@ app.post('/api/tickets/save', async (req, res) => {
       return res.status(403).json({ error: 'Vous ne pouvez enregistrer que vos propres tickets' });
     }
 
-    // Vérifier que le tirage est actif
-    const drawCheck = await pool.query('SELECT active FROM draws WHERE id = $1', [drawId]);
+    // Vérifier que le tirage est actif et récupérer son heure
+    const drawCheck = await pool.query('SELECT active, time FROM draws WHERE id = $1', [drawId]);
     if (drawCheck.rows.length === 0 || !drawCheck.rows[0].active) {
       return res.status(403).json({ error: 'Tirage bloqué ou inexistant' });
     }
+
+    // --- NOUVEAU : Vérification du blocage 3 minutes avant l'heure du tirage ---
+    const drawTime = drawCheck.rows[0].time;
+    if (drawTime) {
+      const [hours, minutes] = drawTime.split(':').map(Number);
+      const now = new Date();
+      const drawDate = new Date();
+      drawDate.setHours(hours, minutes, 0, 0);
+
+      // Si l'heure du tirage est déjà passée aujourd'hui, on la considère pour le lendemain
+      if (drawDate < now) {
+        drawDate.setDate(drawDate.getDate() + 1);
+      }
+
+      const threeMinutesBefore = new Date(drawDate.getTime() - 3 * 60 * 1000);
+      if (now >= threeMinutesBefore && now < drawDate) {
+        return res.status(403).json({ error: 'Tirage bloqué (moins de 3 minutes avant)' });
+      }
+    }
+    // --- FIN NOUVEAU ---
 
     // Récupérer les blocages globaux
     const globalBlocked = await pool.query('SELECT number FROM blocked_numbers');
