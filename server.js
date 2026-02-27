@@ -335,16 +335,74 @@ app.get('/api/tickets', async (req, res) => {
   }
 });
 
-app.delete('/api/tickets/:ticketId', authenticateToken, authorize('supervisor', 'owner'), async (req, res) => {
+/**
+ * SUPPRESSION D'UN TICKET
+ * Accessible à : 
+ *   - agent : ses propres tickets dans les 3 minutes
+ *   - superviseur : tickets des agents supervisés dans les 10 minutes
+ *   - propriétaire : sans restriction
+ */
+app.delete('/api/tickets/:ticketId', authenticateToken, async (req, res) => {
   try {
     const { ticketId } = req.params;
-    const ticket = await pool.query('SELECT date FROM tickets WHERE id = $1', [ticketId]);
-    if (ticket.rows.length === 0) return res.status(404).json({ error: 'Ticket non trouvé' });
-    const diffMinutes = moment().diff(moment(ticket.rows[0].date), 'minutes');
-    if (diffMinutes > 10) {
-      return res.status(403).json({ error: 'Suppression impossible après 10 minutes' });
+    const user = req.user;
+
+    // 1. Valider que l'ID est un nombre (clé primaire)
+    const id = parseInt(ticketId);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: 'ID de ticket invalide' });
     }
-    await pool.query('DELETE FROM tickets WHERE id = $1', [ticketId]);
+
+    // 2. Vérifier que l'utilisateur a un rôle autorisé
+    if (!['supervisor', 'owner', 'agent'].includes(user.role)) {
+      return res.status(403).json({ error: 'Accès interdit' });
+    }
+
+    // 3. Récupérer le ticket (date et agent_id)
+    const ticketResult = await pool.query(
+      'SELECT date, agent_id FROM tickets WHERE id = $1',
+      [id]
+    );
+    if (ticketResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Ticket non trouvé' });
+    }
+    const ticket = ticketResult.rows[0];
+
+    // 4. Vérifier le délai selon le rôle
+    const diffMinutes = moment().diff(moment(ticket.date), 'minutes');
+
+    if (user.role === 'agent') {
+      if (diffMinutes > 3) {
+        return res.status(403).json({ error: 'Suppression impossible après 3 minutes' });
+      }
+      // L'agent ne peut supprimer que ses propres tickets
+      if (ticket.agent_id !== user.id) {
+        return res.status(403).json({ error: 'Vous ne pouvez supprimer que vos propres tickets' });
+      }
+    } else if (user.role === 'supervisor') {
+      if (diffMinutes > 10) {
+        return res.status(403).json({ error: 'Suppression impossible après 10 minutes' });
+      }
+      // Le superviseur ne peut supprimer que les tickets des agents qu'il supervise
+      const agentCheck = await pool.query(
+        'SELECT id FROM agents WHERE id = $1 AND supervisor_id = $2',
+        [ticket.agent_id, user.id]
+      );
+      if (agentCheck.rows.length === 0) {
+        return res.status(403).json({ error: 'Ce ticket n\'est pas sous votre supervision' });
+      }
+    }
+    // Propriétaire : pas de restriction de délai ni de vérification supplémentaire
+
+    // 5. Suppression effective
+    await pool.query('DELETE FROM tickets WHERE id = $1', [id]);
+
+    // 6. Journalisation (sans colonne "details" qui n'existe pas)
+    await pool.query(
+      'INSERT INTO activity_log (user_id, user_role, action, ip_address) VALUES ($1, $2, $3, $4)',
+      [user.id, user.role, 'delete_ticket', req.ip]
+    );
+
     res.json({ success: true });
   } catch (error) {
     console.error('❌ Erreur suppression ticket:', error);
@@ -585,7 +643,8 @@ supervisorRouter.get('/agents', async (req, res) => {
               COALESCE(SUM(t.total_amount), 0) as total_bets,
               COALESCE(SUM(t.win_amount), 0) as total_wins,
               COUNT(t.id) as total_tickets,
-              COALESCE(SUM(t.win_amount) - SUM(t.total_amount), 0) as balance
+              COALESCE(SUM(t.win_amount) - SUM(t.total_amount), 0) as balance,
+              COALESCE(SUM(t.win_amount) FILTER (WHERE t.paid = false), 0) as unpaid_wins
        FROM agents a
        LEFT JOIN tickets t ON a.id = t.agent_id AND DATE(t.date) = CURRENT_DATE
        WHERE a.supervisor_id = $1
@@ -654,6 +713,120 @@ supervisorRouter.get('/tickets/recent', async (req, res) => {
     res.json(tickets.rows);
   } catch (error) {
     console.error('❌ Erreur tickets récents:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// ==================== NOUVELLES ROUTES SUPERVISEUR ====================
+
+// Liste des tickets avec filtres (superviseur)
+supervisorRouter.get('/tickets', async (req, res) => {
+  try {
+    const supervisorId = req.user.id;
+    const { agentId, drawId, period, fromDate, toDate, gain, paid, page = 0, limit = 20 } = req.query;
+
+    let conditions = ['a.supervisor_id = $1'];
+    let params = [supervisorId];
+    let paramIndex = 2;
+
+    if (agentId && agentId !== 'all') {
+      conditions.push(`t.agent_id = $${paramIndex++}`);
+      params.push(agentId);
+    }
+
+    if (drawId && drawId !== 'all') {
+      conditions.push(`t.draw_id = $${paramIndex++}`);
+      params.push(drawId);
+    }
+
+    let dateCondition = '';
+    if (period === 'today') {
+      dateCondition = 'DATE(t.date) = CURRENT_DATE';
+    } else if (period === 'yesterday') {
+      dateCondition = 'DATE(t.date) = CURRENT_DATE - INTERVAL \'1 day\'';
+    } else if (period === 'week') {
+      dateCondition = 't.date >= DATE_TRUNC(\'week\', CURRENT_DATE)';
+    } else if (period === 'month') {
+      dateCondition = 't.date >= DATE_TRUNC(\'month\', CURRENT_DATE)';
+    } else if (period === 'custom' && fromDate && toDate) {
+      dateCondition = `DATE(t.date) BETWEEN $${paramIndex++} AND $${paramIndex++}`;
+      params.push(fromDate, toDate);
+    }
+    if (dateCondition) {
+      conditions.push(dateCondition);
+    }
+
+    if (gain === 'win') {
+      conditions.push('t.win_amount > 0');
+    } else if (gain === 'nowin') {
+      conditions.push('t.win_amount = 0');
+    }
+
+    if (paid === 'paid') {
+      conditions.push('t.paid = true');
+    } else if (paid === 'unpaid') {
+      conditions.push('t.paid = false');
+    }
+
+    const whereClause = 'WHERE ' + conditions.join(' AND ');
+
+    // Compter le total
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM tickets t
+      JOIN agents a ON t.agent_id = a.id
+      ${whereClause}
+    `;
+    const countResult = await pool.query(countQuery, params);
+    const total = parseInt(countResult.rows[0].total);
+    const hasMore = (page * limit + limit) < total;
+
+    // Récupérer les tickets avec pagination
+    const offset = page * limit;
+    const dataQuery = `
+      SELECT t.*
+      FROM tickets t
+      JOIN agents a ON t.agent_id = a.id
+      ${whereClause}
+      ORDER BY t.date DESC
+      LIMIT $${paramIndex++} OFFSET $${paramIndex++}
+    `;
+    params.push(limit, offset);
+    const dataResult = await pool.query(dataQuery, params);
+
+    const tickets = dataResult.rows.map(t => ({
+      ...t,
+      bets: typeof t.bets === 'string' ? JSON.parse(t.bets) : t.bets
+    }));
+
+    res.json({ tickets, hasMore, total });
+  } catch (error) {
+    console.error('❌ Erreur GET /supervisor/tickets:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Marquer un ticket comme payé (superviseur)
+supervisorRouter.post('/tickets/:ticketId/pay', async (req, res) => {
+  try {
+    const { ticketId } = req.params;
+    const supervisorId = req.user.id;
+
+    const check = await pool.query(
+      `SELECT t.id FROM tickets t
+       JOIN agents a ON t.agent_id = a.id
+       WHERE t.id = $1 AND a.supervisor_id = $2`,
+      [ticketId, supervisorId]
+    );
+    if (check.rows.length === 0) {
+      return res.status(404).json({ error: 'Ticket non trouvé ou non autorisé' });
+    }
+
+    await pool.query('UPDATE tickets SET paid = true, paid_at = NOW() WHERE id = $1', [ticketId]);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Erreur POST /supervisor/tickets/:ticketId/pay:', error);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
