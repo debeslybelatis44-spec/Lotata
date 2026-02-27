@@ -1,5 +1,5 @@
 // ==========================
-// cartManager.js (FINAL - logo centré)
+// cartManager.js (FINAL - centrage garanti)
 // ==========================
 
 // ---------- Utils ----------
@@ -153,10 +153,6 @@ async function processFinalTicket() {
 
 // ---------- PRINT (fenêtre pop-up) ----------
 function printThermalTicket(ticket) {
-    // (logs optionnels, peut être retiré en production)
-    // console.log('🖨️ Impression ticket - APP_STATE.lotteryConfig:', APP_STATE.lotteryConfig);
-    // console.log('🖨️ Impression ticket - CONFIG:', CONFIG);
-
     const html = generateTicketHTML(ticket);
 
     const printWindow = window.open('', '_blank', 'width=400,height=600');
@@ -185,22 +181,23 @@ function printThermalTicket(ticket) {
                     color: black;
                 }
                 .header {
-                    text-align: center;
+                    text-align: center !important;
                     border-bottom: 1px dashed #000;
                     padding-bottom: 8px;
                     margin-bottom: 8px;
                 }
                 .header img {
-                    display: block;
-                    margin: 0 auto 5px auto;
+                    display: block !important;
+                    margin: 0 auto 5px auto !important;
                     max-height: 50px;
                     max-width: 100%;
                 }
                 .header strong {
-                    font-size: 16px;
                     display: block;
+                    font-size: 16px;
                 }
                 .header small {
+                    display: block;
                     font-size: 10px;
                     color: #555;
                 }
