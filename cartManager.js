@@ -1,5 +1,5 @@
 // ==========================
-// cartManager.js (FINAL - police 20px, logo 120px)
+// cartManager.js (FINAL - TRÈS GRAND)
 // ==========================
 
 // ---------- Utils ----------
@@ -155,7 +155,7 @@ async function processFinalTicket() {
 function printThermalTicket(ticket) {
     const html = generateTicketHTML(ticket);
 
-    const printWindow = window.open('', '_blank', 'width=400,height=600');
+    const printWindow = window.open('', '_blank', 'width=500,height=700');
     if (!printWindow) {
         alert("Veuillez autoriser les pop-ups pour imprimer le ticket.");
         return;
@@ -173,60 +173,62 @@ function printThermalTicket(ticket) {
                 }
                 body {
                     font-family: 'Courier New', monospace;
-                    font-size: 20px;
+                    font-size: 28px; /* Très grand */
                     width: 76mm;
                     margin: 0 auto;
-                    padding: 2mm;
+                    padding: 4mm;
                     background: white;
                     color: black;
                 }
                 .header {
                     text-align: center !important;
-                    border-bottom: 1px dashed #000;
-                    padding-bottom: 8px;
-                    margin-bottom: 8px;
+                    border-bottom: 2px dashed #000;
+                    padding-bottom: 12px;
+                    margin-bottom: 12px;
                 }
                 .header img {
                     display: block !important;
-                    margin: 0 auto 5px auto !important;
-                    max-height: 120px; /* Augmenté à 120px */
+                    margin: 0 auto 10px auto !important;
+                    max-height: 200px; /* Logo encore plus grand */
                     max-width: 100%;
                 }
                 .header strong {
                     display: block;
-                    font-size: 24px;
+                    font-size: 34px;
                 }
                 .header small {
                     display: block;
-                    font-size: 16px;
+                    font-size: 22px;
                     color: #555;
                 }
                 .info {
-                    margin: 5px 0;
+                    margin: 10px 0;
                 }
                 .info p {
-                    margin: 2px 0;
+                    margin: 5px 0;
                 }
                 hr {
                     border: none;
-                    border-top: 1px dashed #000;
-                    margin: 5px 0;
+                    border-top: 2px dashed #000;
+                    margin: 10px 0;
                 }
                 .bet-row {
                     display: flex;
                     justify-content: space-between;
-                    margin: 2px 0;
+                    margin: 5px 0;
                 }
                 .total-row {
                     display: flex;
                     justify-content: space-between;
                     font-weight: bold;
-                    margin-top: 5px;
+                    margin-top: 10px;
+                    font-size: 32px;
                 }
                 .footer {
                     text-align: center;
-                    margin-top: 10px;
+                    margin-top: 20px;
                     font-style: italic;
+                    font-size: 24px;
                 }
             </style>
         </head>
