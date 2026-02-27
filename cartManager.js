@@ -173,7 +173,7 @@ function printThermalTicket(ticket) {
                 }
                 body {
                     font-family: 'Courier New', monospace;
-                    font-size: 11px;
+                    font-size: 14px; /* Augmenté de 11px à 14px */
                     width: 76mm;
                     margin: 0 auto;
                     padding: 2mm;
@@ -189,16 +189,16 @@ function printThermalTicket(ticket) {
                 .header img {
                     display: block !important;
                     margin: 0 auto 5px auto !important;
-                    max-height: 50px;
+                    max-height: 80px; /* Augmenté de 50px à 80px */
                     max-width: 100%;
                 }
                 .header strong {
                     display: block;
-                    font-size: 16px;
+                    font-size: 18px; /* Légèrement augmenté pour harmonie */
                 }
                 .header small {
                     display: block;
-                    font-size: 10px;
+                    font-size: 12px; /* Légèrement augmenté */
                     color: #555;
                 }
                 .info {
@@ -282,7 +282,7 @@ function generateTicketHTML(ticket) {
         </div>
 
         <div class="footer">
-            <p>Mèsi & Bòn Chans</p>
+            <p>tickets valable jusqu'à 90 jours</p> <!-- Message modifié -->
         </div>
     `;
 }
