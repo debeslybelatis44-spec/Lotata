@@ -397,7 +397,7 @@ async function loadDrawReport(drawId = null) {
     }
 }
 
-// Impression des rapports (version corrigée)
+// Impression des rapports (CORRIGÉ : logo, nom, slogan)
 function printReport() {
     const drawSelector = document.getElementById('draw-report-selector');
     const selectedDraw = drawSelector.options[drawSelector.selectedIndex].text;
@@ -420,7 +420,11 @@ function printReport() {
     });
     const balance = totalBets - totalWins;
     
-    const lotteryConfig = APP_STATE.lotteryConfig || CONFIG;
+    const cfg = APP_STATE.lotteryConfig || CONFIG;
+    const lotteryName = cfg.LOTTERY_NAME || cfg.name || 'LOTERIE';
+    const logoUrl = cfg.LOTTERY_LOGO || cfg.logo || cfg.logoUrl || '';
+    const slogan = cfg.slogan || '';
+    
     const content = `
     <!DOCTYPE html>
     <html>
@@ -446,8 +450,9 @@ function printReport() {
     </head>
     <body>
         <div class="header">
-            <h1>${lotteryConfig.LOTTERY_NAME || 'LOTERIE'}</h1>
-            ${lotteryConfig.LOTTERY_LOGO ? `<img src="${lotteryConfig.LOTTERY_LOGO}" style="max-height: 50px;">` : ''}
+            ${logoUrl ? `<img src="${logoUrl}" style="max-height: 60px; margin-bottom: 10px;">` : ''}
+            <h1>${lotteryName}</h1>
+            ${slogan ? `<p style="font-style: italic;">${slogan}</p>` : ''}
             <h2>Rapò Vann ${selectedDraw}</h2>
             <p>Dat: ${new Date().toLocaleDateString('fr-FR')}</p>
             <p>Ajan: ${APP_STATE.agentName}</p>
@@ -486,7 +491,7 @@ function printReport() {
         
         <div class="footer">
             <p>Rapò jenere le: ${new Date().toLocaleString('fr-FR')}</p>
-            <p>© ${lotteryConfig.LOTTERY_NAME || 'LOTERIE'} - Tout dwa rezève</p>
+            <p>© ${lotteryName} - Tout dwa rezève</p>
         </div>
     </body>
     </html>

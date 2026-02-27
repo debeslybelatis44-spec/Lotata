@@ -234,28 +234,34 @@ function printThermalTicket(ticket) {
     };
 }
 
-// ---------- Ticket HTML ----------
+// ---------- Ticket HTML (CORRIGÉ : logo, nom, slogan) ----------
 function generateTicketHTML(ticket) {
     const cfg = APP_STATE.lotteryConfig || CONFIG;
 
+    // Accès sécurisé aux propriétés
+    const lotteryName = cfg.LOTTERY_NAME || cfg.name || 'LOTATO';
+    const slogan = cfg.slogan || '';
+    const logoUrl = cfg.LOTTERY_LOGO || cfg.logo || cfg.logoUrl || '';
+
     const betsHTML = (ticket.bets || []).map(b => `
         <div class="bet-row">
-            <span>${b.game.toUpperCase()} ${b.number}</span>
-            <span>${b.amount} G</span>
+            <span>${b.game?.toUpperCase() || ''} ${b.number || ''}</span>
+            <span>${b.amount || 0} G</span>
         </div>
     `).join('');
 
     return `
         <div class="header">
-            <strong>${cfg.LOTTERY_NAME || 'LOTATO'}</strong><br>
-            <small>${cfg.slogan || ''}</small>
+            ${logoUrl ? `<img src="${logoUrl}" style="max-height: 40px; margin-bottom: 5px;">` : ''}
+            <strong>${lotteryName}</strong><br>
+            <small>${slogan}</small>
         </div>
 
         <div class="info">
             <p>Ticket #: ${ticket.ticket_id || ticket.id}</p>
-            <p>Tiraj: ${ticket.draw_name}</p>
+            <p>Tiraj: ${ticket.draw_name || ticket.drawName || ''}</p>
             <p>Date: ${new Date(ticket.date).toLocaleString('fr-FR')}</p>
-            <p>Ajan: ${ticket.agent_name}</p>
+            <p>Ajan: ${ticket.agent_name || ticket.agentName || ''}</p>
         </div>
 
         <hr>
@@ -264,7 +270,7 @@ function generateTicketHTML(ticket) {
 
         <div class="total-row">
             <span>TOTAL</span>
-            <span>${ticket.total_amount || ticket.total} Gdes</span>
+            <span>${ticket.total_amount || ticket.total || 0} Gdes</span>
         </div>
 
         <div class="footer">
