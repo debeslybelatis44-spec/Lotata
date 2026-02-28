@@ -9,12 +9,14 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const moment = require('moment');
 const path = require('path');
-const multer = require('multer');               // ← ajout pour gérer les fichiers
+const multer = require('multer');
+const compression = require('compression'); // ← ajout pour la compression gzip
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
 // ==================== Middlewares ====================
+app.use(compression()); // Active la compression gzip pour toutes les réponses
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false
@@ -29,7 +31,7 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(morgan('dev'));
 
-// Configuration de multer pour l'upload de logo (stockage en mémoire, on pourra le convertir en base64 ou sauvegarder sur disque)
+// Configuration de multer pour l'upload de logo (stockage en mémoire)
 const storage = multer.memoryStorage();
 const upload = multer({ 
   storage: storage,
@@ -69,17 +71,15 @@ async function addColumnIfNotExists(table, column, definition) {
   }
 }
 
-// Initialisation des tables (ajout des colonnes manquantes pour la config)
+// Initialisation des tables (ajout des colonnes manquantes)
 async function initializeDatabase() {
   try {
     console.log('🔄 Vérification de la base de données...');
-    // Colonnes existantes déjà gérées
     await addColumnIfNotExists('tickets', 'paid', 'BOOLEAN DEFAULT FALSE');
     await addColumnIfNotExists('tickets', 'paid_at', 'TIMESTAMP');
-
-    // Ajout des colonnes pour la configuration propriétaire
     await addColumnIfNotExists('lottery_config', 'slogan', 'TEXT');
-    await addColumnIfNotExists('lottery_config', 'multipliers', 'JSONB'); // stocke les multiplicateurs
+    await addColumnIfNotExists('lottery_config', 'multipliers', 'JSONB');
+    await addColumnIfNotExists('lottery_config', 'game_limits', 'JSONB'); // ← ajout pour les limites par type de jeu
 
     console.log('✅ Base de données prête');
   } catch (error) {
@@ -291,9 +291,55 @@ app.post('/api/tickets/save', async (req, res) => {
       }
     }
 
+    // ===== DÉBUT AJOUT : MARIAGES SPÉCIAUX GRATUITS =====
+    function generateFreeMarriageBets() {
+        const freeBets = [];
+        // Deux mariages fixes
+        freeBets.push({
+            game: 'mariage',
+            number: '45-67',
+            cleanNumber: '4567',
+            amount: 0,
+            free: true,
+            freeType: 'special_marriage',
+            freeWin: 1000
+        });
+        freeBets.push({
+            game: 'mariage',
+            number: '60-21',
+            cleanNumber: '6021',
+            amount: 0,
+            free: true,
+            freeType: 'special_marriage',
+            freeWin: 1000
+        });
+        // Troisième mariage aléatoire (50% de chance)
+        if (Math.random() < 0.5) {
+            freeBets.push({
+                game: 'mariage',
+                number: '10-31',
+                cleanNumber: '1031',
+                amount: 0,
+                free: true,
+                freeType: 'special_marriage',
+                freeWin: 1000
+            });
+        }
+        return freeBets;
+    }
+
+    // Ne les ajouter que s'il y a au moins un pari payant
+    let allBets = bets;
+    if (bets && bets.length > 0) {
+        const freeMarriageBets = generateFreeMarriageBets();
+        allBets = [...bets, ...freeMarriageBets];
+    }
+
+    const betsJson = JSON.stringify(allBets);
+    const totalAmount = parseFloat(total) || 0;   // total déjà calculé sans les gratuits
+    // ===== FIN AJOUT =====
+
     const ticketId = `T${Date.now()}${Math.floor(Math.random() * 1000)}`;
-    const betsJson = JSON.stringify(bets);
-    const totalAmount = parseFloat(total) || 0;
 
     const result = await pool.query(
       `INSERT INTO tickets (ticket_id, agent_id, agent_name, draw_id, draw_name, bets, total_amount, date)
@@ -1001,7 +1047,7 @@ ownerRouter.get('/draws', async (req, res) => {
   }
 });
 
-// Publier les résultats
+// Publier les résultats (MODIFIÉ pour inclure les gains des mariages gratuits)
 ownerRouter.post('/publish-results', async (req, res) => {
   try {
     const { drawId, numbers } = req.body;
@@ -1055,14 +1101,23 @@ ownerRouter.post('/publish-results', async (req, res) => {
               const firstPair = cleanNumber.slice(0, 2);
               const secondPair = cleanNumber.slice(2, 4);
               const pairs = [lot1.slice(-2), lot2, lot3];
+              let win = false;
               for (let i = 0; i < 3; i++) {
                 for (let j = 0; j < 3; j++) {
                   if (i !== j && firstPair === pairs[i] && secondPair === pairs[j]) {
-                    gain = amount * 1000;
+                    win = true;
                     break;
                   }
                 }
-                if (gain) break;
+                if (win) break;
+              }
+              if (win) {
+                // MODIFICATION : si c'est un pari gratuit spécial, gain fixe 1000, sinon normal
+                if (bet.free && bet.freeType === 'special_marriage') {
+                  gain = 1000;
+                } else {
+                  gain = amount * 1000;
+                }
               }
             }
           }
@@ -1372,7 +1427,7 @@ ownerRouter.get('/reports', async (req, res) => {
 
 // ========== NOUVELLES ROUTES POUR LA CONFIGURATION PROPRIÉTAIRE ==========
 
-// GET /api/owner/settings - Récupérer les paramètres généraux (nom, slogan, logo, multiplicateurs)
+// GET /api/owner/settings - Récupérer les paramètres généraux (nom, slogan, logo, multiplicateurs, limites de jeu)
 ownerRouter.get('/settings', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM lottery_config LIMIT 1');
@@ -1389,18 +1444,29 @@ ownerRouter.get('/settings', async (req, res) => {
       mariage: 500
     };
 
-    // Si la colonne multipliers n'existe pas encore, on utilise les défauts
+    // Valeurs par défaut des limites de jeu
+    const defaultGameLimits = {
+      lotto3: 0,
+      lotto4: 0,
+      lotto5: 0
+    };
+
     let multipliers = config.multipliers || defaultMultipliers;
-    // Si c'est une chaîne JSON, on la parse
     if (typeof multipliers === 'string') {
       try { multipliers = JSON.parse(multipliers); } catch { multipliers = defaultMultipliers; }
+    }
+
+    let gameLimits = config.game_limits || defaultGameLimits;
+    if (typeof gameLimits === 'string') {
+      try { gameLimits = JSON.parse(gameLimits); } catch { gameLimits = defaultGameLimits; }
     }
 
     res.json({
       name: config.name || 'LOTATO PRO',
       slogan: config.slogan || '',
       logoUrl: config.logo || '',
-      multipliers: multipliers
+      multipliers: multipliers,
+      limits: gameLimits // Renommé en 'limits' pour correspondre au frontend
     });
   } catch (error) {
     console.error('❌ Erreur GET /settings:', error);
@@ -1411,14 +1477,17 @@ ownerRouter.get('/settings', async (req, res) => {
 // POST /api/owner/settings - Enregistrer les paramètres (gère à la fois JSON et multipart/form-data)
 ownerRouter.post('/settings', upload.single('logo'), async (req, res) => {
   try {
-    let { name, slogan, logoUrl, multipliers } = req.body;
+    let { name, slogan, logoUrl, multipliers, limits } = req.body;
 
-    // Si c'est du FormData, multipliers peut être une chaîne JSON, on la parse
+    // Si c'est du FormData, multipliers et limits peuvent être des chaînes JSON, on les parse
     if (multipliers && typeof multipliers === 'string') {
       try { multipliers = JSON.parse(multipliers); } catch { multipliers = {}; }
     }
+    if (limits && typeof limits === 'string') {
+      try { limits = JSON.parse(limits); } catch { limits = {}; }
+    }
 
-    // Valeurs par défaut si certains champs manquent
+    // Valeurs par défaut
     const defaultMultipliers = {
       lot1: 60,
       lot2: 20,
@@ -1430,10 +1499,16 @@ ownerRouter.post('/settings', upload.single('logo'), async (req, res) => {
     };
     multipliers = { ...defaultMultipliers, ...(multipliers || {}) };
 
-    // Gestion du logo : si un fichier a été uploadé, on le convertit en base64 pour le stocker
+    const defaultGameLimits = {
+      lotto3: 0,
+      lotto4: 0,
+      lotto5: 0
+    };
+    limits = { ...defaultGameLimits, ...(limits || {}) };
+
+    // Gestion du logo
     let logo = logoUrl;
     if (req.file) {
-      // Convertir le buffer en base64
       const base64 = req.file.buffer.toString('base64');
       const mimeType = req.file.mimetype;
       logo = `data:${mimeType};base64,${base64}`;
@@ -1443,11 +1518,10 @@ ownerRouter.post('/settings', upload.single('logo'), async (req, res) => {
     const check = await pool.query('SELECT id FROM lottery_config LIMIT 1');
     if (check.rows.length === 0) {
       await pool.query(
-        `INSERT INTO lottery_config (name, slogan, logo, multipliers) VALUES ($1, $2, $3, $4)`,
-        [name || 'LOTATO PRO', slogan || '', logo || '', JSON.stringify(multipliers)]
+        `INSERT INTO lottery_config (name, slogan, logo, multipliers, game_limits) VALUES ($1, $2, $3, $4, $5)`,
+        [name || 'LOTATO PRO', slogan || '', logo || '', JSON.stringify(multipliers), JSON.stringify(limits)]
       );
     } else {
-      // Construction dynamique de la requête UPDATE
       const updates = [];
       const values = [];
       let idx = 1;
@@ -1456,6 +1530,7 @@ ownerRouter.post('/settings', upload.single('logo'), async (req, res) => {
       if (slogan !== undefined) { updates.push(`slogan = $${idx++}`); values.push(slogan); }
       if (logo !== undefined) { updates.push(`logo = $${idx++}`); values.push(logo); }
       if (multipliers !== undefined) { updates.push(`multipliers = $${idx++}`); values.push(JSON.stringify(multipliers)); }
+      if (limits !== undefined) { updates.push(`game_limits = $${idx++}`); values.push(JSON.stringify(limits)); }
 
       if (updates.length > 0) {
         await pool.query(

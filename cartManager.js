@@ -1,5 +1,5 @@
 // ==========================
-// cartManager.js (FINAL - TRÈS GRAND)
+// cartManager.js (FINAL - ajustements supplémentaires)
 // ==========================
 
 // ---------- Utils ----------
@@ -173,7 +173,7 @@ function printThermalTicket(ticket) {
                 }
                 body {
                     font-family: 'Courier New', monospace;
-                    font-size: 28px; /* Très grand */
+                    font-size: 30px; /* Texte général */
                     width: 76mm;
                     margin: 0 auto;
                     padding: 4mm;
@@ -189,7 +189,7 @@ function printThermalTicket(ticket) {
                 .header img {
                     display: block !important;
                     margin: 0 auto 10px auto !important;
-                    max-height: 200px; /* Logo encore plus grand */
+                    max-height: 250px; /* Logo agrandi */
                     max-width: 100%;
                 }
                 .header strong {
@@ -222,13 +222,13 @@ function printThermalTicket(ticket) {
                     justify-content: space-between;
                     font-weight: bold;
                     margin-top: 10px;
-                    font-size: 32px;
+                    font-size: 34px; /* Total */
                 }
                 .footer {
                     text-align: center;
                     margin-top: 20px;
                     font-style: italic;
-                    font-size: 24px;
+                    font-size: 26px; /* Footer */
                 }
             </style>
         </head>

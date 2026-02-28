@@ -1,4 +1,4 @@
-// MODIFICATION : utiliser APP_STATE.draws et vérifier active
+// drawManager.js complet
 function isDrawBlocked(drawTime) {
     const now = new Date();
     const [hours, minutes] = drawTime.split(':').map(Number);
@@ -6,13 +6,14 @@ function isDrawBlocked(drawTime) {
     const drawDate = new Date();
     drawDate.setHours(hours, minutes, 0, 0);
     
-    if (drawDate < now) {
-        drawDate.setDate(drawDate.getDate() + 1);
+    // Si l'heure du tirage est déjà passée aujourd'hui → bloqué définitivement
+    if (now > drawDate) {
+        return true;
     }
     
-    const blockedTime = new Date(drawDate.getTime() - (3 * 60 * 1000));
-    
-    return now >= blockedTime && now < drawDate;
+    // Période de blocage : 3 minutes avant l'heure
+    const blockedStart = new Date(drawDate.getTime() - (3 * 60 * 1000));
+    return now >= blockedStart;
 }
 
 function checkSelectedDrawStatus() {
