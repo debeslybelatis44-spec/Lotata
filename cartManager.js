@@ -1,5 +1,5 @@
 // ==========================
-// cartManager.js (MODIFIÉ - abréviations loto & espace logo réduit)
+// cartManager.js (CORRECTIONS FINALES)
 // ==========================
 
 // ---------- Utils ----------
@@ -98,17 +98,25 @@ var CartManager = {
     }
 };
 
-// ---------- Fonction d'abréviation des jeux (améliorée) ----------
+// ---------- Fonction d'abréviation des jeux (VERSION FINALE) ----------
 function getGameAbbreviation(gameName) {
     const map = {
+        // Borlette
         'borlette': 'Bor',
-        'lotto 3': 'lot3',
-        'lotto 4': 'lot4',
-        'lotto 5': 'lot5',
-        // Ajout des orthographes avec un seul 't'
-        'loto 3': 'lot3',
-        'loto 4': 'lot4',
-        'loto 5': 'lot5',
+        // Lotto 3,4,5 (toutes orthographes possibles)
+        'lotto 3': 'LO3',
+        'lotto 4': 'LO4',
+        'lotto 5': 'LO5',
+        'lotto3': 'LO3',
+        'lotto4': 'LO4',
+        'lotto5': 'LO5',
+        'loto 3': 'LO3',
+        'loto 4': 'LO4',
+        'loto 5': 'LO5',
+        'loto3': 'LO3',
+        'loto4': 'LO4',
+        'loto5': 'LO5',
+        // Mariages
         'mariage': 'mar',
         'mariage gratuit': 'marg',
         'mariage spécial gratuit': 'marg'
@@ -180,7 +188,7 @@ async function processFinalTicket() {
     }
 }
 
-// ---------- PRINT (avec espace logo/texte réduit) ----------
+// ---------- PRINT (CSS avec espace logo/texte = 0) ----------
 function printThermalTicket(ticket, printWindow) {
     const html = generateTicketHTML(ticket);
 
@@ -207,12 +215,12 @@ function printThermalTicket(ticket, printWindow) {
                 .header {
                     text-align: center !important;
                     border-bottom: 2px dashed #000;
-                    padding-bottom: 2px; /* Réduit de 4px à 2px */
-                    margin-bottom: 4px;
+                    padding: 0 !important;          /* Supprime tout padding */
+                    margin: 0 0 2px 0 !important;   /* Uniquement une petite marge basse pour séparer de la suite */
                 }
                 .header img {
                     display: block !important;
-                    margin: 0 auto 0 auto !important; /* margin-bottom passé de 5px à 0 */
+                    margin: 0 auto !important;       /* Pas de marge verticale */
                     max-height: 350px;
                     max-width: 100%;
                 }
@@ -220,13 +228,15 @@ function printThermalTicket(ticket, printWindow) {
                     display: block;
                     font-size: 40px;
                     font-weight: bold;
-                    margin: 0; /* Supprime les marges par défaut */
+                    margin: 0;
+                    line-height: 1;                  /* Réduit l'interligne */
                 }
                 .header small {
                     display: block;
                     font-size: 26px;
                     color: #555;
-                    margin: 0; /* Supprime les marges par défaut */
+                    margin: 0;
+                    line-height: 1;
                 }
                 .info {
                     margin: 10px 0;
@@ -290,7 +300,7 @@ function generateTicketHTML(ticket) {
     const slogan = cfg.slogan || '';
     const logoUrl = cfg.LOTTERY_LOGO || cfg.logo || cfg.logoUrl || '';
 
-    // Format de la date : jj/mm/aaaa hh:mm (sans secondes)
+    // Format de la date : jj/mm/aaaa hh:mm
     const dateObj = new Date(ticket.date);
     const formattedDate = dateObj.toLocaleDateString('fr-FR') + ' ' + 
                           dateObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
