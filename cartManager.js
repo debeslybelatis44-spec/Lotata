@@ -98,12 +98,12 @@ var CartManager = {
     }
 };
 
-// ---------- Fonction d'abréviation des jeux (VERSION FINALE) ----------
+// ---------- Fonction d'abréviation des jeux (version complète) ----------
 function getGameAbbreviation(gameName) {
     const map = {
         // Borlette
         'borlette': 'Bor',
-        // Lotto 3,4,5 (toutes orthographes possibles)
+        // Lotto 3,4,5 - toutes orthographes possibles
         'lotto 3': 'LO3',
         'lotto 4': 'LO4',
         'lotto 5': 'LO5',
@@ -188,7 +188,7 @@ async function processFinalTicket() {
     }
 }
 
-// ---------- PRINT (CSS avec espace logo/texte = 0) ----------
+// ---------- PRINT (CSS avec espace logo/texte réduit à zéro) ----------
 function printThermalTicket(ticket, printWindow) {
     const html = generateTicketHTML(ticket);
 
@@ -215,12 +215,14 @@ function printThermalTicket(ticket, printWindow) {
                 .header {
                     text-align: center !important;
                     border-bottom: 2px dashed #000;
-                    padding: 0 !important;          /* Supprime tout padding */
-                    margin: 0 0 2px 0 !important;   /* Uniquement une petite marge basse pour séparer de la suite */
+                    padding: 0 !important;
+                    margin: 0 0 2px 0 !important; /* très petite marge après le header */
+                    line-height: 1; /* supprime l'interligne superflu */
                 }
                 .header img {
                     display: block !important;
-                    margin: 0 auto !important;       /* Pas de marge verticale */
+                    margin: 0 auto !important;
+                    vertical-align: bottom !important; /* évite l'espace sous l'image */
                     max-height: 350px;
                     max-width: 100%;
                 }
@@ -229,7 +231,7 @@ function printThermalTicket(ticket, printWindow) {
                     font-size: 40px;
                     font-weight: bold;
                     margin: 0;
-                    line-height: 1;                  /* Réduit l'interligne */
+                    line-height: 1;
                 }
                 .header small {
                     display: block;
