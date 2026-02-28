@@ -1,6 +1,5 @@
-// cartManager.js complet
 // ==========================
-// cartManager.js (FINAL - avec abréviations, écritures grasses, iframe print)
+// cartManager.js (MODIFIÉ - abréviations étendues, impression optimisée)
 // ==========================
 
 // ---------- Utils ----------
@@ -85,9 +84,10 @@ var CartManager = {
 
         display.innerHTML = APP_STATE.currentCart.map(bet => {
             total += bet.amount;
+            const gameAbbr = getGameAbbreviation(bet.game); // Utilisation de l'abréviation
             return `
                 <div class="cart-item">
-                    <span>${bet.game.toUpperCase()} ${bet.number}</span>
+                    <span>${gameAbbr} ${bet.number}</span>
                     <span>${bet.amount} G</span>
                     <button onclick="CartManager.removeBet('${bet.id}')">✕</button>
                 </div>
@@ -98,16 +98,19 @@ var CartManager = {
     }
 };
 
-// ---------- Fonction d'abréviation des jeux ----------
+// ---------- Fonction d'abréviation des jeux (mise à jour) ----------
 function getGameAbbreviation(gameName) {
     const map = {
         'borlette': 'Bor',
-        'lotto 3': 'Lot3',
-        'mariage spécial gratuit': 'Margr'
-        // Ajoutez d'autres correspondances ici
+        'lotto 3': 'lot3',
+        'lotto 4': 'lot4',
+        'lotto 5': 'lot5',
+        'mariage': 'mar',
+        'mariage gratuit': 'margr',
+        'mariage spécial gratuit': 'margr' // ancienne clé conservée par compatibilité
     };
     const key = (gameName || '').trim().toLowerCase();
-    return map[key] || gameName;
+    return map[key] || gameName; // Si non trouvé, retourne le nom original
 }
 
 // ---------- Save & Print Ticket ----------
@@ -116,6 +119,17 @@ async function processFinalTicket() {
         alert("Panye vid");
         return;
     }
+
+    // 1. Ouvrir la fenêtre immédiatement (pour éviter le blocage pop-up)
+    const printWindow = window.open('', '_blank', 'width=500,height=700');
+    if (!printWindow) {
+        alert("Veuillez autoriser les pop-ups pour imprimer le ticket.");
+        return;
+    }
+
+    // Écrire un contenu de chargement
+    printWindow.document.write('<html><head><title>Chargement...</title></head><body><p style="font-size:20px; text-align:center;">Génération du ticket en cours...</p></body></html>');
+    printWindow.document.close();
 
     const betsByDraw = {};
     APP_STATE.currentCart.forEach(b => {
@@ -149,7 +163,8 @@ async function processFinalTicket() {
             if (!res.ok) throw new Error("Erreur serveur");
 
             const data = await res.json();
-            printThermalTicket(data.ticket);
+            // Passe la fenêtre déjà ouverte et le ticket
+            printThermalTicket(data.ticket, printWindow);
             APP_STATE.ticketsHistory.unshift(data.ticket);
         }
 
@@ -161,24 +176,16 @@ async function processFinalTicket() {
     } catch (err) {
         console.error(err);
         alert("❌ Erè pandan enpresyon");
+        printWindow.close(); // fermer la fenêtre en cas d'erreur
     }
 }
 
-// ---------- PRINT (via iframe, pas de pop-up) ----------
-function printThermalTicket(ticket) {
+// ---------- PRINT (utilisation de onload pour déclencher l'impression) ----------
+function printThermalTicket(ticket, printWindow) {
     const html = generateTicketHTML(ticket);
 
-    // Créer un iframe invisible
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'absolute';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = 'none';
-    document.body.appendChild(iframe);
-
-    const iframeDoc = iframe.contentWindow.document;
-    iframeDoc.open();
-    iframeDoc.write(`
+    // Réécrire le contenu de la fenêtre avec le ticket
+    printWindow.document.write(`
         <!DOCTYPE html>
         <html>
         <head>
@@ -190,8 +197,8 @@ function printThermalTicket(ticket) {
                 }
                 body {
                     font-family: 'Courier New', monospace;
-                    font-size: 32px;
-                    font-weight: bold;
+                    font-size: 32px; /* Agrandi */
+                    font-weight: bold; /* Tout en gras */
                     width: 76mm;
                     margin: 0 auto;
                     padding: 4mm;
@@ -207,7 +214,7 @@ function printThermalTicket(ticket) {
                 .header img {
                     display: block !important;
                     margin: 0 auto 10px auto !important;
-                    max-height: 350px;
+                    max-height: 350px; /* Logo encore plus grand */
                     max-width: 100%;
                 }
                 .header strong {
@@ -261,17 +268,12 @@ function printThermalTicket(ticket) {
         </body>
         </html>
     `);
-    iframeDoc.close();
+    printWindow.document.close();
 
-    // Attendre le chargement puis imprimer
-    iframe.onload = function() {
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
-
-        // Nettoyer après impression (optionnel, avec un délai)
-        setTimeout(() => {
-            document.body.removeChild(iframe);
-        }, 1000);
+    // Attendre que le contenu soit complètement chargé avant d'imprimer
+    printWindow.onload = function() {
+        printWindow.focus();
+        printWindow.print();
     };
 }
 
