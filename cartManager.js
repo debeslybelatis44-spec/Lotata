@@ -1,5 +1,6 @@
+// cartManager.js complet
 // ==========================
-// cartManager.js (MODIFIÉ - abréviations, texte gras, pop-up optimisé)
+// cartManager.js (FINAL - avec abréviations, écritures grasses, iframe print)
 // ==========================
 
 // ---------- Utils ----------
@@ -103,6 +104,7 @@ function getGameAbbreviation(gameName) {
         'borlette': 'Bor',
         'lotto 3': 'Lot3',
         'mariage spécial gratuit': 'Margr'
+        // Ajoutez d'autres correspondances ici
     };
     const key = (gameName || '').trim().toLowerCase();
     return map[key] || gameName;
@@ -114,17 +116,6 @@ async function processFinalTicket() {
         alert("Panye vid");
         return;
     }
-
-    // 1. Ouvrir la fenêtre immédiatement (pour éviter le blocage pop-up)
-    const printWindow = window.open('', '_blank', 'width=500,height=700');
-    if (!printWindow) {
-        alert("Veuillez autoriser les pop-ups pour imprimer le ticket.");
-        return;
-    }
-
-    // Écrire un contenu de chargement (optionnel)
-    printWindow.document.write('<html><head><title>Chargement...</title></head><body>Génération du ticket...</body></html>');
-    printWindow.document.close();
 
     const betsByDraw = {};
     APP_STATE.currentCart.forEach(b => {
@@ -158,7 +149,7 @@ async function processFinalTicket() {
             if (!res.ok) throw new Error("Erreur serveur");
 
             const data = await res.json();
-            printThermalTicket(data.ticket, printWindow); // on passe la fenêtre déjà ouverte
+            printThermalTicket(data.ticket);
             APP_STATE.ticketsHistory.unshift(data.ticket);
         }
 
@@ -170,16 +161,24 @@ async function processFinalTicket() {
     } catch (err) {
         console.error(err);
         alert("❌ Erè pandan enpresyon");
-        printWindow.close(); // fermer la fenêtre en cas d'erreur
     }
 }
 
-// ---------- PRINT (réutilise la fenêtre déjà ouverte) ----------
-function printThermalTicket(ticket, printWindow) {
+// ---------- PRINT (via iframe, pas de pop-up) ----------
+function printThermalTicket(ticket) {
     const html = generateTicketHTML(ticket);
 
-    // Réécrire le contenu de la fenêtre avec le ticket
-    printWindow.document.write(`
+    // Créer un iframe invisible
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = 'none';
+    document.body.appendChild(iframe);
+
+    const iframeDoc = iframe.contentWindow.document;
+    iframeDoc.open();
+    iframeDoc.write(`
         <!DOCTYPE html>
         <html>
         <head>
@@ -191,8 +190,8 @@ function printThermalTicket(ticket, printWindow) {
                 }
                 body {
                     font-family: 'Courier New', monospace;
-                    font-size: 32px; /* Agrandi */
-                    font-weight: bold; /* Tout en gras */
+                    font-size: 32px;
+                    font-weight: bold;
                     width: 76mm;
                     margin: 0 auto;
                     padding: 4mm;
@@ -208,7 +207,7 @@ function printThermalTicket(ticket, printWindow) {
                 .header img {
                     display: block !important;
                     margin: 0 auto 10px auto !important;
-                    max-height: 350px; /* Logo encore plus grand */
+                    max-height: 350px;
                     max-width: 100%;
                 }
                 .header strong {
@@ -262,13 +261,18 @@ function printThermalTicket(ticket, printWindow) {
         </body>
         </html>
     `);
-    printWindow.document.close();
+    iframeDoc.close();
 
-    // Lancer l'impression après un court délai pour permettre le rendu
-    setTimeout(() => {
-        printWindow.focus();
-        printWindow.print();
-    }, 200);
+    // Attendre le chargement puis imprimer
+    iframe.onload = function() {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+
+        // Nettoyer après impression (optionnel, avec un délai)
+        setTimeout(() => {
+            document.body.removeChild(iframe);
+        }, 1000);
+    };
 }
 
 // ---------- Ticket HTML ----------
@@ -315,7 +319,7 @@ function generateTicketHTML(ticket) {
         <div class="footer">
             <p>tickets valable jusqu'à 90 jours</p>
             <p>Ref : +509 40 64 3557</p>
-            <p><strong>LOTATO S.A.</strong></p> <!-- Ajout en gras -->
+            <p><strong>LOTATO S.A.</strong></p>
         </div>
     `;
 }
