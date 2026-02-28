@@ -1,6 +1,5 @@
-// cartManager.js complet
 // ==========================
-// cartManager.js (FINAL - avec abréviations, écritures grasses et agrandies)
+// cartManager.js (MODIFIÉ - abréviations, texte gras, pop-up optimisé)
 // ==========================
 
 // ---------- Utils ----------
@@ -104,11 +103,9 @@ function getGameAbbreviation(gameName) {
         'borlette': 'Bor',
         'lotto 3': 'Lot3',
         'mariage spécial gratuit': 'Margr'
-        // Ajoutez d'autres correspondances ici
     };
-    // Normaliser : minuscules, sans espaces superflus
-    const key = gameName.trim().toLowerCase();
-    return map[key] || gameName; // retourne l'abréviation ou le nom original si non trouvé
+    const key = (gameName || '').trim().toLowerCase();
+    return map[key] || gameName;
 }
 
 // ---------- Save & Print Ticket ----------
@@ -117,6 +114,17 @@ async function processFinalTicket() {
         alert("Panye vid");
         return;
     }
+
+    // 1. Ouvrir la fenêtre immédiatement (pour éviter le blocage pop-up)
+    const printWindow = window.open('', '_blank', 'width=500,height=700');
+    if (!printWindow) {
+        alert("Veuillez autoriser les pop-ups pour imprimer le ticket.");
+        return;
+    }
+
+    // Écrire un contenu de chargement (optionnel)
+    printWindow.document.write('<html><head><title>Chargement...</title></head><body>Génération du ticket...</body></html>');
+    printWindow.document.close();
 
     const betsByDraw = {};
     APP_STATE.currentCart.forEach(b => {
@@ -150,7 +158,7 @@ async function processFinalTicket() {
             if (!res.ok) throw new Error("Erreur serveur");
 
             const data = await res.json();
-            printThermalTicket(data.ticket);
+            printThermalTicket(data.ticket, printWindow); // on passe la fenêtre déjà ouverte
             APP_STATE.ticketsHistory.unshift(data.ticket);
         }
 
@@ -162,19 +170,15 @@ async function processFinalTicket() {
     } catch (err) {
         console.error(err);
         alert("❌ Erè pandan enpresyon");
+        printWindow.close(); // fermer la fenêtre en cas d'erreur
     }
 }
 
-// ---------- PRINT (fenêtre pop-up) ----------
-function printThermalTicket(ticket) {
+// ---------- PRINT (réutilise la fenêtre déjà ouverte) ----------
+function printThermalTicket(ticket, printWindow) {
     const html = generateTicketHTML(ticket);
 
-    const printWindow = window.open('', '_blank', 'width=500,height=700');
-    if (!printWindow) {
-        alert("Veuillez autoriser les pop-ups pour imprimer le ticket.");
-        return;
-    }
-
+    // Réécrire le contenu de la fenêtre avec le ticket
     printWindow.document.write(`
         <!DOCTYPE html>
         <html>
@@ -187,8 +191,8 @@ function printThermalTicket(ticket) {
                 }
                 body {
                     font-family: 'Courier New', monospace;
-                    font-size: 32px; /* Augmenté pour des écritures plus grandes */
-                    font-weight: bold; /* Tout le texte en gras */
+                    font-size: 32px; /* Agrandi */
+                    font-weight: bold; /* Tout en gras */
                     width: 76mm;
                     margin: 0 auto;
                     padding: 4mm;
@@ -209,7 +213,7 @@ function printThermalTicket(ticket) {
                 }
                 .header strong {
                     display: block;
-                    font-size: 40px; /* Plus grand */
+                    font-size: 40px;
                     font-weight: bold;
                 }
                 .header small {
@@ -239,16 +243,16 @@ function printThermalTicket(ticket) {
                     justify-content: space-between;
                     font-weight: bold;
                     margin-top: 10px;
-                    font-size: 36px; /* Total encore plus gros */
+                    font-size: 36px;
                 }
                 .footer {
                     text-align: center;
                     margin-top: 20px;
                     font-style: italic;
-                    font-size: 28px; /* Footer plus grand */
+                    font-size: 28px;
                 }
                 .footer p {
-                    font-weight: bold; /* Footer en gras */
+                    font-weight: bold;
                     margin: 3px 0;
                 }
             </style>
@@ -260,10 +264,11 @@ function printThermalTicket(ticket) {
     `);
     printWindow.document.close();
 
-    printWindow.onload = function() {
+    // Lancer l'impression après un court délai pour permettre le rendu
+    setTimeout(() => {
         printWindow.focus();
         printWindow.print();
-    };
+    }, 200);
 }
 
 // ---------- Ticket HTML ----------
@@ -274,13 +279,11 @@ function generateTicketHTML(ticket) {
     const slogan = cfg.slogan || '';
     const logoUrl = cfg.LOTTERY_LOGO || cfg.logo || cfg.logoUrl || '';
 
-    // Utilisation de l'abréviation pour chaque pari
     const betsHTML = (ticket.bets || []).map(b => {
         const gameAbbr = getGameAbbreviation(b.game || '');
-        const freeLabel = b.free ? ' (gratuit)' : '';
         return `
             <div class="bet-row">
-                <span>${gameAbbr} ${b.number || ''}${freeLabel}</span>
+                <span>${gameAbbr} ${b.number || ''}</span>
                 <span>${b.amount || 0} G</span>
             </div>
         `;
@@ -312,7 +315,7 @@ function generateTicketHTML(ticket) {
         <div class="footer">
             <p>tickets valable jusqu'à 90 jours</p>
             <p>Ref : +509 40 64 3557</p>
-            <p><strong>LOTATO S.A.</strong></p> <!-- Modifié avec S.A. et gras -->
+            <p><strong>LOTATO S.A.</strong></p> <!-- Ajout en gras -->
         </div>
     `;
 }
