@@ -1,5 +1,5 @@
 // ==========================
-// cartManager.js (MODIFIÉ - abréviations étendues, impression optimisée)
+// cartManager.js (MODIFIÉ - informations sur une ligne, date simplifiée)
 // ==========================
 
 // ---------- Utils ----------
@@ -84,7 +84,7 @@ var CartManager = {
 
         display.innerHTML = APP_STATE.currentCart.map(bet => {
             total += bet.amount;
-            const gameAbbr = getGameAbbreviation(bet.game); // Utilisation de l'abréviation
+            const gameAbbr = getGameAbbreviation(bet.game);
             return `
                 <div class="cart-item">
                     <span>${gameAbbr} ${bet.number}</span>
@@ -98,7 +98,7 @@ var CartManager = {
     }
 };
 
-// ---------- Fonction d'abréviation des jeux (mise à jour) ----------
+// ---------- Fonction d'abréviation des jeux ----------
 function getGameAbbreviation(gameName) {
     const map = {
         'borlette': 'Bor',
@@ -106,11 +106,11 @@ function getGameAbbreviation(gameName) {
         'lotto 4': 'lot4',
         'lotto 5': 'lot5',
         'mariage': 'mar',
-        'mariage gratuit': 'margr',
-        'mariage spécial gratuit': 'margr' // ancienne clé conservée par compatibilité
+        'mariage gratuit': 'marg',
+        'mariage spécial gratuit': 'marg'
     };
     const key = (gameName || '').trim().toLowerCase();
-    return map[key] || gameName; // Si non trouvé, retourne le nom original
+    return map[key] || gameName;
 }
 
 // ---------- Save & Print Ticket ----------
@@ -120,14 +120,12 @@ async function processFinalTicket() {
         return;
     }
 
-    // 1. Ouvrir la fenêtre immédiatement (pour éviter le blocage pop-up)
     const printWindow = window.open('', '_blank', 'width=500,height=700');
     if (!printWindow) {
         alert("Veuillez autoriser les pop-ups pour imprimer le ticket.");
         return;
     }
 
-    // Écrire un contenu de chargement
     printWindow.document.write('<html><head><title>Chargement...</title></head><body><p style="font-size:20px; text-align:center;">Génération du ticket en cours...</p></body></html>');
     printWindow.document.close();
 
@@ -163,28 +161,25 @@ async function processFinalTicket() {
             if (!res.ok) throw new Error("Erreur serveur");
 
             const data = await res.json();
-            // Passe la fenêtre déjà ouverte et le ticket
             printThermalTicket(data.ticket, printWindow);
             APP_STATE.ticketsHistory.unshift(data.ticket);
         }
 
         APP_STATE.currentCart = [];
         CartManager.renderCart();
-
         alert("✅ Tikè sove & enprime");
 
     } catch (err) {
         console.error(err);
         alert("❌ Erè pandan enpresyon");
-        printWindow.close(); // fermer la fenêtre en cas d'erreur
+        printWindow.close();
     }
 }
 
-// ---------- PRINT (utilisation de onload pour déclencher l'impression) ----------
+// ---------- PRINT ----------
 function printThermalTicket(ticket, printWindow) {
     const html = generateTicketHTML(ticket);
 
-    // Réécrire le contenu de la fenêtre avec le ticket
     printWindow.document.write(`
         <!DOCTYPE html>
         <html>
@@ -197,8 +192,8 @@ function printThermalTicket(ticket, printWindow) {
                 }
                 body {
                     font-family: 'Courier New', monospace;
-                    font-size: 32px; /* Agrandi */
-                    font-weight: bold; /* Tout en gras */
+                    font-size: 32px;
+                    font-weight: bold;
                     width: 76mm;
                     margin: 0 auto;
                     padding: 4mm;
@@ -208,13 +203,13 @@ function printThermalTicket(ticket, printWindow) {
                 .header {
                     text-align: center !important;
                     border-bottom: 2px dashed #000;
-                    padding-bottom: 12px;
-                    margin-bottom: 12px;
+                    padding-bottom: 4px;
+                    margin-bottom: 4px;
                 }
                 .header img {
                     display: block !important;
-                    margin: 0 auto 10px auto !important;
-                    max-height: 350px; /* Logo encore plus grand */
+                    margin: 0 auto 5px auto !important;
+                    max-height: 350px;
                     max-width: 100%;
                 }
                 .header strong {
@@ -232,6 +227,10 @@ function printThermalTicket(ticket, printWindow) {
                 }
                 .info p {
                     margin: 5px 0;
+                    font-size: 20px;        /* Réduit pour tenir sur une ligne */
+                    white-space: nowrap;     /* Force une seule ligne */
+                    overflow: hidden;        /* Cache le débordement */
+                    text-overflow: ellipsis; /* Ajoute ... si nécessaire */
                 }
                 hr {
                     border: none;
@@ -243,6 +242,7 @@ function printThermalTicket(ticket, printWindow) {
                     justify-content: space-between;
                     margin: 5px 0;
                     font-weight: bold;
+                    font-size: 32px;         /* Taille normale pour les mises */
                 }
                 .total-row {
                     display: flex;
@@ -270,7 +270,6 @@ function printThermalTicket(ticket, printWindow) {
     `);
     printWindow.document.close();
 
-    // Attendre que le contenu soit complètement chargé avant d'imprimer
     printWindow.onload = function() {
         printWindow.focus();
         printWindow.print();
@@ -284,6 +283,11 @@ function generateTicketHTML(ticket) {
     const lotteryName = cfg.LOTTERY_NAME || cfg.name || 'LOTATO';
     const slogan = cfg.slogan || '';
     const logoUrl = cfg.LOTTERY_LOGO || cfg.logo || cfg.logoUrl || '';
+
+    // Format de la date : jj/mm/aaaa hh:mm (sans secondes)
+    const dateObj = new Date(ticket.date);
+    const formattedDate = dateObj.toLocaleDateString('fr-FR') + ' ' + 
+                          dateObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
     const betsHTML = (ticket.bets || []).map(b => {
         const gameAbbr = getGameAbbreviation(b.game || '');
@@ -305,7 +309,7 @@ function generateTicketHTML(ticket) {
         <div class="info">
             <p>Ticket #: ${ticket.ticket_id || ticket.id}</p>
             <p>Tiraj: ${ticket.draw_name || ticket.drawName || ''}</p>
-            <p>Date: ${new Date(ticket.date).toLocaleString('fr-FR')}</p>
+            <p>Date: ${formattedDate}</p>
             <p>Ajan: ${ticket.agent_name || ticket.agentName || ''}</p>
         </div>
 
