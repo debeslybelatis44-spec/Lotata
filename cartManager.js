@@ -1,6 +1,6 @@
 // cartManager.js complet
 // ==========================
-// cartManager.js (FINAL - ajustements supplémentaires)
+// cartManager.js (FINAL - avec abréviations, écritures grasses et agrandies)
 // ==========================
 
 // ---------- Utils ----------
@@ -98,6 +98,19 @@ var CartManager = {
     }
 };
 
+// ---------- Fonction d'abréviation des jeux ----------
+function getGameAbbreviation(gameName) {
+    const map = {
+        'borlette': 'Bor',
+        'lotto 3': 'Lot3',
+        'mariage spécial gratuit': 'Margr'
+        // Ajoutez d'autres correspondances ici
+    };
+    // Normaliser : minuscules, sans espaces superflus
+    const key = gameName.trim().toLowerCase();
+    return map[key] || gameName; // retourne l'abréviation ou le nom original si non trouvé
+}
+
 // ---------- Save & Print Ticket ----------
 async function processFinalTicket() {
     if (!APP_STATE.currentCart.length) {
@@ -174,7 +187,8 @@ function printThermalTicket(ticket) {
                 }
                 body {
                     font-family: 'Courier New', monospace;
-                    font-size: 30px; /* Texte général */
+                    font-size: 32px; /* Augmenté pour des écritures plus grandes */
+                    font-weight: bold; /* Tout le texte en gras */
                     width: 76mm;
                     margin: 0 auto;
                     padding: 4mm;
@@ -190,16 +204,17 @@ function printThermalTicket(ticket) {
                 .header img {
                     display: block !important;
                     margin: 0 auto 10px auto !important;
-                    max-height: 250px; /* Logo agrandi */
+                    max-height: 350px; /* Logo encore plus grand */
                     max-width: 100%;
                 }
                 .header strong {
                     display: block;
-                    font-size: 34px;
+                    font-size: 40px; /* Plus grand */
+                    font-weight: bold;
                 }
                 .header small {
                     display: block;
-                    font-size: 22px;
+                    font-size: 26px;
                     color: #555;
                 }
                 .info {
@@ -217,19 +232,24 @@ function printThermalTicket(ticket) {
                     display: flex;
                     justify-content: space-between;
                     margin: 5px 0;
+                    font-weight: bold;
                 }
                 .total-row {
                     display: flex;
                     justify-content: space-between;
                     font-weight: bold;
                     margin-top: 10px;
-                    font-size: 34px; /* Total */
+                    font-size: 36px; /* Total encore plus gros */
                 }
                 .footer {
                     text-align: center;
                     margin-top: 20px;
                     font-style: italic;
-                    font-size: 26px; /* Footer */
+                    font-size: 28px; /* Footer plus grand */
+                }
+                .footer p {
+                    font-weight: bold; /* Footer en gras */
+                    margin: 3px 0;
                 }
             </style>
         </head>
@@ -254,12 +274,13 @@ function generateTicketHTML(ticket) {
     const slogan = cfg.slogan || '';
     const logoUrl = cfg.LOTTERY_LOGO || cfg.logo || cfg.logoUrl || '';
 
-    // MODIFICATION : ajout de la mention (gratuit) pour les paris gratuits
+    // Utilisation de l'abréviation pour chaque pari
     const betsHTML = (ticket.bets || []).map(b => {
+        const gameAbbr = getGameAbbreviation(b.game || '');
         const freeLabel = b.free ? ' (gratuit)' : '';
         return `
             <div class="bet-row">
-                <span>${b.game?.toUpperCase() || ''} ${b.number || ''}${freeLabel}</span>
+                <span>${gameAbbr} ${b.number || ''}${freeLabel}</span>
                 <span>${b.amount || 0} G</span>
             </div>
         `;
@@ -290,6 +311,8 @@ function generateTicketHTML(ticket) {
 
         <div class="footer">
             <p>tickets valable jusqu'à 90 jours</p>
+            <p>Ref : +509 40 64 3557</p>
+            <p><strong>LOTATO S.A.</strong></p> <!-- Modifié avec S.A. et gras -->
         </div>
     `;
 }
