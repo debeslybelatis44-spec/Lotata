@@ -290,6 +290,39 @@ app.post('/api/tickets/save', async (req, res) => {
         }
       }
     }
+    // ===== AJOUT : Vérification des limites par type de jeu =====
+// Récupérer la configuration (limites de jeu)
+const configResult = await pool.query('SELECT game_limits FROM lottery_config LIMIT 1');
+let gameLimits = {};
+if (configResult.rows.length > 0 && configResult.rows[0].game_limits) {
+    const raw = configResult.rows[0].game_limits;
+    gameLimits = typeof raw === 'string' ? JSON.parse(raw) : raw;
+}
+
+// Calculer les totaux par type de jeu
+const totalsByGame = {};
+for (const bet of bets) {
+    const game = bet.game || bet.specialType;
+    let category = null;
+    if (game === 'lotto3' || game === 'auto_lotto3') category = 'lotto3';
+    else if (game === 'lotto4' || game === 'auto_lotto4') category = 'lotto4';
+    else if (game === 'lotto5' || game === 'auto_lotto5') category = 'lotto5';
+    else continue; // autres jeux non concernés
+
+    const amount = parseFloat(bet.amount) || 0;
+    totalsByGame[category] = (totalsByGame[category] || 0) + amount;
+}
+
+// Vérifier les limites
+for (const [category, total] of Object.entries(totalsByGame)) {
+    const limit = gameLimits[category] || 0; // 0 = illimité
+    if (limit > 0 && total > limit) {
+        return res.status(403).json({
+            error: `Limite de mise pour ${category} dépassée (max ${limit} Gdes par ticket)`
+        });
+    }
+}
+// ===== FIN AJOUT =====
 
     // ===== DÉBUT AJOUT : MARIAGES SPÉCIAUX GRATUITS =====
     function generateFreeMarriageBets() {
