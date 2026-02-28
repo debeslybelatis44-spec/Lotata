@@ -1,3 +1,4 @@
+// cartManager.js complet
 // ==========================
 // cartManager.js (FINAL - ajustements supplémentaires)
 // ==========================
@@ -253,12 +254,16 @@ function generateTicketHTML(ticket) {
     const slogan = cfg.slogan || '';
     const logoUrl = cfg.LOTTERY_LOGO || cfg.logo || cfg.logoUrl || '';
 
-    const betsHTML = (ticket.bets || []).map(b => `
-        <div class="bet-row">
-            <span>${b.game?.toUpperCase() || ''} ${b.number || ''}</span>
-            <span>${b.amount || 0} G</span>
-        </div>
-    `).join('');
+    // MODIFICATION : ajout de la mention (gratuit) pour les paris gratuits
+    const betsHTML = (ticket.bets || []).map(b => {
+        const freeLabel = b.free ? ' (gratuit)' : '';
+        return `
+            <div class="bet-row">
+                <span>${b.game?.toUpperCase() || ''} ${b.number || ''}${freeLabel}</span>
+                <span>${b.amount || 0} G</span>
+            </div>
+        `;
+    }).join('');
 
     return `
         <div class="header">
