@@ -1,5 +1,5 @@
 // ==========================
-// cartManager.js (MODIFIÉ - informations sur une ligne, date simplifiée)
+// cartManager.js (MODIFIÉ - abréviations loto & espace logo réduit)
 // ==========================
 
 // ---------- Utils ----------
@@ -98,13 +98,17 @@ var CartManager = {
     }
 };
 
-// ---------- Fonction d'abréviation des jeux ----------
+// ---------- Fonction d'abréviation des jeux (améliorée) ----------
 function getGameAbbreviation(gameName) {
     const map = {
         'borlette': 'Bor',
         'lotto 3': 'lot3',
         'lotto 4': 'lot4',
         'lotto 5': 'lot5',
+        // Ajout des orthographes avec un seul 't'
+        'loto 3': 'lot3',
+        'loto 4': 'lot4',
+        'loto 5': 'lot5',
         'mariage': 'mar',
         'mariage gratuit': 'marg',
         'mariage spécial gratuit': 'marg'
@@ -176,7 +180,7 @@ async function processFinalTicket() {
     }
 }
 
-// ---------- PRINT ----------
+// ---------- PRINT (avec espace logo/texte réduit) ----------
 function printThermalTicket(ticket, printWindow) {
     const html = generateTicketHTML(ticket);
 
@@ -203,12 +207,12 @@ function printThermalTicket(ticket, printWindow) {
                 .header {
                     text-align: center !important;
                     border-bottom: 2px dashed #000;
-                    padding-bottom: 4px;
+                    padding-bottom: 2px; /* Réduit de 4px à 2px */
                     margin-bottom: 4px;
                 }
                 .header img {
                     display: block !important;
-                    margin: 0 auto 5px auto !important;
+                    margin: 0 auto 0 auto !important; /* margin-bottom passé de 5px à 0 */
                     max-height: 350px;
                     max-width: 100%;
                 }
@@ -216,21 +220,23 @@ function printThermalTicket(ticket, printWindow) {
                     display: block;
                     font-size: 40px;
                     font-weight: bold;
+                    margin: 0; /* Supprime les marges par défaut */
                 }
                 .header small {
                     display: block;
                     font-size: 26px;
                     color: #555;
+                    margin: 0; /* Supprime les marges par défaut */
                 }
                 .info {
                     margin: 10px 0;
                 }
                 .info p {
                     margin: 5px 0;
-                    font-size: 20px;        /* Réduit pour tenir sur une ligne */
-                    white-space: nowrap;     /* Force une seule ligne */
-                    overflow: hidden;        /* Cache le débordement */
-                    text-overflow: ellipsis; /* Ajoute ... si nécessaire */
+                    font-size: 20px;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
                 }
                 hr {
                     border: none;
@@ -242,7 +248,7 @@ function printThermalTicket(ticket, printWindow) {
                     justify-content: space-between;
                     margin: 5px 0;
                     font-weight: bold;
-                    font-size: 32px;         /* Taille normale pour les mises */
+                    font-size: 32px;
                 }
                 .total-row {
                     display: flex;
