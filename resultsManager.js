@@ -1,4 +1,4 @@
-// resultsManager.js - Version stable utilisant APP_STATE.winningResults
+// resultsManager.js - Version corrigée pour afficher les résultats depuis la BDD
 (function() {
     if (window.resultsManagerReady) return;
     window.resultsManagerReady = true;
@@ -36,13 +36,10 @@
             tab.innerHTML = '<i class="fas fa-calendar-alt"></i><span>Résultats</span>';
             tab.addEventListener('click', function(e) {
                 e.preventDefault();
-                // Désactiver les autres écrans et onglets
                 document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
                 document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-                // Activer l'écran results et cet onglet
                 document.getElementById('results-screen').classList.add('active');
                 this.classList.add('active');
-                // Afficher les résultats
                 renderResults();
             });
             nav.appendChild(tab);
@@ -83,7 +80,7 @@
         const container = document.getElementById('results-container');
         if (!container) return;
 
-        // Récupérer les données depuis APP_STATE
+        // Récupérer les données depuis APP_STATE (peuplé par APIService.getWinningResults)
         const results = window.APP_STATE?.winningResults || [];
         
         if (results.length === 0) {
@@ -91,7 +88,7 @@
             return;
         }
 
-        // Filtrer selon la période
+        // Filtrer selon la période en utilisant published_at
         const now = new Date();
         const todayStr = now.toDateString();
         const yesterday = new Date(now);
@@ -102,11 +99,11 @@
 
         let filtered = results;
         if (filter === 'today') {
-            filtered = results.filter(r => new Date(r.date).toDateString() === todayStr);
+            filtered = results.filter(r => new Date(r.published_at).toDateString() === todayStr);
         } else if (filter === 'yesterday') {
-            filtered = results.filter(r => new Date(r.date).toDateString() === yesterdayStr);
+            filtered = results.filter(r => new Date(r.published_at).toDateString() === yesterdayStr);
         } else if (filter === 'week') {
-            filtered = results.filter(r => new Date(r.date) >= weekAgo);
+            filtered = results.filter(r => new Date(r.published_at) >= weekAgo);
         }
 
         if (filtered.length === 0) {
@@ -114,10 +111,12 @@
             return;
         }
 
-        // Grouper par jour
+        // Grouper par jour (toujours avec published_at)
         const grouped = {};
         filtered.forEach(r => {
-            const day = new Date(r.date).toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            const day = new Date(r.published_at).toLocaleDateString('fr-FR', { 
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+            });
             if (!grouped[day]) grouped[day] = [];
             grouped[day].push(r);
         });
@@ -129,14 +128,21 @@
         sortedDays.forEach(day => {
             html += `<div class="result-day-group"><h3>${day}</h3>`;
             grouped[day].forEach(r => {
-                const time = new Date(r.date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+                const time = new Date(r.published_at).toLocaleTimeString('fr-FR', { 
+                    hour: '2-digit', minute: '2-digit' 
+                });
+                // Formatage des numéros : r.numbers est un tableau (ex: ['45','67','89'])
+                let numbersDisplay = '—';
+                if (r.numbers) {
+                    numbersDisplay = Array.isArray(r.numbers) ? r.numbers.join(' - ') : r.numbers;
+                }
                 html += `
                     <div class="result-draw-row">
                         <div class="draw-info">
-                            <span class="draw-name">${r.drawName || 'Tirage'}</span>
+                            <span class="draw-name">${r.name || 'Tirage'}</span>
                             <span class="draw-time">${time}</span>
                         </div>
-                        <span class="result-numbers">${r.winningNumbers || '—'}</span>
+                        <span class="result-numbers">${numbersDisplay}</span>
                     </div>
                 `;
             });
