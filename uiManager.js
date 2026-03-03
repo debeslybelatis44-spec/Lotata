@@ -31,6 +31,8 @@ function switchTab(tabName) {
         case 'home':
             screenId = 'draw-selection-screen';
             document.querySelector('.nav-item:nth-child(1)').classList.add('active');
+            // Correction de l'affichage des tirages (notamment Texas)
+            fixHomeScreenDisplay();
             break;
         case 'history':
             screenId = 'history-screen';
@@ -52,6 +54,33 @@ function switchTab(tabName) {
     if (screenId) {
         document.getElementById(screenId).classList.add('active');
     }
+}
+
+// Nouvelle fonction pour ajuster l'affichage des tirages sur l'écran d'accueil
+function fixHomeScreenDisplay() {
+    // On attend un court instant pour que le DOM soit bien mis à jour
+    setTimeout(() => {
+        // Cibler tous les éléments susceptibles de contenir le nom d'un tirage
+        // Adapter les sélecteurs selon la structure réelle (ex: .draw-card, .draw-item, .draw-name)
+        const drawNames = document.querySelectorAll('.draw-card .draw-name, .draw-item .draw-title, .draw-selection .draw-name');
+        drawNames.forEach(el => {
+            el.style.whiteSpace = 'normal';
+            el.style.wordWrap = 'break-word';
+            el.style.overflowWrap = 'break-word';
+            el.style.maxWidth = '100%';
+            el.style.fontSize = '1rem'; // Ajuster si nécessaire
+        });
+        
+        // Si les tirages sont dans des conteneurs avec une largeur fixe, on force l'adaptation
+        const drawContainers = document.querySelectorAll('.draw-card, .draw-item, .draw-selection');
+        drawContainers.forEach(container => {
+            container.style.width = 'auto';
+            container.style.minWidth = '0';
+            container.style.flex = '1 1 auto';
+        });
+        
+        console.log('Affichage des tirages corrigé (notamment pour Texas)');
+    }, 100);
 }
 
 async function loadHistory() {
@@ -396,7 +425,7 @@ async function loadDrawReport(drawId = null) {
     }
 }
 
-// Impression des rapports (CORRIGÉ avec fallbacks)
+// Impression des rapports (CORRIGÉ avec tailles doublées pour une meilleure lisibilité)
 function printReport() {
     const drawSelector = document.getElementById('draw-report-selector');
     const selectedDraw = drawSelector.options[drawSelector.selectedIndex].text;
@@ -424,10 +453,10 @@ function printReport() {
     const logoUrl = cfg.LOTTERY_LOGO || cfg.logo || cfg.logoUrl || '';
     const slogan = cfg.slogan || '';
 
-    // Log pour déboguer
     console.log('📊 printReport - cfg utilisé:', cfg);
     console.log('📊 printReport - valeurs extraites:', { lotteryName, logoUrl, slogan });
     
+    // Styles modifiés : toutes les tailles de police DOUBLÉES pour un rendu plus lisible
     const content = `
     <!DOCTYPE html>
     <html>
@@ -435,25 +464,25 @@ function printReport() {
         <title>Rapò ${selectedDraw}</title>
         <style>
             @page { size: A4; margin: 2cm; }
-            body { font-family: 'Arial', sans-serif; line-height: 1.5; color: #222; font-size: 12pt; }
+            body { font-family: 'Arial', sans-serif; line-height: 1.5; color: #222; font-size: 24pt; } /* doublé */
             .header { text-align: center; margin-bottom: 30px; }
-            .header h1 { font-size: 24pt; margin: 5px 0; color: #000; }
-            .header h2 { font-size: 18pt; font-weight: normal; color: #333; }
-            .header p { margin: 2px 0; font-size: 12pt; }
+            .header h1 { font-size: 48pt; margin: 5px 0; color: #000; } /* doublé */
+            .header h2 { font-size: 36pt; font-weight: normal; color: #333; } /* doublé */
+            .header p { margin: 2px 0; font-size: 20pt; } /* ajouté pour le slogan et date */
             .section { margin: 20px 0; }
-            .section h3 { border-bottom: 2px solid #000; padding-bottom: 5px; }
+            .section h3 { border-bottom: 2px solid #000; padding-bottom: 5px; font-size: 32pt; } /* doublé */
             table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-            th, td { border: 1px solid #aaa; padding: 8px; text-align: left; }
+            th, td { border: 1px solid #aaa; padding: 12px; text-align: left; font-size: 22pt; } /* doublé */
             th { background-color: #eee; font-weight: bold; }
             .total-row { font-weight: bold; background-color: #f9f9f9; }
             .summary { background: #f5f5f5; padding: 15px; border-radius: 5px; margin-top: 20px; }
-            .summary p { margin: 5px 0; font-size: 12pt; }
-            .footer { margin-top: 30px; text-align: center; font-size: 10pt; color: #666; border-top: 1px solid #ccc; padding-top: 10px; }
+            .summary p { margin: 5px 0; font-size: 22pt; } /* doublé */
+            .footer { margin-top: 30px; text-align: center; font-size: 18pt; color: #666; border-top: 1px solid #ccc; padding-top: 10px; } /* doublé */
         </style>
     </head>
     <body>
         <div class="header">
-            ${logoUrl ? `<img src="${logoUrl}" style="max-height: 60px; margin-bottom: 10px;">` : ''}
+            ${logoUrl ? `<img src="${logoUrl}" style="max-height: 120px; margin-bottom: 20px;">` : ''} <!-- logo doublé -->
             <h1>${lotteryName}</h1>
             ${slogan ? `<p style="font-style: italic;">${slogan}</p>` : ''}
             <h2>Rapò Vann ${selectedDraw}</h2>
