@@ -1,14 +1,12 @@
-// resultsManager.js - Version corrigée avec appel API autonome
+// resultsManager.js - Version corrigée avec appel API autonome et affichage du Lotto 3 complet
 (function() {
     if (window.resultsManagerReady) return;
     window.resultsManagerReady = true;
 
-    // État interne du filtre actif
     let currentFilter = 'all';
 
     // ==================== Création de l'UI si absente ====================
     function createResultsUI() {
-        // 1. Écran des résultats
         if (!document.getElementById('results-screen')) {
             const main = document.querySelector('.content-area');
             if (!main) {
@@ -33,7 +31,6 @@
             main.appendChild(screen);
         }
 
-        // 2. Onglet dans la navigation
         const nav = document.querySelector('.nav-bar');
         if (nav && !document.querySelector('.nav-item[data-tab="results"]')) {
             const tab = document.createElement('a');
@@ -47,12 +44,11 @@
                 document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
                 document.getElementById('results-screen').classList.add('active');
                 this.classList.add('active');
-                fetchResults(currentFilter); // recharge au besoin
+                fetchResults(currentFilter);
             });
             nav.appendChild(tab);
         }
 
-        // 3. Styles spécifiques (si pas déjà présents)
         if (!document.getElementById('results-styles')) {
             const style = document.createElement('style');
             style.id = 'results-styles';
@@ -77,9 +73,7 @@
     async function fetchResults(filter = 'all') {
         const container = document.getElementById('results-container');
         if (!container) return;
-
-        // Afficher un indicateur de chargement
-        container.innerHTML = '<div class="no-result">Chargement des résultats...</div>';
+        container.innerHTML = '<div class="no-result">Chargement...</div>';
 
         try {
             const token = localStorage.getItem('auth_token');
@@ -102,11 +96,9 @@
             }
 
             const data = await res.json();
-            // Stocker dans un état global (optionnel mais pratique)
             window.APP_STATE = window.APP_STATE || {};
             window.APP_STATE.winningResults = data.results || [];
 
-            // Mettre à jour le filtre courant et afficher
             currentFilter = filter;
             renderResults(filter);
         } catch (error) {
@@ -149,7 +141,7 @@
             return;
         }
 
-        // Grouper par jour (en utilisant published_at)
+        // Grouper par jour
         const grouped = {};
         filtered.forEach(r => {
             const day = new Date(r.published_at).toLocaleDateString('fr-FR', {
@@ -159,7 +151,6 @@
             grouped[day].push(r);
         });
 
-        // Trier les jours du plus récent au plus ancien
         const sortedDays = Object.keys(grouped).sort((a, b) => new Date(b) - new Date(a));
 
         let html = '';
@@ -169,11 +160,17 @@
                 const time = new Date(r.published_at).toLocaleTimeString('fr-FR', {
                     hour: '2-digit', minute: '2-digit'
                 });
-                // Formatage des numéros : r.numbers est un tableau
+
+                // Formatage des numéros : utilisation de lotto3 pour le premier nombre
                 let numbersDisplay = '—';
-                if (r.numbers) {
+                if (r.lotto3) {
+                    // Nouveau format : Lotto 3 complet (3 chiffres) suivi des deux autres lots (2 chiffres)
+                    numbersDisplay = `${r.lotto3}  |  ${r.numbers[1]}  |  ${r.numbers[2]}`;
+                } else if (r.numbers) {
+                    // Anciens résultats (sans lotto3)
                     numbersDisplay = Array.isArray(r.numbers) ? r.numbers.join(' - ') : r.numbers;
                 }
+
                 html += `
                     <div class="result-draw-row">
                         <div class="draw-info">
@@ -194,7 +191,6 @@
     function init() {
         createResultsUI();
 
-        // Attacher les événements aux boutons de filtre
         const filterContainer = document.querySelector('.results-filter');
         if (filterContainer) {
             filterContainer.addEventListener('click', (e) => {
@@ -203,16 +199,13 @@
                 const filter = btn.dataset.filter;
                 if (!filter) return;
 
-                // Mettre à jour la classe active
                 document.querySelectorAll('.results-filter .chip').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
 
-                // Recharger avec le nouveau filtre
                 fetchResults(filter);
             });
         }
 
-        // Premier chargement (seulement si l'écran est actif ? on charge toujours pour préparer)
         fetchResults('all');
     }
 
