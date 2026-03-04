@@ -31,7 +31,6 @@ function switchTab(tabName) {
         case 'home':
             screenId = 'draw-selection-screen';
             document.querySelector('.nav-item:nth-child(1)').classList.add('active');
-            // Correction de l'affichage des tirages (notamment Texas)
             fixHomeScreenDisplay();
             break;
         case 'history':
@@ -56,22 +55,17 @@ function switchTab(tabName) {
     }
 }
 
-// Nouvelle fonction pour ajuster l'affichage des tirages sur l'écran d'accueil
 function fixHomeScreenDisplay() {
-    // On attend un court instant pour que le DOM soit bien mis à jour
     setTimeout(() => {
-        // Cibler tous les éléments susceptibles de contenir le nom d'un tirage
-        // Adapter les sélecteurs selon la structure réelle (ex: .draw-card, .draw-item, .draw-name)
         const drawNames = document.querySelectorAll('.draw-card .draw-name, .draw-item .draw-title, .draw-selection .draw-name');
         drawNames.forEach(el => {
             el.style.whiteSpace = 'normal';
             el.style.wordWrap = 'break-word';
             el.style.overflowWrap = 'break-word';
             el.style.maxWidth = '100%';
-            el.style.fontSize = '1rem'; // Ajuster si nécessaire
+            el.style.fontSize = '1rem';
         });
         
-        // Si les tirages sont dans des conteneurs avec une largeur fixe, on force l'adaptation
         const drawContainers = document.querySelectorAll('.draw-card, .draw-item, .draw-selection');
         drawContainers.forEach(container => {
             container.style.width = 'auto';
@@ -274,7 +268,6 @@ function editTicket(ticketId) {
     alert(`Tikè #${ticket.ticket_id || ticket.id} charge nan panye. Ou kapab modifye l.`);
 }
 
-// Réimpression d'un ticket depuis l'historique
 function reprintTicket(ticketId) {
     const ticket = APP_STATE.ticketsHistory.find(t => t.id === ticketId || t.ticket_id === ticketId);
     if (!ticket) {
@@ -425,7 +418,7 @@ async function loadDrawReport(drawId = null) {
     }
 }
 
-// Impression des rapports (version améliorée)
+// Impression des rapports (version ultra-compacte et lisible)
 function printReport() {
     const drawSelector = document.getElementById('draw-report-selector');
     const selectedDraw = drawSelector.options[drawSelector.selectedIndex].text;
@@ -453,118 +446,108 @@ function printReport() {
     const logoUrl = cfg.LOTTERY_LOGO || cfg.logo || cfg.logoUrl || '';
     const slogan = cfg.slogan || '';
 
-    // Construction du contenu HTML du rapport
     const content = `
     <!DOCTYPE html>
     <html>
     <head>
         <title>Rapò ${selectedDraw}</title>
         <style>
-            /* Styles pour l'impression A4 */
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
             @page {
                 size: A4;
-                margin: 1.5cm;
+                margin: 0.5cm;
             }
             body {
                 font-family: 'Arial', sans-serif;
-                line-height: 1.4;
+                font-size: 18pt;
+                line-height: 1.2;
                 color: #000;
                 background: #fff;
-                font-size: 12pt;
-                margin: 0;
-                padding: 0;
+                padding: 0.5cm;
             }
             .header {
                 text-align: center;
-                margin-bottom: 20px;
+                margin-bottom: 15px;
                 border-bottom: 2px solid #333;
-                padding-bottom: 10px;
+                padding-bottom: 5px;
             }
             .header h1 {
-                font-size: 24pt;
+                font-size: 32pt;
                 margin: 5px 0;
-                color: #000;
             }
             .header h2 {
-                font-size: 18pt;
+                font-size: 26pt;
                 font-weight: normal;
-                color: #333;
-                margin: 5px 0;
+                margin: 3px 0;
             }
             .header p {
+                font-size: 16pt;
                 margin: 2px 0;
-                font-size: 11pt;
-                color: #555;
             }
             .header img {
-                max-height: 80px;
-                margin-bottom: 10px;
+                max-height: 100px;
+                margin-bottom: 5px;
             }
             .section {
-                margin: 20px 0;
+                margin: 15px 0;
             }
             .section h3 {
+                font-size: 24pt;
                 border-bottom: 1px solid #aaa;
-                padding-bottom: 5px;
-                font-size: 16pt;
-                margin-bottom: 15px;
+                padding-bottom: 3px;
+                margin-bottom: 10px;
             }
             table {
                 width: 100%;
                 border-collapse: collapse;
-                margin: 15px 0;
-                font-size: 11pt;
+                font-size: 16pt;
+                margin: 10px 0;
             }
             th, td {
-                border: 1px solid #aaa;
-                padding: 8px;
+                border: 1px solid #333;
+                padding: 6px 4px;
                 text-align: left;
             }
             th {
-                background-color: #f0f0f0;
+                background-color: #eee;
                 font-weight: bold;
-            }
-            .total-row {
-                font-weight: bold;
-                background-color: #f9f9f9;
             }
             .summary {
-                background: #f5f5f5;
-                padding: 15px;
-                border-radius: 5px;
-                margin-top: 20px;
                 display: flex;
                 flex-wrap: wrap;
                 justify-content: space-between;
+                margin: 10px 0;
             }
             .summary-item {
-                flex: 1 1 200px;
-                margin: 5px;
-                padding: 10px;
-                background: #fff;
+                flex: 1 1 180px;
+                background: #f5f5f5;
+                padding: 8px;
+                margin: 3px;
                 border-radius: 4px;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                font-size: 16pt;
             }
             .summary-item strong {
                 display: block;
-                font-size: 14pt;
-                color: #000;
+                font-size: 18pt;
             }
             .summary-item span {
-                font-size: 18pt;
+                font-size: 22pt;
                 font-weight: bold;
-                color: #007bff;
+                color: #0066cc;
             }
+            .profit { color: #008800; }
+            .loss { color: #cc0000; }
             .footer {
-                margin-top: 30px;
+                margin-top: 20px;
                 text-align: center;
-                font-size: 10pt;
-                color: #666;
+                font-size: 14pt;
                 border-top: 1px solid #ccc;
-                padding-top: 10px;
+                padding-top: 5px;
             }
-            .profit { color: #28a745; }
-            .loss { color: #dc3545; }
         </style>
     </head>
     <body>
@@ -573,90 +556,59 @@ function printReport() {
             <h1>${lotteryName}</h1>
             ${slogan ? `<p>${slogan}</p>` : ''}
             <h2>Rapò Vann ${selectedDraw}</h2>
-            <p>Dat: ${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR')}</p>
-            <p>Ajan: ${APP_STATE.agentName}</p>
+            <p>${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR')} - Ajan: ${APP_STATE.agentName}</p>
         </div>
-        
+
         <div class="section">
             <h3>Rekapitilatif</h3>
             <div class="summary">
-                <div class="summary-item">
-                    <strong>Total Tikè</strong>
-                    <span>${totalTickets}</span>
-                </div>
-                <div class="summary-item">
-                    <strong>Total Paris</strong>
-                    <span>${totalBets.toLocaleString('fr-FR')} G</span>
-                </div>
-                <div class="summary-item">
-                    <strong>Total Ganyen</strong>
-                    <span class="profit">${totalWins.toLocaleString('fr-FR')} G</span>
-                </div>
-                <div class="summary-item">
-                    <strong>Pèdi</strong>
-                    <span class="loss">${totalLoss.toLocaleString('fr-FR')} G</span>
-                </div>
-                <div class="summary-item">
-                    <strong>Balans</strong>
-                    <span class="${balance >= 0 ? 'profit' : 'loss'}">${balance.toLocaleString('fr-FR')} G</span>
-                </div>
+                <div class="summary-item"><strong>Tikè</strong><span>${totalTickets}</span></div>
+                <div class="summary-item"><strong>Paris</strong><span>${totalBets.toLocaleString('fr-FR')} G</span></div>
+                <div class="summary-item"><strong>Ganyen</strong><span class="profit">${totalWins.toLocaleString('fr-FR')} G</span></div>
+                <div class="summary-item"><strong>Pèdi</strong><span class="loss">${totalLoss.toLocaleString('fr-FR')} G</span></div>
+                <div class="summary-item"><strong>Balans</strong><span class="${balance >= 0 ? 'profit' : 'loss'}">${balance.toLocaleString('fr-FR')} G</span></div>
             </div>
         </div>
-        
+
         <div class="section">
             <h3>Detay Tikè</h3>
             <table>
                 <thead>
-                    <tr>
-                        <th>N° Tikè</th>
-                        <th>Tiraj</th>
-                        <th>Lè</th>
-                        <th>Montan</th>
-                        <th>Ganyen</th>
-                    </tr>
+                    <tr><th>N°</th><th>Tiraj</th><th>Lè</th><th>Montan</th><th>Ganyen</th></tr>
                 </thead>
                 <tbody>
                     ${tickets.map(t => {
-                        const winAmount = parseFloat(t.win_amount || t.winAmount || t.prize_amount || 0);
-                        const totalAmount = parseFloat(t.total_amount || t.totalAmount || t.amount || 0);
-                        return `
-                        <tr>
+                        const win = parseFloat(t.win_amount || t.winAmount || t.prize_amount || 0);
+                        const montant = parseFloat(t.total_amount || t.totalAmount || t.amount || 0);
+                        return `<tr>
                             <td>${t.ticket_id || t.id}</td>
                             <td>${t.draw_name || t.drawName || ''}</td>
                             <td>${new Date(t.date).toLocaleTimeString('fr-FR')}</td>
-                            <td>${totalAmount.toLocaleString('fr-FR')} G</td>
-                            <td class="${winAmount > 0 ? 'profit' : ''}">${winAmount > 0 ? winAmount.toLocaleString('fr-FR') + ' G' : '-'}</td>
-                        </tr>
-                    `}).join('')}
+                            <td>${montant.toLocaleString('fr-FR')} G</td>
+                            <td class="${win > 0 ? 'profit' : ''}">${win > 0 ? win.toLocaleString('fr-FR') + ' G' : '-'}</td>
+                        </tr>`;
+                    }).join('')}
                 </tbody>
             </table>
         </div>
-        
+
         <div class="footer">
             <p>Rapò jenere le: ${new Date().toLocaleString('fr-FR')}</p>
-            <p>© ${lotteryName} - Tout dwa rezève</p>
+            <p>© ${lotteryName}</p>
         </div>
     </body>
     </html>
     `;
-    
-    // Ouvrir une nouvelle fenêtre pour l'impression
+
     const printWindow = window.open('', '_blank', 'width=800,height=600,scrollbars=yes');
     if (!printWindow) {
         alert("Veuillez autoriser les pop-ups pour imprimer le rapport.");
         return;
     }
-    
     printWindow.document.write(content);
     printWindow.document.close();
     printWindow.focus();
-    
-    // Déclencher l'impression après le chargement complet
-    printWindow.onload = function() {
-        printWindow.print();
-        // Optionnel : fermer la fenêtre après impression (laisser à l'utilisateur le choix)
-        // printWindow.onafterprint = function() { printWindow.close(); };
-    };
+    printWindow.onload = () => printWindow.print();
 }
 
 async function loadWinners() {
@@ -919,14 +871,12 @@ async function loadLotteryConfig() {
         if (config) {
             APP_STATE.lotteryConfig = config;
 
-            // Mettre à jour CONFIG avec toutes les propriétés (pour compatibilité)
             CONFIG.LOTTERY_NAME = config.name || 'LOTATO';
             CONFIG.LOTTERY_LOGO = config.logo || config.logoUrl || '';
             CONFIG.slogan = config.slogan || '';
             CONFIG.LOTTERY_ADDRESS = config.address || '';
             CONFIG.LOTTERY_PHONE = config.phone || '';
 
-            // Mettre à jour l'affichage
             document.getElementById('lottery-name').innerHTML = `${config.name} <span class="pro-badge">version 6</span>`;
             const sloganEl = document.getElementById('lottery-slogan');
             if (sloganEl) sloganEl.textContent = config.slogan || '';

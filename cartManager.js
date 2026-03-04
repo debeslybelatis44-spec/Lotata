@@ -20,8 +20,6 @@ var CartManager = {
 
         const numInput = document.getElementById('num-input');
         const amtInput = document.getElementById('amt-input');
-
-        let num = numInput.value.trim();
         const amt = parseFloat(amtInput.value);
 
         if (isNaN(amt) || amt <= 0) {
@@ -29,7 +27,43 @@ var CartManager = {
             return;
         }
 
-        if (!GameEngine.validateEntry(APP_STATE.selectedGame, num)) {
+        const game = APP_STATE.selectedGame;
+
+        // === GESTION DES JEUX AUTOMATIQUES ===
+        const autoGames = ['auto_marriage', 'auto_lotto4', 'auto_lotto5', 'bo', 'grap'];
+        if (autoGames.includes(game) || game.startsWith('n')) {
+            let generatedBets = [];
+
+            if (game === 'auto_marriage') {
+                generatedBets = GameEngine.generateAutoMarriageBets(amt);
+            } else if (game === 'auto_lotto4') {
+                generatedBets = GameEngine.generateAutoLotto4Bets(amt);
+            } else if (game === 'auto_lotto5') {
+                generatedBets = GameEngine.generateAutoLotto5Bets(amt);
+            } else if (game === 'bo') {
+                generatedBets = SpecialGames.generateBOBets(amt);
+            } else if (game === 'grap') {
+                generatedBets = SpecialGames.generateGRAPBets(amt);
+            } else if (game.startsWith('n')) {
+                const digit = game.slice(1);
+                generatedBets = SpecialGames.generateNBets(digit, amt);
+            }
+
+            // Ajouter tous les paris générés au panier
+            generatedBets.forEach(bet => {
+                APP_STATE.currentCart.push(bet);
+            });
+
+            this.renderCart();
+            numInput.value = '';
+            amtInput.value = '';
+            return;
+        }
+
+        // === TRAITEMENT NORMAL (jeux manuels) ===
+        let num = numInput.value.trim();
+
+        if (!GameEngine.validateEntry(game, num)) {
             alert("Nimewo pa valid");
             return;
         }
@@ -50,7 +84,7 @@ var CartManager = {
         draws.forEach(drawId => {
             APP_STATE.currentCart.push({
                 id: Date.now() + Math.random(),
-                game: APP_STATE.selectedGame,
+                game: game,
                 number: num,
                 cleanNumber: num,
                 amount: amt,
@@ -120,7 +154,6 @@ function getGameAbbreviation(gameName) {
         'mariage': 'mar',
         'mariage gratuit': 'marg',
         'mariage spécial gratuit': 'marg',
-        // AJOUT : mariage automatique
         'auto_marriage': 'mar'
     };
     const key = (gameName || '').trim().toLowerCase();
@@ -218,13 +251,13 @@ function printThermalTicket(ticket, printWindow) {
                     text-align: center !important;
                     border-bottom: 2px dashed #000;
                     padding: 0 !important;
-                    margin: 0 0 2px 0 !important; /* très petite marge après le header */
-                    line-height: 1; /* supprime l'interligne superflu */
+                    margin: 0 0 2px 0 !important;
+                    line-height: 1;
                 }
                 .header img {
                     display: block !important;
                     margin: 0 auto !important;
-                    vertical-align: bottom !important; /* évite l'espace sous l'image */
+                    vertical-align: bottom !important;
                     max-height: 350px;
                     max-width: 100%;
                 }
@@ -304,7 +337,6 @@ function generateTicketHTML(ticket) {
     const slogan = cfg.slogan || '';
     const logoUrl = cfg.LOTTERY_LOGO || cfg.logo || cfg.logoUrl || '';
 
-    // Format de la date : jj/mm/aaaa hh:mm
     const dateObj = new Date(ticket.date);
     const formattedDate = dateObj.toLocaleDateString('fr-FR') + ' ' + 
                           dateObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
