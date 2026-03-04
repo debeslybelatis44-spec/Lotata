@@ -1,5 +1,5 @@
 // ==========================
-// cartManager.js (avec gestion des jeux automatiques, abréviations courtes, n0/n1/n2, mariages gratuits)
+// cartManager.js (avec gestion des jeux automatiques et abréviations courtes)
 // ==========================
 
 // ---------- Utils ----------
@@ -7,42 +7,6 @@ function isNumberBlocked(number, drawId) {
     if (APP_STATE.globalBlockedNumbers.includes(number)) return true;
     const drawBlocked = APP_STATE.drawBlockedNumbers[drawId] || [];
     return drawBlocked.includes(number);
-}
-
-// Génère les nombres pour les touches n0, n1, n2... (ex: n2 → 02,12,32,42,52,62,72,82,92)
-function generateNumbersForN(digit) {
-    const numbers = [];
-    for (let tens = 0; tens <= 9; tens++) {
-        if (tens === digit) continue; // exclut le double (22, 33, etc.)
-        numbers.push(`${tens}${digit}`);
-    }
-    return numbers;
-}
-
-// Crée les paris gratuits (mariage) en fonction du montant joué
-function createFreeMarriageBets(amount, drawId, drawName) {
-    let count = 0;
-    if (amount >= 1 && amount < 100) count = 1;
-    else if (amount >= 100 && amount < 500) count = 2;
-    else if (amount >= 500) count = 3;
-    else return [];
-
-    const freeBets = [];
-    for (let i = 0; i < count; i++) {
-        freeBets.push({
-            id: Date.now() + Math.random() + i,
-            game: 'mariage',
-            number: 'GRATUIT',
-            cleanNumber: 'GRATUIT',
-            amount: 0,
-            free: true,
-            freeType: 'special_marriage',
-            drawId: drawId,
-            drawName: drawName,
-            timestamp: new Date().toISOString()
-        });
-    }
-    return freeBets;
 }
 
 // ---------- Cart Manager ----------
@@ -65,7 +29,7 @@ var CartManager = {
 
         const game = APP_STATE.selectedGame;
 
-        // --- Gestion des jeux automatiques existants ---
+        // --- Gestion des jeux automatiques ---
         if (game === 'auto_marriage' || game === 'bo' || game === 'grap' || game === 'auto_lotto4' || game === 'auto_lotto5') {
             let autoBets = [];
             switch (game) {
@@ -91,91 +55,31 @@ var CartManager = {
                 return;
             }
 
+            // Récupérer les tirages sélectionnés
             const draws = APP_STATE.multiDrawMode
                 ? APP_STATE.selectedDraws
                 : [APP_STATE.selectedDraw];
 
+            // Pour chaque tirage, ajouter une copie de chaque pari
             draws.forEach(drawId => {
                 const drawName = CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId;
                 autoBets.forEach(bet => {
-                    const newBet = {
+                    APP_STATE.currentCart.push({
                         ...bet,
-                        id: Date.now() + Math.random(),
+                        id: Date.now() + Math.random(), // nouvel ID unique
                         drawId: drawId,
                         drawName: drawName
-                    };
-                    APP_STATE.currentCart.push(newBet);
-                    // Ajout des mariages gratuits pour ce pari automatique
-                    const freeBets = createFreeMarriageBets(bet.amount, drawId, drawName);
-                    freeBets.forEach(fb => APP_STATE.currentCart.push(fb));
+                    });
                 });
             });
 
             this.renderCart();
-            amtInput.value = '';
-            return;
-        }
-
-        // --- Gestion des touches n0, n1, n2 ... (uniquement pour borlette) ---
-        const numRaw = numInput.value.trim();
-        const nMatch = numRaw.match(/^n([0-9])$/i);
-        if (nMatch) {
-            // Vérifier que le jeu sélectionné est bien borlette
-            if (game !== 'borlette') {
-                alert("Touche nX disponible seulement pou borlette");
-                return;
-            }
-
-            const digit = parseInt(nMatch[1], 10);
-            const numbers = generateNumbersForN(digit);
-            if (numbers.length === 0) {
-                alert("Pa gen nimewo pou sa");
-                return;
-            }
-
-            const draws = APP_STATE.multiDrawMode
-                ? APP_STATE.selectedDraws
-                : [APP_STATE.selectedDraw];
-
-            // Vérification de blocage pour tous les numéros
-            for (const drawId of draws) {
-                for (const num of numbers) {
-                    if (isNumberBlocked(num, drawId)) {
-                        alert(`Nimewo ${num} bloke`);
-                        return;
-                    }
-                }
-            }
-
-            // Ajout des paris
-            draws.forEach(drawId => {
-                const drawName = CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId;
-                numbers.forEach(num => {
-                    const bet = {
-                        id: Date.now() + Math.random(),
-                        game: game,
-                        number: num,
-                        cleanNumber: num,
-                        amount: amt,
-                        drawId: drawId,
-                        drawName: drawName,
-                        timestamp: new Date().toISOString()
-                    };
-                    APP_STATE.currentCart.push(bet);
-                    // Mariages gratuits pour ce pari
-                    const freeBets = createFreeMarriageBets(amt, drawId, drawName);
-                    freeBets.forEach(fb => APP_STATE.currentCart.push(fb));
-                });
-            });
-
-            this.renderCart();
-            numInput.value = '';
             amtInput.value = '';
             return;
         }
 
         // --- Gestion des jeux normaux (saisie manuelle) ---
-        let num = numRaw;
+        let num = numInput.value.trim();
 
         if (!GameEngine.validateEntry(game, num)) {
             alert("Nimewo pa valid");
@@ -196,34 +100,27 @@ var CartManager = {
         }
 
         draws.forEach(drawId => {
-            const drawName = CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId;
             // Pour les jeux Lotto 4/5 avec options multiples
             if (game === 'lotto4' || game === 'lotto5') {
                 const optionBets = GameEngine.generateLottoBetsWithOptions(game, num, amt);
                 optionBets.forEach(bet => {
-                    const fullBet = {
+                    APP_STATE.currentCart.push({
                         ...bet,
                         drawId: drawId,
-                        drawName: drawName
-                    };
-                    APP_STATE.currentCart.push(fullBet);
-                    const freeBets = createFreeMarriageBets(bet.amount, drawId, drawName);
-                    freeBets.forEach(fb => APP_STATE.currentCart.push(fb));
+                        drawName: CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId
+                    });
                 });
             } else {
-                const bet = {
+                APP_STATE.currentCart.push({
                     id: Date.now() + Math.random(),
                     game: game,
                     number: num,
                     cleanNumber: num,
                     amount: amt,
                     drawId: drawId,
-                    drawName: drawName,
+                    drawName: CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId,
                     timestamp: new Date().toISOString()
-                };
-                APP_STATE.currentCart.push(bet);
-                const freeBets = createFreeMarriageBets(amt, drawId, drawName);
-                freeBets.forEach(fb => APP_STATE.currentCart.push(fb));
+                });
             }
         });
 
@@ -244,7 +141,7 @@ var CartManager = {
 
         if (!APP_STATE.currentCart.length) {
             display.innerHTML = '<div class="empty-msg">Panye vid</div>';
-            totalEl.innerText = '0 G';
+            totalEl.innerText = '0 Gdes';
             if (itemsCount) itemsCount.innerText = '0 jwèt';
             return;
         }
@@ -255,7 +152,8 @@ var CartManager = {
         display.innerHTML = APP_STATE.currentCart.map(bet => {
             total += bet.amount;
             count++;
-            const gameAbbr = getGameAbbreviation(bet.game, bet);
+            const gameAbbr = getGameAbbreviation(bet.game, bet); // ← on passe bet pour détecter gratuit
+            // Affichage spécial pour les mariages auto (format XX*YY)
             let displayNumber = bet.number;
             if (bet.game === 'auto_marriage' && bet.number.includes('&')) {
                 displayNumber = bet.number.replace('&', '*');
@@ -269,14 +167,14 @@ var CartManager = {
             `;
         }).join('');
 
-        totalEl.innerText = total.toLocaleString('fr-FR') + ' G';
+        totalEl.innerText = total.toLocaleString('fr-FR') + ' Gdes';
         if (itemsCount) itemsCount.innerText = count + ' jwèt';
     }
 };
 
 // ---------- Fonction d'abréviation des jeux (version courte) ----------
 function getGameAbbreviation(gameName, bet) {
-    // Cas spécial : mariage gratuit
+    // Cas spécial : mariage gratuit (freeType 'special_marriage')
     if (bet && bet.free && bet.freeType === 'special_marriage') {
         return 'marg';
     }
@@ -289,6 +187,7 @@ function getGameAbbreviation(gameName, bet) {
         'auto_lotto4': 'loa4',
         'auto_lotto5': 'loa5',
         'mariage': 'mar',
+        // variantes possibles
         'lotto 3': 'lo3',
         'lotto 4': 'lo4',
         'lotto 5': 'lo5',
@@ -365,7 +264,7 @@ async function processFinalTicket() {
     }
 }
 
-// ---------- PRINT (CSS avec espace réduit entre total et message) ----------
+// ---------- PRINT (CSS avec espace logo/texte réduit à zéro) ----------
 function printThermalTicket(ticket, printWindow) {
     const html = generateTicketHTML(ticket);
 
@@ -445,17 +344,16 @@ function printThermalTicket(ticket, printWindow) {
                     font-weight: bold;
                     margin-top: 10px;
                     font-size: 36px;
-                    margin-bottom: 2px; /* Espace réduit ici */
                 }
                 .footer {
                     text-align: center;
-                    margin-top: 0;
+                    margin-top: 20px;
                     font-style: italic;
                     font-size: 28px;
                 }
                 .footer p {
                     font-weight: bold;
-                    margin: 2px 0;
+                    margin: 3px 0;
                 }
             </style>
         </head>
@@ -485,8 +383,9 @@ function generateTicketHTML(ticket) {
                           dateObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
     const betsHTML = (ticket.bets || []).map(b => {
-        const gameAbbr = getGameAbbreviation(b.game || '', b);
+        const gameAbbr = getGameAbbreviation(b.game || '', b); // ← on passe b pour détecter gratuit
         let displayNumber = b.number || '';
+        // Pour les mariages auto, remplacer & par * pour l'affichage
         if (b.game === 'auto_marriage' && displayNumber.includes('&')) {
             displayNumber = displayNumber.replace('&', '*');
         }
@@ -517,13 +416,13 @@ function generateTicketHTML(ticket) {
         <hr>
 
         <div class="total-row">
-            <span>Tot.</span>
-            <span>${ticket.total_amount || ticket.total || 0} G</span>
+            <span>TOTAL</span>
+            <span>${ticket.total_amount || ticket.total || 0} Gdes</span>
         </div>
 
         <div class="footer">
             <p>tickets valable jusqu'à 90 jours</p>
-            <p>Ref : +509 40 64 3557 / 49012887</p> <!-- Deux numéros sur la même ligne -->
+            <p>Ref : +509 40 64 3557</p>
             <p><strong>LOTATO S.A.</strong></p>
         </div>
     `;
