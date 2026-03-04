@@ -1,13 +1,20 @@
-// resultsManager.js - Version corrigée pour afficher les résultats depuis la BDD
+// resultsManager.js - Version corrigée avec appel API autonome
 (function() {
     if (window.resultsManagerReady) return;
     window.resultsManagerReady = true;
 
-    function init() {
-        // 1. Créer l'écran des résultats s'il n'existe pas
+    // État interne du filtre actif
+    let currentFilter = 'all';
+
+    // ==================== Création de l'UI si absente ====================
+    function createResultsUI() {
+        // 1. Écran des résultats
         if (!document.getElementById('results-screen')) {
             const main = document.querySelector('.content-area');
-            if (!main) return console.error('content-area introuvable');
+            if (!main) {
+                console.error('Élément .content-area introuvable');
+                return;
+            }
             const screen = document.createElement('section');
             screen.id = 'results-screen';
             screen.className = 'screen';
@@ -20,13 +27,13 @@
                         <button class="chip" data-filter="yesterday">Hier</button>
                         <button class="chip" data-filter="week">7 derniers jours</button>
                     </div>
-                    <div id="results-container" class="results-list"></div>
+                    <div id="results-container" class="results-list">Chargement...</div>
                 </div>
             `;
             main.appendChild(screen);
         }
 
-        // 2. Ajouter l'onglet dans la navigation s'il n'existe pas
+        // 2. Onglet dans la navigation
         const nav = document.querySelector('.nav-bar');
         if (nav && !document.querySelector('.nav-item[data-tab="results"]')) {
             const tab = document.createElement('a');
@@ -40,12 +47,12 @@
                 document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
                 document.getElementById('results-screen').classList.add('active');
                 this.classList.add('active');
-                renderResults();
+                fetchResults(currentFilter); // recharge au besoin
             });
             nav.appendChild(tab);
         }
 
-        // 3. Ajouter les styles nécessaires (si pas déjà dans style.css)
+        // 3. Styles spécifiques (si pas déjà présents)
         if (!document.getElementById('results-styles')) {
             const style = document.createElement('style');
             style.id = 'results-styles';
@@ -64,31 +71,62 @@
             `;
             document.head.appendChild(style);
         }
-
-        // 4. Gérer les clics sur les filtres
-        document.querySelectorAll('.results-filter .chip').forEach(btn => {
-            btn.addEventListener('click', function() {
-                document.querySelectorAll('.results-filter .chip').forEach(b => b.classList.remove('active'));
-                this.classList.add('active');
-                renderResults(this.dataset.filter);
-            });
-        });
     }
 
-    // Fonction pour afficher les résultats depuis APP_STATE.winningResults
-    function renderResults(filter = 'all') {
+    // ==================== Appel API ====================
+    async function fetchResults(filter = 'all') {
         const container = document.getElementById('results-container');
         if (!container) return;
 
-        // Récupérer les données depuis APP_STATE (peuplé par APIService.getWinningResults)
+        // Afficher un indicateur de chargement
+        container.innerHTML = '<div class="no-result">Chargement des résultats...</div>';
+
+        try {
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                container.innerHTML = '<div class="no-result">Vous devez être connecté.</div>';
+                return;
+            }
+
+            const res = await fetch('/api/winners/results', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!res.ok) {
+                if (res.status === 401) {
+                    container.innerHTML = '<div class="no-result">Session expirée, veuillez vous reconnecter.</div>';
+                } else {
+                    throw new Error(`Erreur HTTP ${res.status}`);
+                }
+                return;
+            }
+
+            const data = await res.json();
+            // Stocker dans un état global (optionnel mais pratique)
+            window.APP_STATE = window.APP_STATE || {};
+            window.APP_STATE.winningResults = data.results || [];
+
+            // Mettre à jour le filtre courant et afficher
+            currentFilter = filter;
+            renderResults(filter);
+        } catch (error) {
+            console.error('Erreur lors du chargement des résultats:', error);
+            container.innerHTML = '<div class="no-result">Impossible de charger les résultats.</div>';
+        }
+    }
+
+    // ==================== Affichage ====================
+    function renderResults(filter) {
+        const container = document.getElementById('results-container');
+        if (!container) return;
+
         const results = window.APP_STATE?.winningResults || [];
-        
         if (results.length === 0) {
             container.innerHTML = '<div class="no-result">Aucun résultat publié pour le moment.</div>';
             return;
         }
 
-        // Filtrer selon la période en utilisant published_at
+        // Filtrer selon la période
         const now = new Date();
         const todayStr = now.toDateString();
         const yesterday = new Date(now);
@@ -111,11 +149,11 @@
             return;
         }
 
-        // Grouper par jour (toujours avec published_at)
+        // Grouper par jour (en utilisant published_at)
         const grouped = {};
         filtered.forEach(r => {
-            const day = new Date(r.published_at).toLocaleDateString('fr-FR', { 
-                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+            const day = new Date(r.published_at).toLocaleDateString('fr-FR', {
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
             });
             if (!grouped[day]) grouped[day] = [];
             grouped[day].push(r);
@@ -128,10 +166,10 @@
         sortedDays.forEach(day => {
             html += `<div class="result-day-group"><h3>${day}</h3>`;
             grouped[day].forEach(r => {
-                const time = new Date(r.published_at).toLocaleTimeString('fr-FR', { 
-                    hour: '2-digit', minute: '2-digit' 
+                const time = new Date(r.published_at).toLocaleTimeString('fr-FR', {
+                    hour: '2-digit', minute: '2-digit'
                 });
-                // Formatage des numéros : r.numbers est un tableau (ex: ['45','67','89'])
+                // Formatage des numéros : r.numbers est un tableau
                 let numbersDisplay = '—';
                 if (r.numbers) {
                     numbersDisplay = Array.isArray(r.numbers) ? r.numbers.join(' - ') : r.numbers;
@@ -152,7 +190,32 @@
         container.innerHTML = html;
     }
 
-    // Lancer l'initialisation quand le DOM est prêt
+    // ==================== Initialisation ====================
+    function init() {
+        createResultsUI();
+
+        // Attacher les événements aux boutons de filtre
+        const filterContainer = document.querySelector('.results-filter');
+        if (filterContainer) {
+            filterContainer.addEventListener('click', (e) => {
+                const btn = e.target.closest('.chip');
+                if (!btn) return;
+                const filter = btn.dataset.filter;
+                if (!filter) return;
+
+                // Mettre à jour la classe active
+                document.querySelectorAll('.results-filter .chip').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                // Recharger avec le nouveau filtre
+                fetchResults(filter);
+            });
+        }
+
+        // Premier chargement (seulement si l'écran est actif ? on charge toujours pour préparer)
+        fetchResults('all');
+    }
+
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {
