@@ -1,5 +1,5 @@
 // ==========================
-// cartManager.js (avec gestion des jeux automatiques et abréviations courtes)
+// cartManager.js (avec gestion des jeux automatiques)
 // ==========================
 
 // ---------- Utils ----------
@@ -152,7 +152,7 @@ var CartManager = {
         display.innerHTML = APP_STATE.currentCart.map(bet => {
             total += bet.amount;
             count++;
-            const gameAbbr = getGameAbbreviation(bet.game, bet); // ← on passe bet pour détecter gratuit
+            const gameAbbr = getGameAbbreviation(bet.game);
             // Affichage spécial pour les mariages auto (format XX*YY)
             let displayNumber = bet.number;
             if (bet.game === 'auto_marriage' && bet.number.includes('&')) {
@@ -172,30 +172,30 @@ var CartManager = {
     }
 };
 
-// ---------- Fonction d'abréviation des jeux (version courte) ----------
-function getGameAbbreviation(gameName, bet) {
-    // Cas spécial : mariage gratuit (freeType 'special_marriage')
-    if (bet && bet.free && bet.freeType === 'special_marriage') {
-        return 'marg';
-    }
+// ---------- Fonction d'abréviation des jeux (version complète) ----------
+function getGameAbbreviation(gameName) {
     const map = {
-        'borlette': 'bor',
-        'lotto3': 'lo3',
-        'lotto4': 'lo4',
-        'lotto5': 'lo5',
-        'auto_marriage': 'mara',
-        'auto_lotto4': 'loa4',
-        'auto_lotto5': 'loa5',
+        'borlette': 'Bor',
+        'lotto 3': 'LO3',
+        'lotto 4': 'LO4',
+        'lotto 5': 'LO5',
+        'lotto3': 'LO3',
+        'lotto4': 'LO4',
+        'lotto5': 'LO5',
+        'loto 3': 'LO3',
+        'loto 4': 'LO4',
+        'loto 5': 'LO5',
+        'loto3': 'LO3',
+        'loto4': 'LO4',
+        'loto5': 'LO5',
         'mariage': 'mar',
-        // variantes possibles
-        'lotto 3': 'lo3',
-        'lotto 4': 'lo4',
-        'lotto 5': 'lo5',
-        'loto3': 'lo3',
-        'loto4': 'lo4',
-        'loto5': 'lo5',
-        'bo': 'bo',
-        'grap': 'grap'
+        'mariage gratuit': 'marg',
+        'mariage spécial gratuit': 'marg',
+        'auto_marriage': 'AutoMar',
+        'bo': 'BO',
+        'grap': 'GRAP',
+        'auto_lotto4': 'AutoL4',
+        'auto_lotto5': 'AutoL5'
     };
     const key = (gameName || '').trim().toLowerCase();
     return map[key] || gameName;
@@ -383,7 +383,7 @@ function generateTicketHTML(ticket) {
                           dateObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
     const betsHTML = (ticket.bets || []).map(b => {
-        const gameAbbr = getGameAbbreviation(b.game || '', b); // ← on passe b pour détecter gratuit
+        const gameAbbr = getGameAbbreviation(b.game || '');
         let displayNumber = b.number || '';
         // Pour les mariages auto, remplacer & par * pour l'affichage
         if (b.game === 'auto_marriage' && displayNumber.includes('&')) {
