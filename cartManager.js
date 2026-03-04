@@ -1,5 +1,5 @@
 // ==========================
-// cartManager.js (CORRECTIONS FINALES)
+// cartManager.js (avec gestion des jeux automatiques)
 // ==========================
 
 // ---------- Utils ----------
@@ -29,38 +29,56 @@ var CartManager = {
 
         const game = APP_STATE.selectedGame;
 
-        // === GESTION DES JEUX AUTOMATIQUES ===
-        const autoGames = ['auto_marriage', 'auto_lotto4', 'auto_lotto5', 'bo', 'grap'];
-        if (autoGames.includes(game) || game.startsWith('n')) {
-            let generatedBets = [];
-
-            if (game === 'auto_marriage') {
-                generatedBets = GameEngine.generateAutoMarriageBets(amt);
-            } else if (game === 'auto_lotto4') {
-                generatedBets = GameEngine.generateAutoLotto4Bets(amt);
-            } else if (game === 'auto_lotto5') {
-                generatedBets = GameEngine.generateAutoLotto5Bets(amt);
-            } else if (game === 'bo') {
-                generatedBets = SpecialGames.generateBOBets(amt);
-            } else if (game === 'grap') {
-                generatedBets = SpecialGames.generateGRAPBets(amt);
-            } else if (game.startsWith('n')) {
-                const digit = game.slice(1);
-                generatedBets = SpecialGames.generateNBets(digit, amt);
+        // --- Gestion des jeux automatiques ---
+        if (game === 'auto_marriage' || game === 'bo' || game === 'grap' || game === 'auto_lotto4' || game === 'auto_lotto5') {
+            let autoBets = [];
+            switch (game) {
+                case 'auto_marriage':
+                    autoBets = GameEngine.generateAutoMarriageBets(amt);
+                    break;
+                case 'bo':
+                    autoBets = SpecialGames.generateBOBets(amt);
+                    break;
+                case 'grap':
+                    autoBets = SpecialGames.generateGRAPBets(amt);
+                    break;
+                case 'auto_lotto4':
+                    autoBets = GameEngine.generateAutoLotto4Bets(amt);
+                    break;
+                case 'auto_lotto5':
+                    autoBets = GameEngine.generateAutoLotto5Bets(amt);
+                    break;
             }
 
-            // Ajouter tous les paris générés au panier
-            generatedBets.forEach(bet => {
-                APP_STATE.currentCart.push(bet);
+            if (autoBets.length === 0) {
+                alert("Pa gen ase nimevo nan panye pou jenere " + game);
+                return;
+            }
+
+            // Récupérer les tirages sélectionnés
+            const draws = APP_STATE.multiDrawMode
+                ? APP_STATE.selectedDraws
+                : [APP_STATE.selectedDraw];
+
+            // Pour chaque tirage, ajouter une copie de chaque pari
+            draws.forEach(drawId => {
+                const drawName = CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId;
+                autoBets.forEach(bet => {
+                    APP_STATE.currentCart.push({
+                        ...bet,
+                        id: Date.now() + Math.random(), // nouvel ID unique
+                        drawId: drawId,
+                        drawName: drawName
+                    });
+                });
             });
 
             this.renderCart();
-            numInput.value = '';
             amtInput.value = '';
             return;
         }
 
-        // === TRAITEMENT NORMAL (jeux manuels) ===
+        // --- Gestion des jeux normaux (saisie manuelle) ---
         let num = numInput.value.trim();
 
         if (!GameEngine.validateEntry(game, num)) {
@@ -82,16 +100,28 @@ var CartManager = {
         }
 
         draws.forEach(drawId => {
-            APP_STATE.currentCart.push({
-                id: Date.now() + Math.random(),
-                game: game,
-                number: num,
-                cleanNumber: num,
-                amount: amt,
-                drawId,
-                drawName: CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId,
-                timestamp: new Date().toISOString()
-            });
+            // Pour les jeux Lotto 4/5 avec options multiples
+            if (game === 'lotto4' || game === 'lotto5') {
+                const optionBets = GameEngine.generateLottoBetsWithOptions(game, num, amt);
+                optionBets.forEach(bet => {
+                    APP_STATE.currentCart.push({
+                        ...bet,
+                        drawId: drawId,
+                        drawName: CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId
+                    });
+                });
+            } else {
+                APP_STATE.currentCart.push({
+                    id: Date.now() + Math.random(),
+                    game: game,
+                    number: num,
+                    cleanNumber: num,
+                    amount: amt,
+                    drawId: drawId,
+                    drawName: CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId,
+                    timestamp: new Date().toISOString()
+                });
+            }
         });
 
         this.renderCart();
@@ -107,21 +137,30 @@ var CartManager = {
     renderCart() {
         const display = document.getElementById('cart-display');
         const totalEl = document.getElementById('cart-total-display');
+        const itemsCount = document.getElementById('items-count');
 
         if (!APP_STATE.currentCart.length) {
             display.innerHTML = '<div class="empty-msg">Panye vid</div>';
             totalEl.innerText = '0 Gdes';
+            if (itemsCount) itemsCount.innerText = '0 jwèt';
             return;
         }
 
         let total = 0;
+        let count = 0;
 
         display.innerHTML = APP_STATE.currentCart.map(bet => {
             total += bet.amount;
+            count++;
             const gameAbbr = getGameAbbreviation(bet.game);
+            // Affichage spécial pour les mariages auto (format XX*YY)
+            let displayNumber = bet.number;
+            if (bet.game === 'auto_marriage' && bet.number.includes('&')) {
+                displayNumber = bet.number.replace('&', '*');
+            }
             return `
                 <div class="cart-item">
-                    <span>${gameAbbr} ${bet.number}</span>
+                    <span>${gameAbbr} ${displayNumber}</span>
                     <span>${bet.amount} G</span>
                     <button onclick="CartManager.removeBet('${bet.id}')">✕</button>
                 </div>
@@ -129,15 +168,14 @@ var CartManager = {
         }).join('');
 
         totalEl.innerText = total.toLocaleString('fr-FR') + ' Gdes';
+        if (itemsCount) itemsCount.innerText = count + ' jwèt';
     }
 };
 
 // ---------- Fonction d'abréviation des jeux (version complète) ----------
 function getGameAbbreviation(gameName) {
     const map = {
-        // Borlette
         'borlette': 'Bor',
-        // Lotto 3,4,5 - toutes orthographes possibles
         'lotto 3': 'LO3',
         'lotto 4': 'LO4',
         'lotto 5': 'LO5',
@@ -150,11 +188,14 @@ function getGameAbbreviation(gameName) {
         'loto3': 'LO3',
         'loto4': 'LO4',
         'loto5': 'LO5',
-        // Mariages
         'mariage': 'mar',
         'mariage gratuit': 'marg',
         'mariage spécial gratuit': 'marg',
-        'auto_marriage': 'mar'
+        'auto_marriage': 'AutoMar',
+        'bo': 'BO',
+        'grap': 'GRAP',
+        'auto_lotto4': 'AutoL4',
+        'auto_lotto5': 'AutoL5'
     };
     const key = (gameName || '').trim().toLowerCase();
     return map[key] || gameName;
@@ -343,9 +384,14 @@ function generateTicketHTML(ticket) {
 
     const betsHTML = (ticket.bets || []).map(b => {
         const gameAbbr = getGameAbbreviation(b.game || '');
+        let displayNumber = b.number || '';
+        // Pour les mariages auto, remplacer & par * pour l'affichage
+        if (b.game === 'auto_marriage' && displayNumber.includes('&')) {
+            displayNumber = displayNumber.replace('&', '*');
+        }
         return `
             <div class="bet-row">
-                <span>${gameAbbr} ${b.number || ''}</span>
+                <span>${gameAbbr} ${displayNumber}</span>
                 <span>${b.amount || 0} G</span>
             </div>
         `;
