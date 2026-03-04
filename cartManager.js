@@ -119,7 +119,9 @@ function getGameAbbreviation(gameName) {
         // Mariages
         'mariage': 'mar',
         'mariage gratuit': 'marg',
-        'mariage spécial gratuit': 'marg'
+        'mariage spécial gratuit': 'marg',
+        // AJOUT : mariage automatique
+        'auto_marriage': 'mar'
     };
     const key = (gameName || '').trim().toLowerCase();
     return map[key] || gameName;

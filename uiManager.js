@@ -425,7 +425,7 @@ async function loadDrawReport(drawId = null) {
     }
 }
 
-// Impression des rapports (CORRIGÉ avec tailles doublées pour une meilleure lisibilité)
+// Impression des rapports (version améliorée)
 function printReport() {
     const drawSelector = document.getElementById('draw-report-selector');
     const selectedDraw = drawSelector.options[drawSelector.selectedIndex].text;
@@ -453,70 +453,181 @@ function printReport() {
     const logoUrl = cfg.LOTTERY_LOGO || cfg.logo || cfg.logoUrl || '';
     const slogan = cfg.slogan || '';
 
-    console.log('📊 printReport - cfg utilisé:', cfg);
-    console.log('📊 printReport - valeurs extraites:', { lotteryName, logoUrl, slogan });
-    
-    // Styles modifiés : toutes les tailles de police DOUBLÉES pour un rendu plus lisible
+    // Construction du contenu HTML du rapport
     const content = `
     <!DOCTYPE html>
     <html>
     <head>
         <title>Rapò ${selectedDraw}</title>
         <style>
-            @page { size: A4; margin: 2cm; }
-            body { font-family: 'Arial', sans-serif; line-height: 1.5; color: #222; font-size: 24pt; } /* doublé */
-            .header { text-align: center; margin-bottom: 30px; }
-            .header h1 { font-size: 48pt; margin: 5px 0; color: #000; } /* doublé */
-            .header h2 { font-size: 36pt; font-weight: normal; color: #333; } /* doublé */
-            .header p { margin: 2px 0; font-size: 20pt; } /* ajouté pour le slogan et date */
-            .section { margin: 20px 0; }
-            .section h3 { border-bottom: 2px solid #000; padding-bottom: 5px; font-size: 32pt; } /* doublé */
-            table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-            th, td { border: 1px solid #aaa; padding: 12px; text-align: left; font-size: 22pt; } /* doublé */
-            th { background-color: #eee; font-weight: bold; }
-            .total-row { font-weight: bold; background-color: #f9f9f9; }
-            .summary { background: #f5f5f5; padding: 15px; border-radius: 5px; margin-top: 20px; }
-            .summary p { margin: 5px 0; font-size: 22pt; } /* doublé */
-            .footer { margin-top: 30px; text-align: center; font-size: 18pt; color: #666; border-top: 1px solid #ccc; padding-top: 10px; } /* doublé */
+            /* Styles pour l'impression A4 */
+            @page {
+                size: A4;
+                margin: 1.5cm;
+            }
+            body {
+                font-family: 'Arial', sans-serif;
+                line-height: 1.4;
+                color: #000;
+                background: #fff;
+                font-size: 12pt;
+                margin: 0;
+                padding: 0;
+            }
+            .header {
+                text-align: center;
+                margin-bottom: 20px;
+                border-bottom: 2px solid #333;
+                padding-bottom: 10px;
+            }
+            .header h1 {
+                font-size: 24pt;
+                margin: 5px 0;
+                color: #000;
+            }
+            .header h2 {
+                font-size: 18pt;
+                font-weight: normal;
+                color: #333;
+                margin: 5px 0;
+            }
+            .header p {
+                margin: 2px 0;
+                font-size: 11pt;
+                color: #555;
+            }
+            .header img {
+                max-height: 80px;
+                margin-bottom: 10px;
+            }
+            .section {
+                margin: 20px 0;
+            }
+            .section h3 {
+                border-bottom: 1px solid #aaa;
+                padding-bottom: 5px;
+                font-size: 16pt;
+                margin-bottom: 15px;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                margin: 15px 0;
+                font-size: 11pt;
+            }
+            th, td {
+                border: 1px solid #aaa;
+                padding: 8px;
+                text-align: left;
+            }
+            th {
+                background-color: #f0f0f0;
+                font-weight: bold;
+            }
+            .total-row {
+                font-weight: bold;
+                background-color: #f9f9f9;
+            }
+            .summary {
+                background: #f5f5f5;
+                padding: 15px;
+                border-radius: 5px;
+                margin-top: 20px;
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: space-between;
+            }
+            .summary-item {
+                flex: 1 1 200px;
+                margin: 5px;
+                padding: 10px;
+                background: #fff;
+                border-radius: 4px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            }
+            .summary-item strong {
+                display: block;
+                font-size: 14pt;
+                color: #000;
+            }
+            .summary-item span {
+                font-size: 18pt;
+                font-weight: bold;
+                color: #007bff;
+            }
+            .footer {
+                margin-top: 30px;
+                text-align: center;
+                font-size: 10pt;
+                color: #666;
+                border-top: 1px solid #ccc;
+                padding-top: 10px;
+            }
+            .profit { color: #28a745; }
+            .loss { color: #dc3545; }
         </style>
     </head>
     <body>
         <div class="header">
-            ${logoUrl ? `<img src="${logoUrl}" style="max-height: 120px; margin-bottom: 20px;">` : ''} <!-- logo doublé -->
+            ${logoUrl ? `<img src="${logoUrl}" alt="Logo">` : ''}
             <h1>${lotteryName}</h1>
-            ${slogan ? `<p style="font-style: italic;">${slogan}</p>` : ''}
+            ${slogan ? `<p>${slogan}</p>` : ''}
             <h2>Rapò Vann ${selectedDraw}</h2>
-            <p>Dat: ${new Date().toLocaleDateString('fr-FR')}</p>
+            <p>Dat: ${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR')}</p>
             <p>Ajan: ${APP_STATE.agentName}</p>
         </div>
         
         <div class="section">
             <h3>Rekapitilatif</h3>
-            <table>
-                <tr><th>Total Tikè</th><td>${totalTickets}</td></tr>
-                <tr><th>Total Paris</th><td>${totalBets.toLocaleString('fr-FR')} Gdes</td></tr>
-                <tr><th>Total Ganyen</th><td>${totalWins.toLocaleString('fr-FR')} Gdes</td></tr>
-                <tr><th>Pèdi</th><td>${totalLoss.toLocaleString('fr-FR')} Gdes</td></tr>
-                <tr class="total-row"><th>Balans</th><td>${balance.toLocaleString('fr-FR')} Gdes</td></tr>
-            </table>
+            <div class="summary">
+                <div class="summary-item">
+                    <strong>Total Tikè</strong>
+                    <span>${totalTickets}</span>
+                </div>
+                <div class="summary-item">
+                    <strong>Total Paris</strong>
+                    <span>${totalBets.toLocaleString('fr-FR')} G</span>
+                </div>
+                <div class="summary-item">
+                    <strong>Total Ganyen</strong>
+                    <span class="profit">${totalWins.toLocaleString('fr-FR')} G</span>
+                </div>
+                <div class="summary-item">
+                    <strong>Pèdi</strong>
+                    <span class="loss">${totalLoss.toLocaleString('fr-FR')} G</span>
+                </div>
+                <div class="summary-item">
+                    <strong>Balans</strong>
+                    <span class="${balance >= 0 ? 'profit' : 'loss'}">${balance.toLocaleString('fr-FR')} G</span>
+                </div>
+            </div>
         </div>
         
         <div class="section">
             <h3>Detay Tikè</h3>
             <table>
                 <thead>
-                    <tr><th>N° Tikè</th><th>Tiraj</th><th>Lè</th><th>Montan</th><th>Ganyen</th></tr>
+                    <tr>
+                        <th>N° Tikè</th>
+                        <th>Tiraj</th>
+                        <th>Lè</th>
+                        <th>Montan</th>
+                        <th>Ganyen</th>
+                    </tr>
                 </thead>
                 <tbody>
-                    ${tickets.map(t => `
+                    ${tickets.map(t => {
+                        const winAmount = parseFloat(t.win_amount || t.winAmount || t.prize_amount || 0);
+                        const totalAmount = parseFloat(t.total_amount || t.totalAmount || t.amount || 0);
+                        return `
                         <tr>
                             <td>${t.ticket_id || t.id}</td>
-                            <td>${t.draw_name || ''}</td>
+                            <td>${t.draw_name || t.drawName || ''}</td>
                             <td>${new Date(t.date).toLocaleTimeString('fr-FR')}</td>
-                            <td>${(t.total_amount || t.amount || 0).toLocaleString('fr-FR')} Gdes</td>
-                            <td>${(t.win_amount || 0).toLocaleString('fr-FR')} Gdes</td>
+                            <td>${totalAmount.toLocaleString('fr-FR')} G</td>
+                            <td class="${winAmount > 0 ? 'profit' : ''}">${winAmount > 0 ? winAmount.toLocaleString('fr-FR') + ' G' : '-'}</td>
                         </tr>
-                    `).join('')}
+                    `}).join('')}
                 </tbody>
             </table>
         </div>
@@ -529,11 +640,23 @@ function printReport() {
     </html>
     `;
     
-    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    // Ouvrir une nouvelle fenêtre pour l'impression
+    const printWindow = window.open('', '_blank', 'width=800,height=600,scrollbars=yes');
+    if (!printWindow) {
+        alert("Veuillez autoriser les pop-ups pour imprimer le rapport.");
+        return;
+    }
+    
     printWindow.document.write(content);
     printWindow.document.close();
     printWindow.focus();
-    printWindow.print();
+    
+    // Déclencher l'impression après le chargement complet
+    printWindow.onload = function() {
+        printWindow.print();
+        // Optionnel : fermer la fenêtre après impression (laisser à l'utilisateur le choix)
+        // printWindow.onafterprint = function() { printWindow.close(); };
+    };
 }
 
 async function loadWinners() {
