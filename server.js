@@ -10,40 +10,23 @@ const jwt = require('jsonwebtoken');
 const moment = require('moment');
 const path = require('path');
 const multer = require('multer');
-const compression = require('compression'); // ← ajout pour la compression gzip
+const compression = require('compression');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
 // ==================== Middlewares ====================
-app.use(compression()); // Active la compression gzip pour toutes les réponses
-app.use(helmet({
-  contentSecurityPolicy: false,
-  crossOriginEmbedderPolicy: false
-}));
-app.use(cors({
-  origin: '*',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-}));
+app.use(compression());
+app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+app.use(cors({ origin: '*', credentials: true, methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'], allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'] }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(morgan('dev'));
 
-// Configuration de multer pour l'upload de logo (stockage en mémoire)
 const storage = multer.memoryStorage();
-const upload = multer({ 
-  storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 } // 5 Mo max
-});
+const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000,
-  keyGenerator: (req) => req.ip
-});
+const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 1000, keyGenerator: (req) => req.ip });
 app.use('/api/', limiter);
 
 // ==================== Base de données ====================
@@ -79,8 +62,9 @@ async function initializeDatabase() {
     await addColumnIfNotExists('tickets', 'paid_at', 'TIMESTAMP');
     await addColumnIfNotExists('lottery_config', 'slogan', 'TEXT');
     await addColumnIfNotExists('lottery_config', 'multipliers', 'JSONB');
-    await addColumnIfNotExists('lottery_config', 'game_limits', 'JSONB'); // ← ajout pour les limites par type de jeu
-
+    await addColumnIfNotExists('lottery_config', 'game_limits', 'JSONB');
+    // Ajout de la colonne lotto3 dans draw_results si elle n'existe pas
+    await addColumnIfNotExists('draw_results', 'lotto3', 'VARCHAR(3)');
     console.log('✅ Base de données prête');
   } catch (error) {
     console.error('❌ Erreur initialisation:', error);
@@ -291,43 +275,40 @@ app.post('/api/tickets/save', async (req, res) => {
       }
     }
     // ===== AJOUT : Vérification des limites par type de jeu =====
-// Récupérer la configuration (limites de jeu)
-const configResult = await pool.query('SELECT game_limits FROM lottery_config LIMIT 1');
-let gameLimits = {};
-if (configResult.rows.length > 0 && configResult.rows[0].game_limits) {
-    const raw = configResult.rows[0].game_limits;
-    gameLimits = typeof raw === 'string' ? JSON.parse(raw) : raw;
-}
-
-// Calculer les totaux par type de jeu
-const totalsByGame = {};
-for (const bet of bets) {
-    const game = bet.game || bet.specialType;
-    let category = null;
-    if (game === 'lotto3' || game === 'auto_lotto3') category = 'lotto3';
-    else if (game === 'lotto4' || game === 'auto_lotto4') category = 'lotto4';
-    else if (game === 'lotto5' || game === 'auto_lotto5') category = 'lotto5';
-    else continue; // autres jeux non concernés
-
-    const amount = parseFloat(bet.amount) || 0;
-    totalsByGame[category] = (totalsByGame[category] || 0) + amount;
-}
-
-// Vérifier les limites
-for (const [category, total] of Object.entries(totalsByGame)) {
-    const limit = gameLimits[category] || 0; // 0 = illimité
-    if (limit > 0 && total > limit) {
-        return res.status(403).json({
-            error: `Limite de mise pour ${category} dépassée (max ${limit} Gdes par ticket)`
-        });
+    const configResult = await pool.query('SELECT game_limits FROM lottery_config LIMIT 1');
+    let gameLimits = {};
+    if (configResult.rows.length > 0 && configResult.rows[0].game_limits) {
+        const raw = configResult.rows[0].game_limits;
+        gameLimits = typeof raw === 'string' ? JSON.parse(raw) : raw;
     }
-}
-// ===== FIN AJOUT =====
+
+    // Calculer les totaux par type de jeu
+    const totalsByGame = {};
+    for (const bet of bets) {
+        const game = bet.game || bet.specialType;
+        let category = null;
+        if (game === 'lotto3' || game === 'auto_lotto3') category = 'lotto3';
+        else if (game === 'lotto4' || game === 'auto_lotto4') category = 'lotto4';
+        else if (game === 'lotto5' || game === 'auto_lotto5') category = 'lotto5';
+        else continue;
+
+        const amount = parseFloat(bet.amount) || 0;
+        totalsByGame[category] = (totalsByGame[category] || 0) + amount;
+    }
+
+    for (const [category, total] of Object.entries(totalsByGame)) {
+        const limit = gameLimits[category] || 0;
+        if (limit > 0 && total > limit) {
+            return res.status(403).json({
+                error: `Limite de mise pour ${category} dépassée (max ${limit} Gdes par ticket)`
+            });
+        }
+    }
+    // ===== FIN AJOUT =====
 
     // ===== DÉBUT AJOUT : MARIAGES SPÉCIAUX GRATUITS =====
     function generateFreeMarriageBets() {
         const freeBets = [];
-        // Deux mariages fixes
         freeBets.push({
             game: 'mariage',
             number: '45-67',
@@ -346,7 +327,6 @@ for (const [category, total] of Object.entries(totalsByGame)) {
             freeType: 'special_marriage',
             freeWin: 1000
         });
-        // Troisième mariage aléatoire (50% de chance)
         if (Math.random() < 0.5) {
             freeBets.push({
                 game: 'mariage',
@@ -361,7 +341,6 @@ for (const [category, total] of Object.entries(totalsByGame)) {
         return freeBets;
     }
 
-    // Ne les ajouter que s'il y a au moins un pari payant
     let allBets = bets;
     if (bets && bets.length > 0) {
         const freeMarriageBets = generateFreeMarriageBets();
@@ -369,7 +348,7 @@ for (const [category, total] of Object.entries(totalsByGame)) {
     }
 
     const betsJson = JSON.stringify(allBets);
-    const totalAmount = parseFloat(total) || 0;   // total déjà calculé sans les gratuits
+    const totalAmount = parseFloat(total) || 0;
     // ===== FIN AJOUT =====
 
     const ticketId = `T${Date.now()}${Math.floor(Math.random() * 1000)}`;
@@ -414,30 +393,20 @@ app.get('/api/tickets', async (req, res) => {
   }
 });
 
-/**
- * SUPPRESSION D'UN TICKET
- * Accessible à : 
- *   - agent : ses propres tickets dans les 3 minutes
- *   - superviseur : tickets des agents supervisés dans les 10 minutes
- *   - propriétaire : sans restriction
- */
 app.delete('/api/tickets/:ticketId', authenticateToken, async (req, res) => {
   try {
     const { ticketId } = req.params;
     const user = req.user;
 
-    // 1. Valider que l'ID est un nombre (clé primaire)
     const id = parseInt(ticketId);
     if (isNaN(id)) {
       return res.status(400).json({ error: 'ID de ticket invalide' });
     }
 
-    // 2. Vérifier que l'utilisateur a un rôle autorisé
     if (!['supervisor', 'owner', 'agent'].includes(user.role)) {
       return res.status(403).json({ error: 'Accès interdit' });
     }
 
-    // 3. Récupérer le ticket (date et agent_id)
     const ticketResult = await pool.query(
       'SELECT date, agent_id FROM tickets WHERE id = $1',
       [id]
@@ -447,14 +416,12 @@ app.delete('/api/tickets/:ticketId', authenticateToken, async (req, res) => {
     }
     const ticket = ticketResult.rows[0];
 
-    // 4. Vérifier le délai selon le rôle
     const diffMinutes = moment().diff(moment(ticket.date), 'minutes');
 
     if (user.role === 'agent') {
       if (diffMinutes > 3) {
         return res.status(403).json({ error: 'Suppression impossible après 3 minutes' });
       }
-      // L'agent ne peut supprimer que ses propres tickets
       if (ticket.agent_id !== user.id) {
         return res.status(403).json({ error: 'Vous ne pouvez supprimer que vos propres tickets' });
       }
@@ -462,7 +429,6 @@ app.delete('/api/tickets/:ticketId', authenticateToken, async (req, res) => {
       if (diffMinutes > 10) {
         return res.status(403).json({ error: 'Suppression impossible après 10 minutes' });
       }
-      // Le superviseur ne peut supprimer que les tickets des agents qu'il supervise
       const agentCheck = await pool.query(
         'SELECT id FROM agents WHERE id = $1 AND supervisor_id = $2',
         [ticket.agent_id, user.id]
@@ -471,12 +437,9 @@ app.delete('/api/tickets/:ticketId', authenticateToken, async (req, res) => {
         return res.status(403).json({ error: 'Ce ticket n\'est pas sous votre supervision' });
       }
     }
-    // Propriétaire : pas de restriction de délai ni de vérification supplémentaire
 
-    // 5. Suppression effective
     await pool.query('DELETE FROM tickets WHERE id = $1', [id]);
 
-    // 6. Journalisation (sans colonne "details" qui n'existe pas)
     await pool.query(
       'INSERT INTO activity_log (user_id, user_role, action, ip_address) VALUES ($1, $2, $3, $4)',
       [user.id, user.role, 'delete_ticket', req.ip]
@@ -515,11 +478,12 @@ app.get('/api/winners', async (req, res) => {
 app.get('/api/winners/results', async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT * FROM draw_results ORDER BY published_at DESC LIMIT 10'
+      'SELECT id, draw_id, name, results, lotto3, published_at FROM draw_results ORDER BY published_at DESC LIMIT 10'
     );
     const results = result.rows.map(r => ({
       ...r,
-      numbers: typeof r.results === 'string' ? JSON.parse(r.results) : r.results
+      numbers: typeof r.results === 'string' ? JSON.parse(r.results) : r.results,
+      lotto3: r.lotto3
     }));
     res.json({ results });
   } catch (error) {
@@ -548,7 +512,6 @@ app.post('/api/tickets/check-winners', async (req, res) => {
   }
 });
 
-// Marquer un ticket comme payé
 app.post('/api/winners/pay/:ticketId', authenticateToken, async (req, res) => {
   try {
     const { ticketId } = req.params;
@@ -796,9 +759,7 @@ supervisorRouter.get('/tickets/recent', async (req, res) => {
   }
 });
 
-// ==================== NOUVELLES ROUTES SUPERVISEUR ====================
-
-// Liste des tickets avec filtres (superviseur)
+// NOUVELLES ROUTES SUPERVISEUR
 supervisorRouter.get('/tickets', async (req, res) => {
   try {
     const supervisorId = req.user.id;
@@ -849,7 +810,6 @@ supervisorRouter.get('/tickets', async (req, res) => {
 
     const whereClause = 'WHERE ' + conditions.join(' AND ');
 
-    // Compter le total
     const countQuery = `
       SELECT COUNT(*) as total
       FROM tickets t
@@ -860,7 +820,6 @@ supervisorRouter.get('/tickets', async (req, res) => {
     const total = parseInt(countResult.rows[0].total);
     const hasMore = (page * limit + limit) < total;
 
-    // Récupérer les tickets avec pagination
     const offset = page * limit;
     const dataQuery = `
       SELECT t.*
@@ -885,7 +844,6 @@ supervisorRouter.get('/tickets', async (req, res) => {
   }
 });
 
-// Marquer un ticket comme payé (superviseur)
 supervisorRouter.post('/tickets/:ticketId/pay', async (req, res) => {
   try {
     const { ticketId } = req.params;
@@ -1080,10 +1038,10 @@ ownerRouter.get('/draws', async (req, res) => {
   }
 });
 
-// Publier les résultats (MODIFIÉ pour inclure les gains des mariages gratuits)
+// Publier les résultats (MODIFIÉ pour inclure lotto3 et calcul correct)
 ownerRouter.post('/publish-results', async (req, res) => {
   try {
-    const { drawId, numbers } = req.body;
+    const { drawId, numbers, lotto3 } = req.body;   // ← ajout de lotto3
     if (!drawId || !numbers || !Array.isArray(numbers) || numbers.length !== 3) {
       return res.status(400).json({ error: 'Données invalides' });
     }
@@ -1091,17 +1049,17 @@ ownerRouter.post('/publish-results', async (req, res) => {
     if (draw.rows.length === 0) return res.status(404).json({ error: 'Tirage non trouvé' });
 
     await pool.query(
-      `INSERT INTO draw_results (draw_id, name, results, draw_time, published_at)
-       VALUES ($1, $2, $3, NOW(), NOW())`,
-      [drawId, draw.rows[0].name, JSON.stringify(numbers)]
+      `INSERT INTO draw_results (draw_id, name, results, lotto3, draw_time, published_at)
+       VALUES ($1, $2, $3, $4, NOW(), NOW())`,
+      [drawId, draw.rows[0].name, JSON.stringify(numbers), lotto3]
     );
 
     await pool.query('UPDATE draws SET last_draw = NOW() WHERE id = $1', [drawId]);
 
     // Calcul automatique des gagnants
-    const lot1 = numbers[0];
-    const lot2 = numbers[1];
-    const lot3 = numbers[2];
+    const lot1 = numbers[0]; // 2 chiffres (premier lot)
+    const lot2 = numbers[1]; // 2 chiffres
+    const lot3 = numbers[2]; // 2 chiffres
 
     const ticketsRes = await pool.query(
       'SELECT id, bets FROM tickets WHERE draw_id = $1 AND checked = false',
@@ -1123,17 +1081,20 @@ ownerRouter.post('/publish-results', async (req, res) => {
             if (cleanNumber.length === 2) {
               if (cleanNumber === lot2) gain = amount * 20;
               else if (cleanNumber === lot3) gain = amount * 10;
-              else if (cleanNumber === lot1.slice(-2)) gain = amount * 60;
+              else if (cleanNumber === lot1) gain = amount * 60;
             }
           }
           else if (game === 'lotto3') {
-            if (cleanNumber.length === 3 && cleanNumber === lot1) gain = amount * 500;
+            // Utilisation de lotto3 (3 chiffres)
+            if (cleanNumber.length === 3 && cleanNumber === lotto3) {
+              gain = amount * 500; // ou multiplicateur configuré
+            }
           }
           else if (game === 'mariage' || game === 'auto_marriage') {
             if (cleanNumber.length === 4) {
               const firstPair = cleanNumber.slice(0, 2);
               const secondPair = cleanNumber.slice(2, 4);
-              const pairs = [lot1.slice(-2), lot2, lot3];
+              const pairs = [lot1, lot2, lot3];
               let win = false;
               for (let i = 0; i < 3; i++) {
                 for (let j = 0; j < 3; j++) {
@@ -1145,7 +1106,6 @@ ownerRouter.post('/publish-results', async (req, res) => {
                 if (win) break;
               }
               if (win) {
-                // MODIFICATION : si c'est un pari gratuit spécial, gain fixe 1000, sinon normal
                 if (bet.free && bet.freeType === 'special_marriage') {
                   gain = 1000;
                 } else {
@@ -1158,9 +1118,9 @@ ownerRouter.post('/publish-results', async (req, res) => {
             if (cleanNumber.length === 4 && bet.option) {
               const option = bet.option;
               let expected = '';
-              if (option == 1) expected = lot1.slice(-2) + lot2;
+              if (option == 1) expected = lot1 + lot2;
               else if (option == 2) expected = lot2 + lot3;
-              else if (option == 3) expected = lot1.slice(-2) + lot3;
+              else if (option == 3) expected = lot1 + lot3;
               if (cleanNumber === expected) gain = amount * 5000;
             }
           }
@@ -1168,8 +1128,8 @@ ownerRouter.post('/publish-results', async (req, res) => {
             if (cleanNumber.length === 5 && bet.option) {
               const option = bet.option;
               let expected = '';
-              if (option == 1) expected = lot1 + lot2;
-              else if (option == 2) expected = lot1 + lot3;
+              if (option == 1) expected = lotto3 + lot2;      // lotto3 (3 chiffres) + lot2 (2 chiffres)
+              else if (option == 2) expected = lotto3 + lot3; // lotto3 (3 chiffres) + lot3 (2 chiffres)
               if (cleanNumber === expected) gain = amount * 5000;
             }
           }
@@ -1459,14 +1419,11 @@ ownerRouter.get('/reports', async (req, res) => {
 });
 
 // ========== NOUVELLES ROUTES POUR LA CONFIGURATION PROPRIÉTAIRE ==========
-
-// GET /api/owner/settings - Récupérer les paramètres généraux (nom, slogan, logo, multiplicateurs, limites de jeu)
 ownerRouter.get('/settings', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM lottery_config LIMIT 1');
     const config = result.rows[0] || {};
 
-    // Valeurs par défaut des multiplicateurs
     const defaultMultipliers = {
       lot1: 60,
       lot2: 20,
@@ -1477,7 +1434,6 @@ ownerRouter.get('/settings', async (req, res) => {
       mariage: 500
     };
 
-    // Valeurs par défaut des limites de jeu
     const defaultGameLimits = {
       lotto3: 0,
       lotto4: 0,
@@ -1499,7 +1455,7 @@ ownerRouter.get('/settings', async (req, res) => {
       slogan: config.slogan || '',
       logoUrl: config.logo || '',
       multipliers: multipliers,
-      limits: gameLimits // Renommé en 'limits' pour correspondre au frontend
+      limits: gameLimits
     });
   } catch (error) {
     console.error('❌ Erreur GET /settings:', error);
@@ -1507,12 +1463,10 @@ ownerRouter.get('/settings', async (req, res) => {
   }
 });
 
-// POST /api/owner/settings - Enregistrer les paramètres (gère à la fois JSON et multipart/form-data)
 ownerRouter.post('/settings', upload.single('logo'), async (req, res) => {
   try {
     let { name, slogan, logoUrl, multipliers, limits } = req.body;
 
-    // Si c'est du FormData, multipliers et limits peuvent être des chaînes JSON, on les parse
     if (multipliers && typeof multipliers === 'string') {
       try { multipliers = JSON.parse(multipliers); } catch { multipliers = {}; }
     }
@@ -1520,7 +1474,6 @@ ownerRouter.post('/settings', upload.single('logo'), async (req, res) => {
       try { limits = JSON.parse(limits); } catch { limits = {}; }
     }
 
-    // Valeurs par défaut
     const defaultMultipliers = {
       lot1: 60,
       lot2: 20,
@@ -1539,7 +1492,6 @@ ownerRouter.post('/settings', upload.single('logo'), async (req, res) => {
     };
     limits = { ...defaultGameLimits, ...(limits || {}) };
 
-    // Gestion du logo
     let logo = logoUrl;
     if (req.file) {
       const base64 = req.file.buffer.toString('base64');
@@ -1547,7 +1499,6 @@ ownerRouter.post('/settings', upload.single('logo'), async (req, res) => {
       logo = `data:${mimeType};base64,${base64}`;
     }
 
-    // Mettre à jour ou insérer dans lottery_config
     const check = await pool.query('SELECT id FROM lottery_config LIMIT 1');
     if (check.rows.length === 0) {
       await pool.query(
@@ -1581,8 +1532,6 @@ ownerRouter.post('/settings', upload.single('logo'), async (req, res) => {
 });
 
 // ========== NOUVELLES ROUTES POUR LA GESTION DES TICKETS (PROPRIÉTAIRE) ==========
-
-// Récupérer les tickets avec filtres (pour le propriétaire)
 ownerRouter.get('/tickets', async (req, res) => {
   try {
     const { supervisorId, agentId, drawId, period, fromDate, toDate, gain, paid, page = 0, limit = 20 } = req.query;
@@ -1591,24 +1540,20 @@ ownerRouter.get('/tickets', async (req, res) => {
     let params = [];
     let paramIndex = 1;
 
-    // Filtre par agent
     if (agentId && agentId !== 'all') {
       conditions.push(`t.agent_id = $${paramIndex++}`);
       params.push(agentId);
     }
-    // Filtre par superviseur (via les agents)
     else if (supervisorId && supervisorId !== 'all') {
       conditions.push(`a.supervisor_id = $${paramIndex++}`);
       params.push(supervisorId);
     }
 
-    // Filtre par tirage
     if (drawId && drawId !== 'all') {
       conditions.push(`t.draw_id = $${paramIndex++}`);
       params.push(drawId);
     }
 
-    // Filtre par période
     let dateCondition = '';
     if (period === 'today') {
       dateCondition = 'DATE(t.date) = CURRENT_DATE';
@@ -1626,14 +1571,12 @@ ownerRouter.get('/tickets', async (req, res) => {
       conditions.push(dateCondition);
     }
 
-    // Filtre gain
     if (gain === 'win') {
       conditions.push('t.win_amount > 0');
     } else if (gain === 'nowin') {
       conditions.push('t.win_amount = 0');
     }
 
-    // Filtre paiement
     if (paid === 'paid') {
       conditions.push('t.paid = true');
     } else if (paid === 'unpaid') {
@@ -1642,7 +1585,6 @@ ownerRouter.get('/tickets', async (req, res) => {
 
     const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
 
-    // Compter le total pour savoir s'il y a plus de pages
     const countQuery = `
       SELECT COUNT(*) as total
       FROM tickets t
@@ -1653,7 +1595,6 @@ ownerRouter.get('/tickets', async (req, res) => {
     const total = parseInt(countResult.rows[0].total);
     const hasMore = (page * limit + limit) < total;
 
-    // Récupérer les tickets avec pagination
     const offset = page * limit;
     const dataQuery = `
       SELECT t.*
@@ -1666,7 +1607,6 @@ ownerRouter.get('/tickets', async (req, res) => {
     params.push(limit, offset);
     const dataResult = await pool.query(dataQuery, params);
 
-    // Convertir bets en objet JSON
     const tickets = dataResult.rows.map(t => ({
       ...t,
       bets: typeof t.bets === 'string' ? JSON.parse(t.bets) : t.bets
@@ -1683,7 +1623,6 @@ ownerRouter.get('/tickets', async (req, res) => {
   }
 });
 
-// Récupérer un ticket par son ID (pour afficher les détails)
 ownerRouter.get('/tickets/:ticketId', async (req, res) => {
   try {
     const { ticketId } = req.params;
@@ -1700,11 +1639,9 @@ ownerRouter.get('/tickets/:ticketId', async (req, res) => {
   }
 });
 
-// Supprimer un ticket (propriétaire seulement, sans restriction de temps)
 ownerRouter.delete('/tickets/:ticketId', async (req, res) => {
   try {
     const { ticketId } = req.params;
-    // Vérifier si le ticket existe
     const check = await pool.query('SELECT id FROM tickets WHERE id = $1', [ticketId]);
     if (check.rows.length === 0) {
       return res.status(404).json({ error: 'Ticket non trouvé' });
@@ -1712,7 +1649,6 @@ ownerRouter.delete('/tickets/:ticketId', async (req, res) => {
 
     await pool.query('DELETE FROM tickets WHERE id = $1', [ticketId]);
 
-    // Optionnel: journaliser la suppression
     await pool.query(
       'INSERT INTO activity_log (user_id, user_role, action, details, ip_address) VALUES ($1, $2, $3, $4, $5)',
       [req.user.id, 'owner', 'delete_ticket', `Ticket ID: ${ticketId}`, req.ip]
