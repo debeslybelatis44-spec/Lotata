@@ -120,6 +120,7 @@ header {
     grid-template-columns: repeat(2, 1fr);
     gap: 12px;
     padding: 20px;
+    padding-bottom: 80px; /* Évite que le dernier tirage soit caché par la nav */
     margin-top: 20px;
     min-height: 70vh;
     overflow-y: auto;
@@ -360,6 +361,7 @@ input:focus { border-color: var(--secondary); background: rgba(0,0,0,0.4); }
     flex: 1;
     overflow-y: auto;
     margin: 15px 0;
+    padding-bottom: 20px; /* Évite que le dernier élément soit caché */
 }
 
 .cart-item {
@@ -404,6 +406,11 @@ input:focus { border-color: var(--secondary); background: rgba(0,0,0,0.4); }
     padding: 20px;
 }
 .history-list { display: flex; flex-direction: column; gap: 15px; padding-bottom: 100px; }
+#history-container {
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+    padding-bottom: 80px; /* Ajout pour éviter que le dernier ticket soit caché */
+}
 .history-card {
     background: var(--surface);
     border: 1px solid var(--glass-border);
@@ -412,24 +419,6 @@ input:focus { border-color: var(--secondary); background: rgba(0,0,0,0.4); }
 .card-header { display: flex; justify-content: space-between; border-bottom: 1px solid var(--glass-border); padding-bottom: 8px; margin-bottom: 10px; font-size: 0.8rem; color: var(--text-dim); }
 .card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
 .btn-small { background: rgba(255,255,255,0.1); border: none; color: white; padding: 5px 10px; border-radius: 8px; cursor: pointer; }
-
-/* Nouveau style pour le bouton Modifye */
-.edit-btn {
-    background: rgba(255, 165, 2, 0.1);
-    border: 1px solid var(--warning);
-    color: var(--warning);
-    padding: 5px 10px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 0.75rem;
-    transition: all 0.3s;
-}
-
-.edit-btn:hover {
-    background: var(--warning);
-    color: black;
-    transform: scale(1.05);
-}
 
 .badge { padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; }
 .badge-wait { background: #555; color: white; }
@@ -908,24 +897,70 @@ input:checked + .slider:before {
     opacity: 0.5;
     cursor: not-allowed;
 }
-/* Bouton de déconnexion */
 .logout-btn {
-    background: rgba(255, 77, 77, 0.2);
-    border: 1px solid var(--danger);
-    border-radius: 8px;
-    color: var(--danger);
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    font-size: 1.2rem;
     cursor: pointer;
-    padding: 6px 10px;
-    margin-left: 8px;
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 0.8rem;
+    margin-left: 10px;
+    transition: color 0.2s;
+}
+.logout-btn:hover {
+    color: var(--danger);
 }
 
-.logout-btn:hover {
+.action-buttons {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.edit-history-btn, .delete-history-btn {
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 15px;
+    padding: 5px 10px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.edit-history-btn {
+    color: var(--warning);
+    border-color: var(--warning);
+}
+.edit-history-btn:hover {
+    background: var(--warning);
+    color: white;
+}
+.edit-history-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.delete-history-btn {
+    color: var(--danger);
+    border-color: var(--danger);
+}
+.delete-history-btn:hover {
     background: var(--danger);
     color: white;
-    transform: scale(1.05);
+}
+.delete-history-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* Ajout pour le conteneur des gagnants */
+#winners-container {
+    max-height: calc(100vh - 280px);
+    overflow-y: auto;
+    padding-bottom: 80px; /* Évite que le dernier ticket gagnant soit caché */
 }
