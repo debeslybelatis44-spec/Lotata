@@ -1,5 +1,5 @@
 // ==========================
-// cartManager.js (corrigé)
+// cartManager.js (corrigé avec debug)
 // ==========================
 
 // ---------- Utils ----------
@@ -23,6 +23,7 @@ var CartManager = {
         } else if (amount >= 501) {
             freeCount = 3;
         }
+        console.log('Montant:', amount, 'Gratuits calculés:', freeCount); // ← Ajout pour debug
 
         // 2. Générer les paris normaux via le moteur existant
         const normalBets = GameEngine.generateAutoMarriageBets(amount); // retourne un tableau de paris
