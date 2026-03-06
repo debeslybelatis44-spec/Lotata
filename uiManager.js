@@ -81,7 +81,7 @@ function fixHomeScreenDisplay() {
     }, 100);
 }
 
-// Initialisation de la barre de recherche dans l'historique
+// Initialisation de la barre de recherche dans l'historique (corrigée avec prepend)
 function initHistorySearchBar() {
     const historyScreen = document.getElementById('history-screen');
     if (!historyScreen) return;
@@ -89,16 +89,15 @@ function initHistorySearchBar() {
     // Vérifier si la barre existe déjà
     if (document.getElementById('history-search')) return;
 
-    // Créer le conteneur de la barre de recherche
+    // Créer la barre de recherche
     const searchBar = document.createElement('div');
     searchBar.className = 'search-bar';
     searchBar.innerHTML = '<input type="text" id="history-search" placeholder="Rechèch tikè (nimewo, tiraj, nimewo jwe...)" />';
 
-    // Insérer la barre en haut de l'écran, avant le conteneur des tickets
-    const container = document.getElementById('history-container');
-    historyScreen.insertBefore(searchBar, container);
+    // Ajouter la barre en premier élément de l'écran d'historique
+    historyScreen.prepend(searchBar);
 
-    // Ajouter le style CSS (si pas déjà présent)
+    // Ajouter le style CSS si nécessaire
     if (!document.getElementById('history-search-styles')) {
         const style = document.createElement('style');
         style.id = 'history-search-styles';
@@ -1048,4 +1047,4 @@ window.printReport = printReport;
 window.loadDrawReport = loadDrawReport;
 window.logout = logout;
 window.reprintTicket = reprintTicket;
-window.replayTicket = replayTicket; // Nouvelle fonction exposée
+window.replayTicket = replayTicket;
