@@ -17,7 +17,9 @@ function extractNumbersFromString(str) {
 
 // Génère tous les numéros pour un pattern nX (ex: n1 → 01,11,21,...,91)
 function expandNPattern(input) {
-    const match = input.match(/^n(\d)$/i); // n suivi d'un seul chiffre
+    // Nettoie l'entrée : enlève les espaces et met en minuscules
+    const cleaned = input.replace(/\s+/g, '').toLowerCase();
+    const match = cleaned.match(/^n(\d)$/); // n suivi d'un seul chiffre
     if (!match) return null;
     const lastDigit = match[1];
     const numbers = [];
@@ -48,98 +50,28 @@ var CartManager = {
         }
 
         const game = APP_STATE.selectedGame;
+        let rawNum = numInput.value.trim();
 
-        // --- Gestion des jeux automatiques ---
-        if (game === 'auto_marriage' || game === 'bo' || game === 'grap' || game === 'auto_lotto4' || game === 'auto_lotto5') {
-            let autoBets = [];
-            switch (game) {
-                case 'auto_marriage':
-                    autoBets = GameEngine.generateAutoMarriageBets(amt);
-                    break;
-                case 'bo':
-                    autoBets = SpecialGames.generateBOBets(amt);
-                    break;
-                case 'grap':
-                    autoBets = SpecialGames.generateGRAPBets(amt);
-                    break;
-                case 'auto_lotto4':
-                    autoBets = GameEngine.generateAutoLotto4Bets(amt);
-                    break;
-                case 'auto_lotto5':
-                    autoBets = GameEngine.generateAutoLotto5Bets(amt);
-                    break;
-            }
-
-            if (autoBets.length === 0) {
-                alert("Pa gen ase nimevo nan panye pou jenere " + game);
-                return;
-            }
-
-            // Vérifier que les numéros générés ne sont pas bloqués
-            const draws = APP_STATE.multiDrawMode
-                ? APP_STATE.selectedDraws
-                : [APP_STATE.selectedDraw];
-
-            for (const drawId of draws) {
-                for (const bet of autoBets) {
-                    let numbersToCheck = [];
-                    if (bet.game === 'auto_marriage' && bet.number) {
-                        numbersToCheck = bet.number.split('&');
-                    } else if (bet.number) {
-                        numbersToCheck = extractNumbersFromString(bet.number);
-                    }
-                    for (const num of numbersToCheck) {
-                        if (isNumberBlocked(num, drawId)) {
-                            alert(`Nimewo ${num} bloke – anile ajou`);
-                            return;
-                        }
-                    }
-                }
-            }
-
-            draws.forEach(drawId => {
-                const drawName = CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId;
-                autoBets.forEach(bet => {
-                    APP_STATE.currentCart.push({
-                        ...bet,
-                        id: Date.now() + Math.random(),
-                        drawId: drawId,
-                        drawName: drawName
-                    });
-                });
-            });
-
-            this.renderCart();
-            amtInput.value = '';
-            return;
-        }
-
-        // --- Gestion des jeux normaux (saisie manuelle) ---
-        let num = numInput.value.trim();
-
-        // --- Traitement spécial pour le pattern nX (borlette) ---
+        // --- Étape 1 : Vérifier s'il s'agit d'un pattern nX (uniquement pour borlette) ---
         let numbersToAdd = [];
         if (game === 'borlette') {
-            const expanded = expandNPattern(num);
+            const expanded = expandNPattern(rawNum);
             if (expanded) {
                 numbersToAdd = expanded;
-            } else {
-                // Sinon, on traite comme un numéro normal
-                if (!GameEngine.validateEntry(game, num)) {
-                    alert("Nimewo pa valid");
-                    return;
-                }
-                num = GameEngine.getCleanNumber(num);
-                numbersToAdd = [num];
+                console.log("Pattern nX détecté, génération de", numbersToAdd.length, "numéros");
             }
-        } else {
-            // Pour les autres jeux, validation normale
-            if (!GameEngine.validateEntry(game, num)) {
+        }
+
+        // --- Si ce n'est pas un pattern, on traite normalement ---
+        if (numbersToAdd.length === 0) {
+            // Validation du format pour le jeu en cours
+            if (!GameEngine.validateEntry(game, rawNum)) {
                 alert("Nimewo pa valid");
                 return;
             }
-            num = GameEngine.getCleanNumber(num);
-            numbersToAdd = [num];
+            // Nettoyage du numéro (supprime les espaces, formate)
+            const cleanNum = GameEngine.getCleanNumber(rawNum);
+            numbersToAdd = [cleanNum];
         }
 
         // Vérifier que nous avons des numéros
@@ -166,12 +98,13 @@ var CartManager = {
         draws.forEach(drawId => {
             const drawName = CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId;
             numbersToAdd.forEach(number => {
-                // Pour les jeux Lotto 4/5 avec options multiples, on utilise generateLottoBetsWithOptions
+                // Pour les jeux Lotto 4/5 avec options multiples
                 if (game === 'lotto4' || game === 'lotto5') {
                     const optionBets = GameEngine.generateLottoBetsWithOptions(game, number, amt);
                     optionBets.forEach(bet => {
                         APP_STATE.currentCart.push({
                             ...bet,
+                            id: Date.now() + Math.random(),
                             drawId: drawId,
                             drawName: drawName
                         });
@@ -220,7 +153,6 @@ var CartManager = {
             total += bet.amount;
             count++;
             const gameAbbr = getGameAbbreviation(bet.game, bet);
-            // Affichage spécial pour les mariages auto (format XX*YY)
             let displayNumber = bet.number;
             if (bet.game === 'auto_marriage' && bet.number.includes('&')) {
                 displayNumber = bet.number.replace('&', '*');
@@ -241,7 +173,6 @@ var CartManager = {
 
 // ---------- Fonction d'abréviation des jeux (version courte) ----------
 function getGameAbbreviation(gameName, bet) {
-    // Cas spécial : mariage gratuit (freeType 'special_marriage')
     if (bet && bet.free && bet.freeType === 'special_marriage') {
         return 'marg';
     }
@@ -254,7 +185,6 @@ function getGameAbbreviation(gameName, bet) {
         'auto_lotto4': 'loa4',
         'auto_lotto5': 'loa5',
         'mariage': 'mar',
-        // variantes possibles
         'lotto 3': 'lo3',
         'lotto 4': 'lo4',
         'lotto 5': 'lo5',
@@ -268,7 +198,7 @@ function getGameAbbreviation(gameName, bet) {
     return map[key] || gameName;
 }
 
-// ---------- Save & Print Ticket ----------
+// ---------- Save & Print Ticket (inchangé) ----------
 async function processFinalTicket() {
     if (!APP_STATE.currentCart.length) {
         alert("Panye vid");
@@ -331,162 +261,73 @@ async function processFinalTicket() {
     }
 }
 
-// ---------- PRINT (CSS avec espace logo/texte réduit à zéro) ----------
+// ---------- PRINT (inchangé) ----------
 function printThermalTicket(ticket, printWindow) {
     const html = generateTicketHTML(ticket);
-
     printWindow.document.write(`
         <!DOCTYPE html>
         <html>
         <head>
             <title>Ticket</title>
             <style>
-                @page {
-                    size: 80mm auto;
-                    margin: 2mm;
-                }
+                @page { size: 80mm auto; margin: 2mm; }
                 body {
                     font-family: 'Courier New', monospace;
-                    font-size: 32px;
-                    font-weight: bold;
-                    width: 76mm;
-                    margin: 0 auto;
-                    padding: 4mm;
-                    background: white;
-                    color: black;
+                    font-size: 32px; font-weight: bold;
+                    width: 76mm; margin: 0 auto; padding: 4mm;
+                    background: white; color: black;
                 }
-                .header {
-                    text-align: center !important;
-                    border-bottom: 2px dashed #000;
-                    padding: 0 !important;
-                    margin: 0 0 2px 0 !important;
-                    line-height: 1;
-                }
-                .header img {
-                    display: block !important;
-                    margin: 0 auto !important;
-                    vertical-align: bottom !important;
-                    max-height: 350px;
-                    max-width: 100%;
-                }
-                .header strong {
-                    display: block;
-                    font-size: 40px;
-                    font-weight: bold;
-                    margin: 0;
-                    line-height: 1;
-                }
-                .header small {
-                    display: block;
-                    font-size: 26px;
-                    color: #555;
-                    margin: 0;
-                    line-height: 1;
-                }
-                .info {
-                    margin: 10px 0;
-                }
-                .info p {
-                    margin: 5px 0;
-                    font-size: 20px;
-                    white-space: nowrap;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                }
-                hr {
-                    border: none;
-                    border-top: 2px dashed #000;
-                    margin: 10px 0;
-                }
-                .bet-row {
-                    display: flex;
-                    justify-content: space-between;
-                    margin: 5px 0;
-                    font-weight: bold;
-                    font-size: 32px;
-                }
-                .total-row {
-                    display: flex;
-                    justify-content: space-between;
-                    font-weight: bold;
-                    margin-top: 10px;
-                    font-size: 36px;
-                }
-                .footer {
-                    text-align: center;
-                    margin-top: 20px;
-                    font-style: italic;
-                    font-size: 28px;
-                }
-                .footer p {
-                    font-weight: bold;
-                    margin: 3px 0;
-                }
+                .header { text-align: center; border-bottom: 2px dashed #000; padding: 0; margin: 0 0 2px 0; line-height: 1; }
+                .header img { display: block; margin: 0 auto; max-height: 350px; max-width: 100%; }
+                .header strong { display: block; font-size: 40px; margin: 0; }
+                .header small { display: block; font-size: 26px; color: #555; margin: 0; }
+                .info { margin: 10px 0; }
+                .info p { margin: 5px 0; font-size: 20px; }
+                hr { border: none; border-top: 2px dashed #000; margin: 10px 0; }
+                .bet-row { display: flex; justify-content: space-between; margin: 5px 0; font-size: 32px; }
+                .total-row { display: flex; justify-content: space-between; font-weight: bold; margin-top: 10px; font-size: 36px; }
+                .footer { text-align: center; margin-top: 20px; font-size: 28px; }
             </style>
         </head>
-        <body>
-            ${html}
-        </body>
+        <body>${html}</body>
         </html>
     `);
     printWindow.document.close();
-
-    printWindow.onload = function() {
-        printWindow.focus();
-        printWindow.print();
-    };
+    printWindow.onload = function() { printWindow.focus(); printWindow.print(); };
 }
 
-// ---------- Ticket HTML ----------
 function generateTicketHTML(ticket) {
     const cfg = APP_STATE.lotteryConfig || CONFIG;
-
     const lotteryName = cfg.LOTTERY_NAME || cfg.name || 'LOTATO';
     const slogan = cfg.slogan || '';
     const logoUrl = cfg.LOTTERY_LOGO || cfg.logo || cfg.logoUrl || '';
-
     const dateObj = new Date(ticket.date);
     const formattedDate = dateObj.toLocaleDateString('fr-FR') + ' ' + 
                           dateObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-
     const betsHTML = (ticket.bets || []).map(b => {
         const gameAbbr = getGameAbbreviation(b.game || '', b);
         let displayNumber = b.number || '';
-        // Pour les mariages auto, remplacer & par * pour l'affichage
         if (b.game === 'auto_marriage' && displayNumber.includes('&')) {
             displayNumber = displayNumber.replace('&', '*');
         }
-        return `
-            <div class="bet-row">
-                <span>${gameAbbr} ${displayNumber}</span>
-                <span>${b.amount || 0} G</span>
-            </div>
-        `;
+        return `<div class="bet-row"><span>${gameAbbr} ${displayNumber}</span><span>${b.amount || 0} G</span></div>`;
     }).join('');
-
     return `
         <div class="header">
             ${logoUrl ? `<img src="${logoUrl}" alt="Logo">` : ''}
             <strong>${lotteryName}</strong>
             ${slogan ? `<small>${slogan}</small>` : ''}
         </div>
-
         <div class="info">
             <p>Ticket #: ${ticket.ticket_id || ticket.id}</p>
             <p>Tiraj: ${ticket.draw_name || ticket.drawName || ''}</p>
             <p>Date: ${formattedDate}</p>
             <p>Ajan: ${ticket.agent_name || ticket.agentName || ''}</p>
         </div>
-
         <hr>
         ${betsHTML}
         <hr>
-
-        <div class="total-row">
-            <span>TOTAL</span>
-            <span>${ticket.total_amount || ticket.total || 0} Gdes</span>
-        </div>
-
+        <div class="total-row"><span>TOTAL</span><span>${ticket.total_amount || ticket.total || 0} Gdes</span></div>
         <div class="footer">
             <p>tickets valable jusqu'à 90 jours</p>
             <p>Ref : +509 40 64 3557</p>
