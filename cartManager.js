@@ -1,5 +1,5 @@
 // ==========================
-// cartManager.js (corrigé avec debug)
+// cartManager.js (corrigé - gestion dynamique des gratuits)
 // ==========================
 
 // ---------- Utils ----------
@@ -12,39 +12,65 @@ function isNumberBlocked(number, drawId) {
 // ---------- Cart Manager ----------
 var CartManager = {
 
-    // Génération des paris "Mariage Auto" avec gratuits progressifs
-    generateAutoMarriageBetsWithFree(amount) {
-        // 1. Déterminer le nombre de gratuits selon le montant total saisi
-        let freeCount = 0;
-        if (amount >= 1 && amount <= 100) {
-            freeCount = 1;
-        } else if (amount >= 101 && amount <= 500) {
-            freeCount = 2;
-        } else if (amount >= 501) {
-            freeCount = 3;
-        }
-        console.log('Montant:', amount, 'Gratuits calculés:', freeCount); // ← Ajout pour debug
+    // Met à jour le nombre de mariages gratuits pour chaque tirage en fonction du total payant
+    updateFreeMarriages() {
+        // Regrouper les paris par drawId
+        const betsByDraw = {};
+        APP_STATE.currentCart.forEach(bet => {
+            if (!betsByDraw[bet.drawId]) betsByDraw[bet.drawId] = [];
+            betsByDraw[bet.drawId].push(bet);
+        });
 
-        // 2. Générer les paris normaux via le moteur existant
-        const normalBets = GameEngine.generateAutoMarriageBets(amount); // retourne un tableau de paris
+        // Pour chaque tirage
+        Object.keys(betsByDraw).forEach(drawId => {
+            const bets = betsByDraw[drawId];
+            // Calculer le total des paris payants (amount > 0)
+            const totalPayant = bets.reduce((sum, b) => sum + (b.amount > 0 ? b.amount : 0), 0);
+            
+            // Déterminer le nombre de gratuits requis
+            let requiredFree = 0;
+            if (totalPayant >= 1 && totalPayant <= 100) requiredFree = 1;
+            else if (totalPayant >= 101 && totalPayant <= 500) requiredFree = 2;
+            else if (totalPayant >= 501) requiredFree = 3;
 
-        // 3. Ajouter les gratuits (copies du premier pari normal avec free=true et amount=0)
-        const freeBets = [];
-        if (freeCount > 0 && normalBets.length > 0) {
-            const baseBet = { ...normalBets[0] }; // on prend le premier pari comme modèle
-            for (let i = 0; i < freeCount; i++) {
-                freeBets.push({
-                    ...baseBet,
-                    id: Date.now() + Math.random() + i,
-                    amount: 0,
-                    free: true,
-                    freeType: 'special_marriage'
-                });
+            // Compter les gratuits existants pour ce tirage
+            const existingFree = bets.filter(b => b.free && b.freeType === 'special_marriage').length;
+
+            // Trouver un modèle de pari normal (non gratuit) pour ce tirage
+            const normalBet = bets.find(b => !b.free);
+            if (!normalBet) {
+                // Si pas de pari normal, on ne peut pas ajouter de gratuit (mais normalement il y en a)
+                return;
             }
-        }
 
-        // 4. Retourner la concaténation (normaux + gratuits)
-        return [...normalBets, ...freeBets];
+            if (existingFree < requiredFree) {
+                // Ajouter des gratuits
+                for (let i = 0; i < requiredFree - existingFree; i++) {
+                    const newFree = {
+                        ...normalBet,
+                        id: Date.now() + Math.random() + i,
+                        amount: 0,
+                        free: true,
+                        freeType: 'special_marriage'
+                    };
+                    APP_STATE.currentCart.push(newFree);
+                }
+            } else if (existingFree > requiredFree) {
+                // Supprimer des gratuits en trop (on supprime les derniers ajoutés)
+                const freeBets = bets.filter(b => b.free && b.freeType === 'special_marriage');
+                const toRemove = existingFree - requiredFree;
+                for (let i = 0; i < toRemove; i++) {
+                    const lastFree = freeBets[freeBets.length - 1 - i];
+                    if (lastFree) {
+                        const index = APP_STATE.currentCart.findIndex(b => b.id === lastFree.id);
+                        if (index !== -1) APP_STATE.currentCart.splice(index, 1);
+                    }
+                }
+            }
+        });
+
+        // Re-rendre le panier
+        this.renderCart();
     },
 
     addBet() {
@@ -69,7 +95,8 @@ var CartManager = {
             let autoBets = [];
             switch (game) {
                 case 'auto_marriage':
-                    autoBets = this.generateAutoMarriageBetsWithFree(amt);
+                    // On ne prend que les paris normaux, sans gratuits (ils seront ajoutés via updateFreeMarriages)
+                    autoBets = GameEngine.generateAutoMarriageBets(amt);
                     break;
                 case 'bo':
                     autoBets = SpecialGames.generateBOBets(amt);
@@ -95,7 +122,7 @@ var CartManager = {
                 ? APP_STATE.selectedDraws
                 : [APP_STATE.selectedDraw];
 
-            // Pour chaque tirage, ajouter une copie de chaque pari
+            // Pour chaque tirage, ajouter une copie de chaque pari normal
             draws.forEach(drawId => {
                 const drawName = CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId;
                 autoBets.forEach(bet => {
@@ -108,9 +135,11 @@ var CartManager = {
                 });
             });
 
-            this.renderCart();
+            // Ajuster les gratuits en fonction du nouveau total
+            this.updateFreeMarriages();
+
             amtInput.value = '';
-            numInput.focus(); // Remet le focus sur le champ numéro
+            numInput.focus();
             return;
         }
 
@@ -213,7 +242,8 @@ var CartManager = {
 
     removeBet(id) {
         APP_STATE.currentCart = APP_STATE.currentCart.filter(b => b.id != id);
-        this.renderCart();
+        // Après suppression, on ajuste les gratuits
+        this.updateFreeMarriages();
     },
 
     renderCart() {
