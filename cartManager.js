@@ -1,5 +1,5 @@
 // ==========================
-// cartManager.js (corrigé - gestion dynamique des gratuits)
+// cartManager.js (corrigé - gestion dynamique des gratuits avec seuils modifiés)
 // ==========================
 
 // ---------- Utils ----------
@@ -27,10 +27,10 @@ var CartManager = {
             // Calculer le total des paris payants (amount > 0)
             const totalPayant = bets.reduce((sum, b) => sum + (b.amount > 0 ? b.amount : 0), 0);
             
-            // Déterminer le nombre de gratuits requis
+            // Déterminer le nombre de gratuits requis selon les nouveaux seuils
             let requiredFree = 0;
-            if (totalPayant >= 1 && totalPayant <= 100) requiredFree = 1;
-            else if (totalPayant >= 101 && totalPayant <= 500) requiredFree = 2;
+            if (totalPayant >= 1 && totalPayant <= 200) requiredFree = 1;
+            else if (totalPayant >= 201 && totalPayant <= 500) requiredFree = 2;
             else if (totalPayant >= 501) requiredFree = 3;
 
             // Compter les gratuits existants pour ce tirage

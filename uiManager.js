@@ -1,5 +1,8 @@
 // uiManager.js
 
+// Variable globale pour le terme de recherche
+window.historySearchTerm = '';
+
 // Fonction utilitaire pour récupérer les tickets depuis l'API
 async function fetchTickets() {
     const token = localStorage.getItem('auth_token');
@@ -31,7 +34,6 @@ function switchTab(tabName) {
         case 'home':
             screenId = 'draw-selection-screen';
             document.querySelector('.nav-item:nth-child(1)').classList.add('active');
-            // Correction de l'affichage des tirages (notamment Texas)
             fixHomeScreenDisplay();
             break;
         case 'history':
@@ -56,22 +58,18 @@ function switchTab(tabName) {
     }
 }
 
-// Nouvelle fonction pour ajuster l'affichage des tirages sur l'écran d'accueil
+// Fonction pour ajuster l'affichage des tirages sur l'écran d'accueil
 function fixHomeScreenDisplay() {
-    // On attend un court instant pour que le DOM soit bien mis à jour
     setTimeout(() => {
-        // Cibler tous les éléments susceptibles de contenir le nom d'un tirage
-        // Adapter les sélecteurs selon la structure réelle (ex: .draw-card, .draw-item, .draw-name)
         const drawNames = document.querySelectorAll('.draw-card .draw-name, .draw-item .draw-title, .draw-selection .draw-name');
         drawNames.forEach(el => {
             el.style.whiteSpace = 'normal';
             el.style.wordWrap = 'break-word';
             el.style.overflowWrap = 'break-word';
             el.style.maxWidth = '100%';
-            el.style.fontSize = '1rem'; // Ajuster si nécessaire
+            el.style.fontSize = '1rem';
         });
         
-        // Si les tirages sont dans des conteneurs avec une largeur fixe, on force l'adaptation
         const drawContainers = document.querySelectorAll('.draw-card, .draw-item, .draw-selection');
         drawContainers.forEach(container => {
             container.style.width = 'auto';
@@ -83,6 +81,90 @@ function fixHomeScreenDisplay() {
     }, 100);
 }
 
+// Initialisation de la barre de recherche dans l'historique
+function initHistorySearchBar() {
+    const historyScreen = document.getElementById('history-screen');
+    if (!historyScreen) return;
+
+    // Vérifier si la barre existe déjà
+    if (document.getElementById('history-search')) return;
+
+    // Créer le conteneur de la barre de recherche
+    const searchBar = document.createElement('div');
+    searchBar.className = 'search-bar';
+    searchBar.innerHTML = '<input type="text" id="history-search" placeholder="Rechèch tikè (nimewo, tiraj, nimewo jwe...)" />';
+
+    // Insérer la barre en haut de l'écran, avant le conteneur des tickets
+    const container = document.getElementById('history-container');
+    historyScreen.insertBefore(searchBar, container);
+
+    // Ajouter le style CSS (si pas déjà présent)
+    if (!document.getElementById('history-search-styles')) {
+        const style = document.createElement('style');
+        style.id = 'history-search-styles';
+        style.textContent = `
+            .search-bar {
+                padding: 10px 15px;
+                background: var(--surface);
+                border-bottom: 1px solid var(--glass-border);
+            }
+            .search-bar input {
+                width: 100%;
+                padding: 12px 15px;
+                border: none;
+                border-radius: 30px;
+                background: var(--bg-light);
+                color: var(--text);
+                font-size: 1rem;
+                outline: none;
+            }
+            .search-bar input::placeholder {
+                color: var(--text-dim);
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // Attacher l'événement de recherche
+    const searchInput = document.getElementById('history-search');
+    searchInput.addEventListener('input', function(e) {
+        window.historySearchTerm = e.target.value;
+        renderHistory();
+    });
+}
+
+// Fonction de filtrage des tickets
+function filterTickets(tickets, term) {
+    if (!term) return tickets;
+    term = term.toLowerCase();
+    return tickets.filter(ticket => {
+        // ID du ticket
+        const ticketId = (ticket.ticket_id || ticket.id || '').toString().toLowerCase();
+        if (ticketId.includes(term)) return true;
+
+        // Nom du tirage
+        const drawName = (ticket.draw_name || ticket.drawName || '').toLowerCase();
+        if (drawName.includes(term)) return true;
+
+        // Date formatée
+        const date = new Date(ticket.date || ticket.created_at);
+        const dateStr = date.toLocaleDateString('fr-FR').toLowerCase();
+        if (dateStr.includes(term)) return true;
+
+        // Numéros joués (dans les paris)
+        const bets = ticket.bets || [];
+        let numbers = '';
+        if (Array.isArray(bets)) {
+            numbers = bets.map(b => b.number || '').join(' ').toLowerCase();
+        } else if (typeof bets === 'string') {
+            numbers = bets.toLowerCase();
+        }
+        if (numbers.includes(term)) return true;
+
+        return false;
+    });
+}
+
 async function loadHistory() {
     try {
         const container = document.getElementById('history-container');
@@ -90,7 +172,11 @@ async function loadHistory() {
         
         const tickets = await fetchTickets();
         APP_STATE.ticketsHistory = tickets;
-        
+
+        // Initialiser la barre de recherche (une seule fois)
+        initHistorySearchBar();
+
+        // Lancer l'affichage
         renderHistory();
     } catch (error) {
         console.error('Erreur chargement historique:', error);
@@ -106,8 +192,16 @@ function renderHistory() {
         container.innerHTML = '<div class="empty-msg">Pa gen tikè nan istorik</div>';
         return;
     }
+
+    // Appliquer le filtre
+    const filteredTickets = filterTickets(APP_STATE.ticketsHistory, window.historySearchTerm);
+
+    if (filteredTickets.length === 0) {
+        container.innerHTML = '<div class="empty-msg">Pa gen tikè ki koresponn ak rechèch la</div>';
+        return;
+    }
     
-    container.innerHTML = APP_STATE.ticketsHistory.map((ticket, index) => {
+    container.innerHTML = filteredTickets.map((ticket, index) => {
         const numericId = ticket.id;
         const displayId = ticket.ticket_id || ticket.id;
         const drawName = ticket.draw_name || ticket.drawName || ticket.draw_name_fr || 'Tiraj Inkonu';
@@ -188,6 +282,10 @@ function renderHistory() {
                         ` : ''}
                         <button class="btn-small print-btn" onclick="reprintTicket('${displayId}')">
                             <i class="fas fa-print"></i> Enprime
+                        </button>
+                        <!-- Nouveau bouton Rejwe -->
+                        <button class="btn-small replay-btn" onclick="replayTicket('${displayId}')">
+                            <i class="fas fa-redo"></i> Rejwe
                         </button>
                         <button class="delete-history-btn" onclick="deleteTicketFromCard(this)" ${canDelete ? '' : 'disabled'}>
                             <i class="fas fa-trash"></i> Efase
@@ -274,7 +372,67 @@ function editTicket(ticketId) {
     alert(`Tikè #${ticket.ticket_id || ticket.id} charge nan panye. Ou kapab modifye l.`);
 }
 
-// Réimpression d'un ticket depuis l'historique (version corrigée)
+// Nouvelle fonction pour rejouer un ticket
+function replayTicket(ticketId) {
+    const ticket = APP_STATE.ticketsHistory.find(t => t.id === ticketId || t.ticket_id === ticketId);
+    if (!ticket) {
+        alert("Tikè pa jwenn!");
+        return;
+    }
+
+    // Récupérer les tirages sélectionnés (mode simple ou multiple)
+    const draws = APP_STATE.multiDrawMode
+        ? APP_STATE.selectedDraws
+        : [APP_STATE.selectedDraw];
+
+    if (!draws || draws.length === 0) {
+        alert("Chwazi yon tiraj anvan!");
+        return;
+    }
+
+    // Extraire les paris du ticket
+    let bets = [];
+    if (Array.isArray(ticket.bets)) {
+        bets = ticket.bets;
+    } else if (typeof ticket.bets === 'string') {
+        try {
+            bets = JSON.parse(ticket.bets);
+        } catch (e) {
+            bets = [];
+        }
+    } else if (ticket.bets && typeof ticket.bets === 'object') {
+        // Si c'est un objet, on le convertit en tableau (ex: { "12": 50, "34": 100 })
+        bets = Object.entries(ticket.bets).map(([num, amt]) => ({ number: num, amount: amt }));
+    }
+
+    // Pour chaque tirage sélectionné, ajouter une copie de chaque pari
+    draws.forEach(drawId => {
+        const drawName = CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId;
+        bets.forEach(bet => {
+            const newBet = {
+                ...bet,
+                id: Date.now() + Math.random(),
+                drawId: drawId,
+                drawName: drawName,
+                // Supprimer les éventuelles informations de gain
+                win_amount: undefined,
+                paid: undefined,
+                checked: undefined
+            };
+            APP_STATE.currentCart.push(newBet);
+        });
+    });
+
+    // Mettre à jour l'affichage du panier
+    CartManager.renderCart();
+
+    // Basculer vers l'écran d'accueil pour visualiser/modifier
+    switchTab('home');
+
+    alert(`Tikè #${ticket.ticket_id || ticket.id} rejwete nan panye.`);
+}
+
+// Réimpression d'un ticket depuis l'historique
 function reprintTicket(ticketId) {
     const ticket = APP_STATE.ticketsHistory.find(t => t.id === ticketId || t.ticket_id === ticketId);
     if (!ticket) {
@@ -282,18 +440,15 @@ function reprintTicket(ticketId) {
         return;
     }
 
-    // Créer une fenêtre d'impression comme dans processFinalTicket
     const printWindow = window.open('', '_blank', 'width=500,height=700');
     if (!printWindow) {
         alert("Veuillez autoriser les pop-ups pour imprimer le ticket.");
         return;
     }
 
-    // Afficher un message de chargement
     printWindow.document.write('<html><head><title>Chargement...</title></head><body><p style="font-size:20px; text-align:center;">Génération du ticket en cours...</p></body></html>');
     printWindow.document.close();
 
-    // Appeler la fonction d'impression avec la fenêtre
     printThermalTicket(ticket, printWindow);
 }
 
@@ -438,7 +593,7 @@ async function loadDrawReport(drawId = null) {
     }
 }
 
-// Impression des rapports (version simplifiée : uniquement les totaux)
+// Impression des rapports
 function printReport() {
     const drawSelector = document.getElementById('draw-report-selector');
     const selectedDraw = drawSelector.options[drawSelector.selectedIndex].text;
@@ -466,7 +621,6 @@ function printReport() {
     const logoUrl = cfg.LOTTERY_LOGO || cfg.logo || cfg.logoUrl || '';
     const slogan = cfg.slogan || '';
 
-    // Ouvrir une nouvelle fenêtre pour l'impression
     const printWindow = window.open('', '_blank', 'width=400,height=600');
     if (!printWindow) {
         alert("Veuillez autoriser les pop-ups pour imprimer le rapport.");
@@ -501,7 +655,7 @@ function printReport() {
                     line-height: 1.2;
                 }
                 .header img {
-                    max-height: 180px;  /* Augmenté pour un logo plus grand */
+                    max-height: 180px;
                     max-width: 100%;
                     margin-bottom: 5px;
                 }
@@ -843,14 +997,12 @@ async function loadLotteryConfig() {
         if (config) {
             APP_STATE.lotteryConfig = config;
 
-            // Mettre à jour CONFIG avec toutes les propriétés (pour compatibilité)
             CONFIG.LOTTERY_NAME = config.name || 'LOTATO';
             CONFIG.LOTTERY_LOGO = config.logo || config.logoUrl || '';
             CONFIG.slogan = config.slogan || '';
             CONFIG.LOTTERY_ADDRESS = config.address || '';
             CONFIG.LOTTERY_PHONE = config.phone || '';
 
-            // Mettre à jour l'affichage
             document.getElementById('lottery-name').innerHTML = `${config.name} <span class="pro-badge">version 6</span>`;
             const sloganEl = document.getElementById('lottery-slogan');
             if (sloganEl) sloganEl.textContent = config.slogan || '';
@@ -896,3 +1048,4 @@ window.printReport = printReport;
 window.loadDrawReport = loadDrawReport;
 window.logout = logout;
 window.reprintTicket = reprintTicket;
+window.replayTicket = replayTicket; // Nouvelle fonction exposée
