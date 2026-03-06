@@ -15,6 +15,20 @@ function extractNumbersFromString(str) {
     return matches || [];
 }
 
+// Génère tous les numéros pour un pattern nX (ex: n1 → 01,11,21,...,91)
+function expandNPattern(input) {
+    const match = input.match(/^n(\d)$/i); // n suivi d'un seul chiffre
+    if (!match) return null;
+    const lastDigit = match[1];
+    const numbers = [];
+    for (let i = 0; i <= 9; i++) {
+        // Former le nombre à deux chiffres : dizaine i, unité lastDigit
+        const num = i.toString() + lastDigit; // "0"+"1" = "01", "1"+"1" = "11", etc.
+        numbers.push(num);
+    }
+    return numbers;
+}
+
 // ---------- Cart Manager ----------
 var CartManager = {
 
@@ -68,14 +82,11 @@ var CartManager = {
 
             for (const drawId of draws) {
                 for (const bet of autoBets) {
-                    // Extraire les numéros du bet selon son type
                     let numbersToCheck = [];
                     if (bet.game === 'auto_marriage' && bet.number) {
-                        numbersToCheck = bet.number.split('&'); // "12&34" → ["12","34"]
+                        numbersToCheck = bet.number.split('&');
                     } else if (bet.number) {
                         numbersToCheck = extractNumbersFromString(bet.number);
-                    } else {
-                        continue;
                     }
                     for (const num of numbersToCheck) {
                         if (isNumberBlocked(num, drawId)) {
@@ -86,7 +97,6 @@ var CartManager = {
                 }
             }
 
-            // Ajouter les paris
             draws.forEach(drawId => {
                 const drawName = CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId;
                 autoBets.forEach(bet => {
@@ -107,16 +117,33 @@ var CartManager = {
         // --- Gestion des jeux normaux (saisie manuelle) ---
         let num = numInput.value.trim();
 
-        if (!GameEngine.validateEntry(game, num)) {
-            alert("Nimewo pa valid");
-            return;
+        // --- Traitement spécial pour le pattern nX (borlette) ---
+        let numbersToAdd = [];
+        if (game === 'borlette') {
+            const expanded = expandNPattern(num);
+            if (expanded) {
+                numbersToAdd = expanded;
+            } else {
+                // Sinon, on traite comme un numéro normal
+                if (!GameEngine.validateEntry(game, num)) {
+                    alert("Nimewo pa valid");
+                    return;
+                }
+                num = GameEngine.getCleanNumber(num);
+                numbersToAdd = [num];
+            }
+        } else {
+            // Pour les autres jeux, validation normale
+            if (!GameEngine.validateEntry(game, num)) {
+                alert("Nimewo pa valid");
+                return;
+            }
+            num = GameEngine.getCleanNumber(num);
+            numbersToAdd = [num];
         }
 
-        num = GameEngine.getCleanNumber(num);
-
-        // Extraire tous les numéros pour vérification blocage
-        const numbersToCheck = extractNumbersFromString(num);
-        if (numbersToCheck.length === 0) {
+        // Vérifier que nous avons des numéros
+        if (numbersToAdd.length === 0) {
             alert("Pa gen nimewo valab");
             return;
         }
@@ -127,7 +154,7 @@ var CartManager = {
 
         // Vérifier chaque numéro pour chaque tirage
         for (const drawId of draws) {
-            for (const n of numbersToCheck) {
+            for (const n of numbersToAdd) {
                 if (isNumberBlocked(n, drawId)) {
                     alert(`Nimewo ${n} bloke pou tiraj sa a`);
                     return;
@@ -135,29 +162,33 @@ var CartManager = {
             }
         }
 
+        // Ajouter les paris : pour chaque numéro dans numbersToAdd, pour chaque tirage
         draws.forEach(drawId => {
-            // Pour les jeux Lotto 4/5 avec options multiples
-            if (game === 'lotto4' || game === 'lotto5') {
-                const optionBets = GameEngine.generateLottoBetsWithOptions(game, num, amt);
-                optionBets.forEach(bet => {
-                    APP_STATE.currentCart.push({
-                        ...bet,
-                        drawId: drawId,
-                        drawName: CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId
+            const drawName = CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId;
+            numbersToAdd.forEach(number => {
+                // Pour les jeux Lotto 4/5 avec options multiples, on utilise generateLottoBetsWithOptions
+                if (game === 'lotto4' || game === 'lotto5') {
+                    const optionBets = GameEngine.generateLottoBetsWithOptions(game, number, amt);
+                    optionBets.forEach(bet => {
+                        APP_STATE.currentCart.push({
+                            ...bet,
+                            drawId: drawId,
+                            drawName: drawName
+                        });
                     });
-                });
-            } else {
-                APP_STATE.currentCart.push({
-                    id: Date.now() + Math.random(),
-                    game: game,
-                    number: num,
-                    cleanNumber: num,
-                    amount: amt,
-                    drawId: drawId,
-                    drawName: CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId,
-                    timestamp: new Date().toISOString()
-                });
-            }
+                } else {
+                    APP_STATE.currentCart.push({
+                        id: Date.now() + Math.random(),
+                        game: game,
+                        number: number,
+                        cleanNumber: number,
+                        amount: amt,
+                        drawId: drawId,
+                        drawName: drawName,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+            });
         });
 
         this.renderCart();
