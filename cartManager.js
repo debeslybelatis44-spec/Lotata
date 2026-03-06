@@ -12,9 +12,9 @@ function isNumberBlocked(number, drawId) {
 // ---------- Cart Manager ----------
 var CartManager = {
 
-    // Nouvelle fonction pour générer les paris "Mariage Auto" avec gratuits progressifs
+    // Génération des paris "Mariage Auto" avec gratuits progressifs
     generateAutoMarriageBetsWithFree(amount) {
-        // 1. Déterminer le nombre de gratuits selon le montant
+        // 1. Déterminer le nombre de gratuits selon le montant total saisi
         let freeCount = 0;
         if (amount >= 1 && amount <= 100) {
             freeCount = 1;
@@ -24,9 +24,9 @@ var CartManager = {
             freeCount = 3;
         }
 
-        // 2. Générer le pari normal (via le moteur existant)
-        const normalBets = GameEngine.generateAutoMarriageBets(amount); // retourne un tableau contenant le(s) pari(s) normal(aux)
-        
+        // 2. Générer les paris normaux via le moteur existant
+        const normalBets = GameEngine.generateAutoMarriageBets(amount); // retourne un tableau de paris
+
         // 3. Ajouter les gratuits (copies du premier pari normal avec free=true et amount=0)
         const freeBets = [];
         if (freeCount > 0 && normalBets.length > 0) {
@@ -63,12 +63,11 @@ var CartManager = {
 
         const game = APP_STATE.selectedGame;
 
-        // --- Gestion des jeux automatiques (existants) ---
+        // --- Gestion des jeux automatiques ---
         if (game === 'auto_marriage' || game === 'bo' || game === 'grap' || game === 'auto_lotto4' || game === 'auto_lotto5') {
             let autoBets = [];
             switch (game) {
                 case 'auto_marriage':
-                    // Utilisation de la nouvelle fonction avec gratuits progressifs
                     autoBets = this.generateAutoMarriageBetsWithFree(amt);
                     break;
                 case 'bo':
@@ -110,26 +109,23 @@ var CartManager = {
 
             this.renderCart();
             amtInput.value = '';
+            numInput.focus(); // Remet le focus sur le champ numéro
             return;
         }
 
-        // --- Nouvelle gestion des jeux NX (n0 à n9) ---
+        // --- Gestion des jeux NX (n0 à n9) ---
         if (/^n[0-9]$/.test(game)) {
-            // Extraire le chiffre (ex: 'n3' → 3)
             const lastDigit = parseInt(game.substring(1), 10);
-            // Générer les 10 numéros à deux chiffres se terminant par ce chiffre
             const numbers = [];
             for (let tens = 0; tens <= 9; tens++) {
-                // Formatage sur deux chiffres (ex: 03, 13, ...)
-                const numStr = tens.toString() + lastDigit.toString();
-                numbers.push(numStr);
+                numbers.push(tens.toString() + lastDigit.toString());
             }
 
-            // Vérifier qu'aucun numéro n'est bloqué pour les tirages sélectionnés
             const draws = APP_STATE.multiDrawMode
                 ? APP_STATE.selectedDraws
                 : [APP_STATE.selectedDraw];
 
+            // Vérification des numéros bloqués
             for (const drawId of draws) {
                 for (const num of numbers) {
                     if (isNumberBlocked(num, drawId)) {
@@ -139,16 +135,16 @@ var CartManager = {
                 }
             }
 
-            // Ajouter chaque numéro comme un pari individuel
+            // Ajout des paris
             draws.forEach(drawId => {
                 const drawName = CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId;
                 numbers.forEach(num => {
                     APP_STATE.currentCart.push({
                         id: Date.now() + Math.random(),
-                        game: game,           // on garde le type 'n3' pour l'affichage
+                        game: game,
                         number: num,
                         cleanNumber: num,
-                        amount: amt,           // montant unitaire
+                        amount: amt,
                         drawId: drawId,
                         drawName: drawName,
                         timestamp: new Date().toISOString()
@@ -159,6 +155,7 @@ var CartManager = {
             this.renderCart();
             numInput.value = '';
             amtInput.value = '';
+            numInput.focus();
             return;
         }
 
@@ -184,7 +181,6 @@ var CartManager = {
         }
 
         draws.forEach(drawId => {
-            // Pour les jeux Lotto 4/5 avec options multiples
             if (game === 'lotto4' || game === 'lotto5') {
                 const optionBets = GameEngine.generateLottoBetsWithOptions(game, num, amt);
                 optionBets.forEach(bet => {
@@ -211,6 +207,7 @@ var CartManager = {
         this.renderCart();
         numInput.value = '';
         amtInput.value = '';
+        numInput.focus();
     },
 
     removeBet(id) {
@@ -237,7 +234,6 @@ var CartManager = {
             total += bet.amount;
             count++;
             const gameAbbr = getGameAbbreviation(bet.game, bet);
-            // Affichage spécial pour les mariages auto (format XX*YY)
             let displayNumber = bet.number;
             if (bet.game === 'auto_marriage' && bet.number && bet.number.includes('&')) {
                 displayNumber = bet.number.replace('&', '*');
@@ -271,7 +267,6 @@ function getGameAbbreviation(gameName, bet) {
         'auto_lotto4': 'loa4',
         'auto_lotto5': 'loa5',
         'mariage': 'mar',
-        // variantes possibles
         'lotto 3': 'lo3',
         'lotto 4': 'lo4',
         'lotto 5': 'lo5',
@@ -280,7 +275,6 @@ function getGameAbbreviation(gameName, bet) {
         'loto5': 'lo5',
         'bo': 'bo',
         'grap': 'grap',
-        // Ajout des jeux NX
         'n0': 'n0',
         'n1': 'n1',
         'n2': 'n2',
@@ -480,7 +474,6 @@ function generateTicketHTML(ticket) {
     const betsHTML = (ticket.bets || []).map(b => {
         const gameAbbr = getGameAbbreviation(b.game || '', b);
         let displayNumber = b.number || '';
-        // Pour les mariages auto, remplacer & par * pour l'affichage
         if (b.game === 'auto_marriage' && displayNumber.includes('&')) {
             displayNumber = displayNumber.replace('&', '*');
         }
@@ -526,4 +519,4 @@ function generateTicketHTML(ticket) {
 // ---------- Global ----------
 window.CartManager = CartManager;
 window.processFinalTicket = processFinalTicket;
-window.printThermalTicket = printThermalTicket; // ← ajout pour que uiManager.js puisse l'utiliser
+window.printThermalTicket = printThermalTicket;
