@@ -274,14 +274,27 @@ function editTicket(ticketId) {
     alert(`Tikè #${ticket.ticket_id || ticket.id} charge nan panye. Ou kapab modifye l.`);
 }
 
-// Réimpression d'un ticket depuis l'historique
+// Réimpression d'un ticket depuis l'historique (version corrigée)
 function reprintTicket(ticketId) {
     const ticket = APP_STATE.ticketsHistory.find(t => t.id === ticketId || t.ticket_id === ticketId);
     if (!ticket) {
         alert("Tikè pa jwenn!");
         return;
     }
-    printThermalTicket(ticket);
+
+    // Créer une fenêtre d'impression comme dans processFinalTicket
+    const printWindow = window.open('', '_blank', 'width=500,height=700');
+    if (!printWindow) {
+        alert("Veuillez autoriser les pop-ups pour imprimer le ticket.");
+        return;
+    }
+
+    // Afficher un message de chargement
+    printWindow.document.write('<html><head><title>Chargement...</title></head><body><p style="font-size:20px; text-align:center;">Génération du ticket en cours...</p></body></html>');
+    printWindow.document.close();
+
+    // Appeler la fonction d'impression avec la fenêtre
+    printThermalTicket(ticket, printWindow);
 }
 
 async function loadReports() {
