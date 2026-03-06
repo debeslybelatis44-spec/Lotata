@@ -9,6 +9,12 @@ function isNumberBlocked(number, drawId) {
     return drawBlocked.includes(number);
 }
 
+// Extrait tous les numéros d'une chaîne (ex: "12 34 56" → ["12","34","56"])
+function extractNumbersFromString(str) {
+    const matches = str.match(/\d+/g);
+    return matches || [];
+}
+
 // ---------- Cart Manager ----------
 var CartManager = {
 
@@ -55,18 +61,38 @@ var CartManager = {
                 return;
             }
 
-            // Récupérer les tirages sélectionnés
+            // Vérifier que les numéros générés ne sont pas bloqués
             const draws = APP_STATE.multiDrawMode
                 ? APP_STATE.selectedDraws
                 : [APP_STATE.selectedDraw];
 
-            // Pour chaque tirage, ajouter une copie de chaque pari
+            for (const drawId of draws) {
+                for (const bet of autoBets) {
+                    // Extraire les numéros du bet selon son type
+                    let numbersToCheck = [];
+                    if (bet.game === 'auto_marriage' && bet.number) {
+                        numbersToCheck = bet.number.split('&'); // "12&34" → ["12","34"]
+                    } else if (bet.number) {
+                        numbersToCheck = extractNumbersFromString(bet.number);
+                    } else {
+                        continue;
+                    }
+                    for (const num of numbersToCheck) {
+                        if (isNumberBlocked(num, drawId)) {
+                            alert(`Nimewo ${num} bloke – anile ajou`);
+                            return;
+                        }
+                    }
+                }
+            }
+
+            // Ajouter les paris
             draws.forEach(drawId => {
                 const drawName = CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId;
                 autoBets.forEach(bet => {
                     APP_STATE.currentCart.push({
                         ...bet,
-                        id: Date.now() + Math.random(), // nouvel ID unique
+                        id: Date.now() + Math.random(),
                         drawId: drawId,
                         drawName: drawName
                     });
@@ -88,14 +114,24 @@ var CartManager = {
 
         num = GameEngine.getCleanNumber(num);
 
+        // Extraire tous les numéros pour vérification blocage
+        const numbersToCheck = extractNumbersFromString(num);
+        if (numbersToCheck.length === 0) {
+            alert("Pa gen nimewo valab");
+            return;
+        }
+
         const draws = APP_STATE.multiDrawMode
             ? APP_STATE.selectedDraws
             : [APP_STATE.selectedDraw];
 
+        // Vérifier chaque numéro pour chaque tirage
         for (const drawId of draws) {
-            if (isNumberBlocked(num, drawId)) {
-                alert(`Nimewo ${num} bloke`);
-                return;
+            for (const n of numbersToCheck) {
+                if (isNumberBlocked(n, drawId)) {
+                    alert(`Nimewo ${n} bloke pou tiraj sa a`);
+                    return;
+                }
             }
         }
 
@@ -152,7 +188,7 @@ var CartManager = {
         display.innerHTML = APP_STATE.currentCart.map(bet => {
             total += bet.amount;
             count++;
-            const gameAbbr = getGameAbbreviation(bet.game, bet); // ← on passe bet pour détecter gratuit
+            const gameAbbr = getGameAbbreviation(bet.game, bet);
             // Affichage spécial pour les mariages auto (format XX*YY)
             let displayNumber = bet.number;
             if (bet.game === 'auto_marriage' && bet.number.includes('&')) {
@@ -383,7 +419,7 @@ function generateTicketHTML(ticket) {
                           dateObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
     const betsHTML = (ticket.bets || []).map(b => {
-        const gameAbbr = getGameAbbreviation(b.game || '', b); // ← on passe b pour détecter gratuit
+        const gameAbbr = getGameAbbreviation(b.game || '', b);
         let displayNumber = b.number || '';
         // Pour les mariages auto, remplacer & par * pour l'affichage
         if (b.game === 'auto_marriage' && displayNumber.includes('&')) {

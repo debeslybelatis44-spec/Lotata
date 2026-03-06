@@ -425,7 +425,7 @@ async function loadDrawReport(drawId = null) {
     }
 }
 
-// Impression des rapports (version adaptée pour papier thermique)
+// Impression des rapports (version simplifiée : uniquement les totaux)
 function printReport() {
     const drawSelector = document.getElementById('draw-report-selector');
     const selectedDraw = drawSelector.options[drawSelector.selectedIndex].text;
@@ -460,20 +460,6 @@ function printReport() {
         return;
     }
 
-    // Construire la liste des tickets sous forme de blocs
-    const ticketsHTML = tickets.map(t => {
-        const date = new Date(t.date).toLocaleString('fr-FR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
-        const amount = (t.total_amount || t.amount || 0).toLocaleString('fr-FR');
-        const win = (t.win_amount || 0).toLocaleString('fr-FR');
-        return `
-            <div style="border-bottom: 1px dashed #000; padding: 5px 0;">
-                <div><strong>#${t.ticket_id || t.id}</strong> - ${t.draw_name || ''}</div>
-                <div>Heure: ${date}</div>
-                <div>Mise: ${amount} Gdes | Gain: ${win} Gdes</div>
-            </div>
-        `;
-    }).join('');
-
     const html = `
         <!DOCTYPE html>
         <html>
@@ -502,7 +488,7 @@ function printReport() {
                     line-height: 1.2;
                 }
                 .header img {
-                    max-height: 120px;
+                    max-height: 180px;  /* Augmenté pour un logo plus grand */
                     max-width: 100%;
                     margin-bottom: 5px;
                 }
@@ -565,11 +551,6 @@ function printReport() {
                 <div class="row"><span>Total Ganyen:</span> <span>${totalWins.toLocaleString('fr-FR')} G</span></div>
                 <div class="row"><span>Pèdi:</span> <span>${totalLoss.toLocaleString('fr-FR')} G</span></div>
                 <div class="row total-row"><span>Balans:</span> <span>${balance.toLocaleString('fr-FR')} G</span></div>
-            </div>
-
-            <div class="section">
-                <div class="section-title">Detay Tikè</div>
-                ${ticketsHTML}
             </div>
 
             <div class="footer">
