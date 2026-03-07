@@ -1,5 +1,5 @@
 // ==========================
-// cartManager.js (corrigé - gestion dynamique des gratuits avec seuils modifiés)
+// cartManager.js (corrigé - gestion dynamique des gratuits avec nouveaux seuils et diversification)
 // ==========================
 
 // ---------- Utils ----------
@@ -27,27 +27,32 @@ var CartManager = {
             // Calculer le total des paris payants (amount > 0)
             const totalPayant = bets.reduce((sum, b) => sum + (b.amount > 0 ? b.amount : 0), 0);
             
-            // Déterminer le nombre de gratuits requis selon les nouveaux seuils
+            // MODIFIÉ : Nouveaux seuils selon votre demande
             let requiredFree = 0;
-            if (totalPayant >= 1 && totalPayant <= 200) requiredFree = 1;
-            else if (totalPayant >= 201 && totalPayant <= 500) requiredFree = 2;
-            else if (totalPayant >= 501) requiredFree = 3;
+            if (totalPayant >= 100 && totalPayant < 500) {
+                requiredFree = 1;
+            } else if (totalPayant >= 500 && totalPayant < 600) {
+                requiredFree = 2;
+            } else if (totalPayant >= 600) {
+                requiredFree = 3;
+            }
 
             // Compter les gratuits existants pour ce tirage
             const existingFree = bets.filter(b => b.free && b.freeType === 'special_marriage').length;
 
-            // Trouver un modèle de pari normal (non gratuit) pour ce tirage
-            const normalBet = bets.find(b => !b.free);
-            if (!normalBet) {
-                // Si pas de pari normal, on ne peut pas ajouter de gratuit (mais normalement il y en a)
-                return;
-            }
-
+            // MODIFIÉ : Récupérer tous les paris normaux pour diversifier les modèles
+            const normalBets = bets.filter(b => !b.free);
+            
             if (existingFree < requiredFree) {
-                // Ajouter des gratuits
+                // S'il n'y a aucun pari normal, on ne peut pas ajouter de gratuit
+                if (normalBets.length === 0) return;
+
+                // Ajouter des gratuits en alternant les modèles de paris normaux
                 for (let i = 0; i < requiredFree - existingFree; i++) {
+                    // On alterne les paris normaux (modulo) pour avoir des numéros différents
+                    const model = normalBets[i % normalBets.length];
                     const newFree = {
-                        ...normalBet,
+                        ...model,
                         id: Date.now() + Math.random() + i,
                         amount: 0,
                         free: true,
@@ -235,6 +240,9 @@ var CartManager = {
         });
 
         this.renderCart();
+        // MODIFIÉ : Ajout de l'appel pour mettre à jour les mariages gratuits après un ajout manuel
+        this.updateFreeMarriages();
+
         numInput.value = '';
         amtInput.value = '';
         numInput.focus();
