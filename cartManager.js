@@ -1,5 +1,5 @@
 // ==========================
-// cartManager.js (version corrigée - gestion dynamique des gratuits)
+// cartManager.js (corrigé - gestion dynamique des gratuits avec seuils corrects)
 // ==========================
 
 // ---------- Utils ----------
@@ -9,69 +9,78 @@ function isNumberBlocked(number, drawId) {
     return drawBlocked.includes(number);
 }
 
-// Fonction utilitaire pour générer un numéro de mariage aléatoire (format XX-XX)
-function generateRandomMarriageNumber() {
-    const pairs = [];
-    for (let i = 0; i < 4; i++) {
-        pairs.push(Math.floor(Math.random() * 10).toString());
-    }
-    // Format XX-XX
-    return pairs[0] + pairs[1] + '-' + pairs[2] + pairs[3];
-}
-
 // ---------- Cart Manager ----------
 var CartManager = {
 
     // Met à jour le nombre de mariages gratuits pour chaque tirage en fonction du total payant
     updateFreeMarriages() {
-        // 1. Supprimer tous les mariages gratuits existants
-        APP_STATE.currentCart = APP_STATE.currentCart.filter(bet => 
-            !(bet.free && bet.freeType === 'special_marriage')
-        );
-
-        // 2. Regrouper les paris par drawId
+        // Regrouper les paris par drawId
         const betsByDraw = {};
         APP_STATE.currentCart.forEach(bet => {
             if (!betsByDraw[bet.drawId]) betsByDraw[bet.drawId] = [];
             betsByDraw[bet.drawId].push(bet);
         });
 
-        // 3. Pour chaque tirage, calculer les mariages gratuits nécessaires
+        // Pour chaque tirage
         Object.keys(betsByDraw).forEach(drawId => {
             const bets = betsByDraw[drawId];
-            
-            // Calculer le total des paris payants pour ce tirage
-            const totalPayant = bets.reduce((sum, b) => sum + (b.amount > 0 ? b.amount : 0), 0);
-            
-            // Déterminer le nombre de gratuits requis selon les seuils
+
+            // Calculer le total des paris PAYANTS uniquement (non gratuits, montant > 0)
+            const totalPayant = bets.reduce((sum, b) =>
+                (!b.free && b.amount > 0) ? sum + b.amount : sum, 0);
+
+            // ✅ Seuils corrigés selon les règles métier :
+            // >= 100G  → 1 mariage gratuit
+            // >= 250G  → 2 mariages gratuits
+            // >= 500G  → 3 mariages gratuits
+            // <  100G  → 0 mariage gratuit
             let requiredFree = 0;
-            if (totalPayant >= 1 && totalPayant <= 200) requiredFree = 1;
-            else if (totalPayant >= 201 && totalPayant <= 500) requiredFree = 2;
-            else if (totalPayant >= 501) requiredFree = 3;
+            if (totalPayant >= 500)      requiredFree = 3;
+            else if (totalPayant >= 250) requiredFree = 2;
+            else if (totalPayant >= 100) requiredFree = 1;
 
-            if (requiredFree === 0) return;
+            // Mariages gratuits déjà présents pour ce tirage
+            const existingFreeBets = bets.filter(b => b.free && b.freeType === 'special_marriage');
+            const existingFree = existingFreeBets.length;
 
-            // Trouver un modèle de pari normal (non gratuit) pour ce tirage
+            // Trouver un pari normal (non gratuit) pour récupérer drawName
             const normalBet = bets.find(b => !b.free);
             if (!normalBet) return;
 
-            // Ajouter les mariages gratuits
-            for (let i = 0; i < requiredFree; i++) {
-                const marriageNumber = generateRandomMarriageNumber();
-                
-                const newFree = {
-                    id: Date.now() + Math.random() + i,
-                    game: 'mariage',
-                    number: marriageNumber,
-                    cleanNumber: marriageNumber.replace(/[^0-9]/g, ''),
-                    amount: 0,
-                    free: true,
-                    freeType: 'special_marriage',
-                    drawId: drawId,
-                    drawName: normalBet.drawName,
-                    timestamp: new Date().toISOString()
-                };
-                APP_STATE.currentCart.push(newFree);
+            if (existingFree < requiredFree) {
+                // ✅ Générer de vrais mariages aléatoires uniques via GameEngine
+                const newMarriages = GameEngine.generateAutoMarriageBets(0);
+                const toAdd = requiredFree - existingFree;
+
+                for (let i = 0; i < toAdd; i++) {
+                    // Utiliser un mariage généré aléatoirement, ou fallback générique
+                    const template = (newMarriages && newMarriages[i])
+                        ? newMarriages[i]
+                        : { game: 'auto_marriage', number: '??&??', cleanNumber: '??&??' };
+
+                    const newFree = {
+                        ...template,
+                        id: Date.now() + Math.random() + i,
+                        amount: 0,
+                        free: true,
+                        freeType: 'special_marriage',
+                        gain: 1000, // Gain interne : 1000 gourdes si gagnant (non affiché sur ticket)
+                        drawId: drawId,
+                        drawName: normalBet.drawName,
+                        timestamp: new Date().toISOString()
+                    };
+                    APP_STATE.currentCart.push(newFree);
+                }
+            } else if (existingFree > requiredFree) {
+                // Supprimer les gratuits en trop (les derniers ajoutés)
+                const toRemove = existingFree - requiredFree;
+                for (let i = 0; i < toRemove; i++) {
+                    const last = existingFreeBets[existingFreeBets.length - 1 - i];
+                    if (last) {
+                        const idx = APP_STATE.currentCart.findIndex(b => b.id === last.id);
+                        if (idx !== -1) APP_STATE.currentCart.splice(idx, 1);
+                    }
+                }
             }
         });
 
@@ -101,7 +110,8 @@ var CartManager = {
             let autoBets = [];
             switch (game) {
                 case 'auto_marriage':
-                    // On ne prend que les paris normaux, sans gratuits (ils seront ajoutés via updateFreeMarriages)
+                    // On génère uniquement les paris normaux payants
+                    // Les mariages gratuits seront ajoutés automatiquement via updateFreeMarriages()
                     autoBets = GameEngine.generateAutoMarriageBets(amt);
                     break;
                 case 'bo':
@@ -141,7 +151,7 @@ var CartManager = {
                 });
             });
 
-            // Ajuster les gratuits en fonction du nouveau total
+            // ✅ Ajuster les mariages gratuits en fonction du nouveau total payant
             this.updateFreeMarriages();
 
             amtInput.value = '';
@@ -188,7 +198,7 @@ var CartManager = {
                 });
             });
 
-            this.updateFreeMarriages();
+            this.renderCart();
             numInput.value = '';
             amtInput.value = '';
             numInput.focus();
@@ -222,7 +232,6 @@ var CartManager = {
                 optionBets.forEach(bet => {
                     APP_STATE.currentCart.push({
                         ...bet,
-                        id: Date.now() + Math.random(),
                         drawId: drawId,
                         drawName: CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId
                     });
@@ -241,7 +250,7 @@ var CartManager = {
             }
         });
 
-        this.updateFreeMarriages();
+        this.renderCart();
         numInput.value = '';
         amtInput.value = '';
         numInput.focus();
@@ -249,7 +258,7 @@ var CartManager = {
 
     removeBet(id) {
         APP_STATE.currentCart = APP_STATE.currentCart.filter(b => b.id != id);
-        // Après suppression, on ajuste les gratuits
+        // ✅ Après suppression, recalculer les mariages gratuits
         this.updateFreeMarriages();
     },
 
@@ -292,7 +301,7 @@ var CartManager = {
 
 // ---------- Fonction d'abréviation des jeux (version courte) ----------
 function getGameAbbreviation(gameName, bet) {
-    // Cas spécial : mariage gratuit (freeType 'special_marriage')
+    // ✅ Mariage gratuit → afficher 'marg' uniquement (gain non affiché)
     if (bet && bet.free && bet.freeType === 'special_marriage') {
         return 'marg';
     }
@@ -335,17 +344,11 @@ async function processFinalTicket() {
         return;
     }
 
-    console.log('=== DÉBUT ENREGISTREMENT ===');
-    console.log('Panier complet (avant envoi) :', JSON.parse(JSON.stringify(APP_STATE.currentCart)));
-
     const printWindow = window.open('', '_blank', 'width=500,height=700');
     if (!printWindow) {
         alert("Veuillez autoriser les pop-ups pour imprimer le ticket.");
         return;
     }
-
-    // On va accumuler le HTML de tous les tickets pour les imprimer ensemble
-    let allTicketsHTML = '';
 
     printWindow.document.write('<html><head><title>Chargement...</title></head><body><p style="font-size:20px; text-align:center;">Génération du ticket en cours...</p></body></html>');
     printWindow.document.close();
@@ -361,19 +364,14 @@ async function processFinalTicket() {
             const bets = betsByDraw[drawId];
             const total = bets.reduce((s, b) => s + b.amount, 0);
 
-            // Nettoyer les paris : enlever les champs internes (id, timestamp, etc.) qui pourraient gêner le serveur
-            const cleanBets = bets.map(({ id, timestamp, ...rest }) => rest);
-
             const payload = {
                 agentId: APP_STATE.agentId,
                 agentName: APP_STATE.agentName,
                 drawId,
                 drawName: bets[0].drawName,
-                bets: cleanBets,
+                bets,
                 total
             };
-
-            console.log(`Envoi pour tirage ${drawId} :`, payload);
 
             const res = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.SAVE_TICKET}`, {
                 method: 'POST',
@@ -384,51 +382,29 @@ async function processFinalTicket() {
                 body: JSON.stringify(payload)
             });
 
-            if (!res.ok) {
-                const errorText = await res.text();
-                throw new Error(`Erreur serveur (${res.status}): ${errorText}`);
-            }
+            if (!res.ok) throw new Error("Erreur serveur");
 
             const data = await res.json();
-            console.log('Réponse serveur :', data);
-
-            if (!data.ticket) {
-                throw new Error('Le serveur n\'a pas retourné de ticket valide');
-            }
-
-            // Ajouter le ticket à l'historique local
+            printThermalTicket(data.ticket, printWindow);
             APP_STATE.ticketsHistory.unshift(data.ticket);
-
-            // Générer le HTML de ce ticket et l'accumuler
-            allTicketsHTML += generateTicketHTML(data.ticket);
-            // Ajouter un séparateur entre les tickets si besoin
-            allTicketsHTML += '<div style="page-break-after: always; margin-bottom: 20px;"></div>';
         }
-
-        // Une fois tous les tickets traités, on imprime le tout
-        printThermalTicket(null, printWindow, allTicketsHTML);
 
         APP_STATE.currentCart = [];
         CartManager.renderCart();
         alert("✅ Tikè sove & enprime");
 
     } catch (err) {
-        console.error('Erreur lors de l\'enregistrement :', err);
-        alert("❌ Erè pandan enpresyon : " + err.message);
+        console.error(err);
+        alert("❌ Erè pandan enpresyon");
         printWindow.close();
     }
 }
 
-// Version modifiée de printThermalTicket pour accepter du HTML pré-généré
-function printThermalTicket(ticket, printWindow, customHTML = null) {
-    let html;
-    if (customHTML) {
-        html = customHTML;
-    } else {
-        html = generateTicketHTML(ticket);
-    }
+// ---------- PRINT ----------
+function printThermalTicket(ticket, printWindow) {
+    const html = generateTicketHTML(ticket);
 
-    const fullHTML = `
+    printWindow.document.write(`
         <!DOCTYPE html>
         <html>
         <head>
@@ -521,9 +497,7 @@ function printThermalTicket(ticket, printWindow, customHTML = null) {
             ${html}
         </body>
         </html>
-    `;
-
-    printWindow.document.write(fullHTML);
+    `);
     printWindow.document.close();
 
     printWindow.onload = function() {
@@ -532,6 +506,7 @@ function printThermalTicket(ticket, printWindow, customHTML = null) {
     };
 }
 
+// ---------- Ticket HTML ----------
 function generateTicketHTML(ticket) {
     const cfg = APP_STATE.lotteryConfig || CONFIG;
 
@@ -540,7 +515,7 @@ function generateTicketHTML(ticket) {
     const logoUrl = cfg.LOTTERY_LOGO || cfg.logo || cfg.logoUrl || '';
 
     const dateObj = new Date(ticket.date);
-    const formattedDate = dateObj.toLocaleDateString('fr-FR') + ' ' + 
+    const formattedDate = dateObj.toLocaleDateString('fr-FR') + ' ' +
                           dateObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
     const betsHTML = (ticket.bets || []).map(b => {
@@ -549,10 +524,14 @@ function generateTicketHTML(ticket) {
         if (b.game === 'auto_marriage' && displayNumber.includes('&')) {
             displayNumber = displayNumber.replace('&', '*');
         }
+
+        // ✅ Mariage gratuit : afficher 'marg XX*XX  0 G' — sans mention du gain 1000G
+        const displayAmount = (b.free && b.freeType === 'special_marriage') ? '0 G' : `${b.amount || 0} G`;
+
         return `
             <div class="bet-row">
                 <span>${gameAbbr} ${displayNumber}</span>
-                <span>${b.amount || 0} G</span>
+                <span>${displayAmount}</span>
             </div>
         `;
     }).join('');
