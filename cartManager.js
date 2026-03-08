@@ -12,6 +12,17 @@ function isNumberBlocked(number, drawId) {
 // ---------- Cart Manager ----------
 var CartManager = {
 
+    // Génère un numéro de mariage aléatoire au format "XX&YY"
+    // Les deux numéros sont différents, entre 00 et 99
+    _generateRandomMarriageNumber() {
+        const rand = () => Math.floor(Math.random() * 100).toString().padStart(2, '0');
+        let n1 = rand();
+        let n2 = rand();
+        // S'assurer que les deux numéros sont différents
+        while (n2 === n1) { n2 = rand(); }
+        return `${n1}&${n2}`;
+    },
+
     // Met à jour le nombre de mariages gratuits pour chaque tirage en fonction du total payant
     updateFreeMarriages() {
         // Regrouper les paris par drawId
@@ -29,10 +40,10 @@ var CartManager = {
             const totalPayant = bets.reduce((sum, b) =>
                 (!b.free && b.amount > 0) ? sum + b.amount : sum, 0);
 
-            // ✅ Seuils corrigés selon les règles métier :
-            // >= 100G  → 1 mariage gratuit
-            // >= 250G  → 2 mariages gratuits
+            // Seuils selon les règles métier :
             // >= 500G  → 3 mariages gratuits
+            // >= 250G  → 2 mariages gratuits
+            // >= 100G  → 1 mariage gratuit
             // <  100G  → 0 mariage gratuit
             let requiredFree = 0;
             if (totalPayant >= 500)      requiredFree = 3;
@@ -48,19 +59,15 @@ var CartManager = {
             if (!normalBet) return;
 
             if (existingFree < requiredFree) {
-                // ✅ Générer de vrais mariages aléatoires uniques via GameEngine
-                const newMarriages = GameEngine.generateAutoMarriageBets(0);
+                // Ajouter les mariages gratuits manquants avec numéros aléatoires uniques
                 const toAdd = requiredFree - existingFree;
-
                 for (let i = 0; i < toAdd; i++) {
-                    // Utiliser un mariage généré aléatoirement, ou fallback générique
-                    const template = (newMarriages && newMarriages[i])
-                        ? newMarriages[i]
-                        : { game: 'auto_marriage', number: '??&??', cleanNumber: '??&??' };
-
+                    const marriageNumber = this._generateRandomMarriageNumber();
                     const newFree = {
-                        ...template,
                         id: Date.now() + Math.random() + i,
+                        game: 'auto_marriage',
+                        number: marriageNumber,
+                        cleanNumber: marriageNumber,
                         amount: 0,
                         free: true,
                         freeType: 'special_marriage',
