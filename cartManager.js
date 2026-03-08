@@ -293,3 +293,91 @@ function getGameAbbreviation(gameName, bet) {
 
 // ---------- Global ----------
 window.CartManager = CartManager;
+// ---------- Save & Print Ticket ----------
+async function processFinalTicket() {
+
+    if (!APP_STATE.currentCart.length) {
+        alert("Panye vid");
+        return;
+    }
+
+    const printWindow = window.open('', '_blank', 'width=500,height=700');
+
+    if (!printWindow) {
+        alert("Veuillez autoriser les pop-ups pour imprimer le ticket.");
+        return;
+    }
+
+    printWindow.document.write('<html><body>Chargement...</body></html>');
+    printWindow.document.close();
+
+    const betsByDraw = {};
+
+    APP_STATE.currentCart.forEach(b => {
+
+        if (!betsByDraw[b.drawId]) {
+            betsByDraw[b.drawId] = [];
+        }
+
+        betsByDraw[b.drawId].push(b);
+
+    });
+
+    try {
+
+        for (const drawId in betsByDraw) {
+
+            const bets = betsByDraw[drawId];
+
+            const total = bets.reduce((s, b) => s + b.amount, 0);
+
+            const payload = {
+
+                agentId: APP_STATE.agentId,
+                agentName: APP_STATE.agentName,
+                drawId,
+                drawName: bets[0].drawName,
+                bets,
+                total
+
+            };
+
+            const res = await fetch(
+                `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.SAVE_TICKET}`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization':
+                            `Bearer ${localStorage.getItem('auth_token')}`
+                    },
+                    body: JSON.stringify(payload)
+                }
+            );
+
+            if (!res.ok) throw new Error("Erreur serveur");
+
+            const data = await res.json();
+
+            printThermalTicket(data.ticket, printWindow);
+
+            APP_STATE.ticketsHistory.unshift(data.ticket);
+        }
+
+        APP_STATE.currentCart = [];
+
+        CartManager.renderCart();
+
+        alert("✅ Tikè sove & enprime");
+
+    }
+
+    catch (err) {
+
+        console.error(err);
+
+        alert("❌ Erè pandan enpresyon");
+
+        printWindow.close();
+    }
+}
