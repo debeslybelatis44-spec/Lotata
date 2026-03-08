@@ -379,14 +379,26 @@ function replayTicket(ticketId) {
         return;
     }
 
-    // Récupérer les tirages sélectionnés (mode simple ou multiple)
-    const draws = APP_STATE.multiDrawMode
-        ? APP_STATE.selectedDraws
-        : [APP_STATE.selectedDraw];
-
-    if (!draws || draws.length === 0) {
-        alert("Chwazi yon tiraj anvan!");
+    // Récupérer le tirage d'origine du ticket
+    const originalDrawId = ticket.draw_id || ticket.drawId;
+    if (!originalDrawId) {
+        alert("Tikè sa pa gen tiraj asosye!");
         return;
+    }
+
+    // Vérifier que le tirage est toujours disponible
+    const drawExists = CONFIG.DRAWS.find(d => d.id === originalDrawId);
+    if (!drawExists) {
+        alert("Tiraj orijinal la pa disponib ankò!");
+        return;
+    }
+
+    // Vider le panier actuel (optionnel : on peut proposer de conserver l'ancien)
+    if (APP_STATE.currentCart.length > 0) {
+        if (!confirm("Panye a pa vid. Vle retire tout epi rejwe tikè sa a?")) {
+            return;
+        }
+        APP_STATE.currentCart = [];
     }
 
     // Extraire les paris du ticket
@@ -400,43 +412,49 @@ function replayTicket(ticketId) {
             bets = [];
         }
     } else if (ticket.bets && typeof ticket.bets === 'object') {
-        // Si c'est un objet, on le convertit en tableau (ex: { "12": 50, "34": 100 })
-        bets = Object.entries(ticket.bets).map(([num, amt]) => ({ number: num, amount: amt }));
+        bets = Object.entries(ticket.bets).map(([num, amt]) => ({ 
+            number: num, 
+            amount: amt,
+            game: 'borlette' // jeu par défaut
+        }));
     }
 
-    // Pour chaque tirage sélectionné, ajouter une copie propre de chaque pari
-    draws.forEach(drawId => {
-        const drawName = CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId;
-        bets.forEach(bet => {
-            // Ne garder que les champs essentiels, supprimer les anciens IDs et infos de gain
-            const newBet = {
-                id: Date.now() + Math.random(), // nouvel ID unique
-                game: bet.game || 'borlette',
-                number: bet.number || bet.numero || '',
-                amount: bet.amount || 0,
-                drawId: drawId,
-                drawName: drawName,
-                timestamp: new Date().toISOString()
-            };
-            // Si c'est un lotto avec option, la conserver
-            if (bet.option) newBet.option = bet.option;
-            // Si c'est un pari gratuit (spécial mariage), on peut le signaler mais le serveur le gérera peut-être
-            if (bet.free) newBet.free = bet.free;
-            if (bet.freeType) newBet.freeType = bet.freeType;
-            // Si le pari a un cleanNumber, le conserver (utile pour certaines validations)
-            if (bet.cleanNumber) newBet.cleanNumber = bet.cleanNumber;
-
-            APP_STATE.currentCart.push(newBet);
-        });
+    // Ajouter les paris au panier (un seul tirage : celui d'origine)
+    bets.forEach(bet => {
+        // Ne garder que les champs essentiels
+        const newBet = {
+            id: Date.now() + Math.random(),
+            game: bet.game || 'borlette',
+            number: bet.number || bet.numero || '',
+            amount: bet.amount || 0,
+            drawId: originalDrawId,
+            drawName: drawExists.name,
+            timestamp: new Date().toISOString()
+        };
+        
+        // Conserver l'option pour lotto4/5
+        if (bet.option) newBet.option = bet.option;
+        
+        // NE PAS conserver free/freeType car ils seront recalculés
+        // NE PAS conserver win_amount, paid, checked, etc.
+        
+        APP_STATE.currentCart.push(newBet);
     });
 
-    // Mettre à jour l'affichage du panier
+    // IMPORTANT: Mettre à jour le tirage sélectionné dans l'interface
+    APP_STATE.selectedDraw = originalDrawId;
+    if (APP_STATE.multiDrawMode) {
+        APP_STATE.multiDrawMode = false;
+        APP_STATE.selectedDraws = [originalDrawId];
+    }
+
+    // Mettre à jour l'affichage du panier (ce qui déclenchera le recalcul des mariages gratuits)
     CartManager.renderCart();
 
-    // Basculer vers l'écran d'accueil pour visualiser/modifier
+    // Basculer vers l'écran d'accueil
     switchTab('home');
 
-    alert(`Tikè #${ticket.ticket_id || ticket.id} rejwete nan panye.`);
+    alert(`Tikè #${ticket.ticket_id || ticket.id} rejwete nan panye sou tiraj ${drawExists.name}.`);
 }
 
 // Réimpression d'un ticket depuis l'historique
