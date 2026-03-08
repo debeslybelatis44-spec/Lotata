@@ -1,5 +1,5 @@
 // ==========================
-// cartManager.js (sans mariages gratuits)
+// cartManager.js (version sans aucun mariage gratuit)
 // ==========================
 
 // ---------- Utils ----------
@@ -12,10 +12,11 @@ function isNumberBlocked(number, drawId) {
 // ---------- Cart Manager ----------
 var CartManager = {
 
-    // Fonction désactivée - plus de mariages gratuits
+    // Fonction vidée : elle ne fait que nettoyer les éventuels gratuits résiduels
     updateFreeMarriages() {
-        // Ne rien faire
-        return;
+        // Supprimer tous les paris gratuits existants
+        APP_STATE.currentCart = APP_STATE.currentCart.filter(b => !(b.free && b.freeType === 'special_marriage'));
+        this.renderCart();
     },
 
     addBet() {
@@ -77,7 +78,7 @@ var CartManager = {
                 });
             });
 
-            this.renderCart();
+            this.updateFreeMarriages(); // nettoie les éventuels gratuits (mais il n'y en a pas)
             amtInput.value = '';
             numInput.focus();
             return;
@@ -120,7 +121,7 @@ var CartManager = {
                 });
             });
 
-            this.renderCart();
+            this.updateFreeMarriages();
             numInput.value = '';
             amtInput.value = '';
             numInput.focus();
@@ -172,7 +173,7 @@ var CartManager = {
             }
         });
 
-        this.renderCart();
+        this.updateFreeMarriages();
 
         numInput.value = '';
         amtInput.value = '';
@@ -181,7 +182,7 @@ var CartManager = {
 
     removeBet(id) {
         APP_STATE.currentCart = APP_STATE.currentCart.filter(b => b.id != id);
-        this.renderCart();
+        this.updateFreeMarriages();
     },
 
     renderCart() {
