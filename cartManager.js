@@ -1,5 +1,5 @@
 // ==========================
-// cartManager.js (corrigé)
+// cartManager.js
 // ==========================
 
 // ---------- Utils ----------
@@ -12,7 +12,7 @@ function isNumberBlocked(number, drawId) {
 // ---------- Cart Manager ----------
 var CartManager = {
 
-    // Gestion des mariages gratuits
+    // ----------- Gestion mariage gratuit -----------
     updateFreeMarriages() {
 
         const betsByDraw = {};
@@ -28,22 +28,15 @@ var CartManager = {
 
             const bets = betsByDraw[drawId];
 
-            // total mariage PAYANT seulement
             const totalMarriage = bets
                 .filter(b => b.game === 'auto_marriage' && !b.free)
                 .reduce((sum, b) => sum + b.amount, 0);
 
             let requiredFree = 0;
 
-            if (totalMarriage >= 100 && totalMarriage <= 200) {
-                requiredFree = 1;
-            }
-            else if (totalMarriage >= 201 && totalMarriage <= 500) {
-                requiredFree = 2;
-            }
-            else if (totalMarriage >= 501) {
-                requiredFree = 3;
-            }
+            if (totalMarriage >= 100 && totalMarriage <= 200) requiredFree = 1;
+            else if (totalMarriage >= 201 && totalMarriage <= 500) requiredFree = 2;
+            else if (totalMarriage >= 501) requiredFree = 3;
 
             const existingFree = bets.filter(
                 b => b.free && b.freeType === 'special_marriage'
@@ -51,7 +44,6 @@ var CartManager = {
 
             const existingCount = existingFree.length;
 
-            // supprimer gratuits en trop
             if (existingCount > requiredFree) {
 
                 const toRemove = existingCount - requiredFree;
@@ -64,13 +56,10 @@ var CartManager = {
                         b => b.id === freeBet.id
                     );
 
-                    if (index !== -1) {
-                        APP_STATE.currentCart.splice(index, 1);
-                    }
+                    if (index !== -1) APP_STATE.currentCart.splice(index, 1);
                 }
             }
 
-            // ajouter gratuits manquants
             if (existingCount < requiredFree) {
 
                 const toAdd = requiredFree - existingCount;
@@ -87,7 +76,7 @@ var CartManager = {
                         amount: 0,
                         free: true,
                         freeType: 'special_marriage',
-                        drawId: drawId,
+                        drawId,
                         drawName: bets[0].drawName
                     });
                 }
@@ -98,7 +87,7 @@ var CartManager = {
         this.renderCart();
     },
 
-    // ---------- Ajouter pari ----------
+    // ----------- Ajouter pari -----------
     addBet() {
 
         if (APP_STATE.isDrawBlocked) {
@@ -108,7 +97,6 @@ var CartManager = {
 
         const numInput = document.getElementById('num-input');
         const amtInput = document.getElementById('amt-input');
-
         const amt = parseFloat(amtInput.value);
 
         if (isNaN(amt) || amt <= 0) {
@@ -118,15 +106,9 @@ var CartManager = {
 
         const game = APP_STATE.selectedGame;
 
-        // jeux automatiques
         if (game === 'auto_marriage') {
 
             const autoBets = GameEngine.generateAutoMarriageBets(amt);
-
-            if (!autoBets.length) {
-                alert("Pa gen ase nimewo pou jenere mariage");
-                return;
-            }
 
             const draws = APP_STATE.multiDrawMode
                 ? APP_STATE.selectedDraws
@@ -158,7 +140,6 @@ var CartManager = {
             return;
         }
 
-        // jeux normaux
         let num = numInput.value.trim();
 
         if (!GameEngine.validateEntry(game, num)) {
@@ -180,7 +161,6 @@ var CartManager = {
             }
 
             APP_STATE.currentCart.push({
-
                 id: Date.now() + Math.random(),
                 game: game,
                 number: num,
@@ -189,9 +169,7 @@ var CartManager = {
                 drawId: drawId,
                 drawName:
                     CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId,
-
                 timestamp: new Date().toISOString()
-
             });
 
         });
@@ -203,7 +181,7 @@ var CartManager = {
         numInput.focus();
     },
 
-    // ---------- supprimer pari ----------
+    // ----------- Supprimer pari -----------
     removeBet(id) {
 
         APP_STATE.currentCart =
@@ -212,7 +190,7 @@ var CartManager = {
         this.updateFreeMarriages();
     },
 
-    // ---------- affichage panier ----------
+    // ----------- Affichage panier -----------
     renderCart() {
 
         const display = document.getElementById('cart-display');
@@ -220,9 +198,8 @@ var CartManager = {
 
         if (!APP_STATE.currentCart.length) {
 
-            display.innerHTML = '<div>Panye vid</div>';
+            display.innerHTML = '<div class="empty-msg">Panye vid</div>';
             totalEl.innerText = '0 Gdes';
-
             return;
         }
 
@@ -245,45 +222,33 @@ var CartManager = {
                 }
 
                 return `
-
                 <div class="cart-item">
-
-                <span>${gameAbbr} ${displayNumber}</span>
-
-                <span>${bet.amount} G</span>
-
-                <button onclick="CartManager.removeBet('${bet.id}')">
-                ✕
-                </button>
-
+                    <span>${gameAbbr} ${displayNumber}</span>
+                    <span>${bet.amount} G</span>
+                    <button onclick="CartManager.removeBet('${bet.id}')">✕</button>
                 </div>
-
                 `;
-
             }).join('');
 
         totalEl.innerText =
             total.toLocaleString('fr-FR') + ' Gdes';
     }
-
 };
 
 // ---------- Abbreviation ----------
 function getGameAbbreviation(gameName, bet) {
 
-    if (bet?.free && bet.freeType === 'special_marriage') {
+    if (bet && bet.free && bet.freeType === 'special_marriage') {
         return 'marg';
     }
 
     const map = {
-
         borlette: 'bor',
         lotto3: 'lo3',
         lotto4: 'lo4',
         lotto5: 'lo5',
         auto_marriage: 'mara',
         mariage: 'mar'
-
     };
 
     const key = (gameName || '').toLowerCase();
@@ -291,9 +256,7 @@ function getGameAbbreviation(gameName, bet) {
     return map[key] || gameName;
 }
 
-// ---------- Global ----------
-window.CartManager = CartManager;
-// ---------- Save & Print Ticket ----------
+// ---------- Save Ticket ----------
 async function processFinalTicket() {
 
     if (!APP_STATE.currentCart.length) {
@@ -301,68 +264,33 @@ async function processFinalTicket() {
         return;
     }
 
-    const printWindow = window.open('', '_blank', 'width=500,height=700');
-
-    if (!printWindow) {
-        alert("Veuillez autoriser les pop-ups pour imprimer le ticket.");
-        return;
-    }
-
-    printWindow.document.write('<html><body>Chargement...</body></html>');
-    printWindow.document.close();
-
-    const betsByDraw = {};
-
-    APP_STATE.currentCart.forEach(b => {
-
-        if (!betsByDraw[b.drawId]) {
-            betsByDraw[b.drawId] = [];
-        }
-
-        betsByDraw[b.drawId].push(b);
-
-    });
-
     try {
 
-        for (const drawId in betsByDraw) {
+        const payload = {
+            agentId: APP_STATE.agentId,
+            agentName: APP_STATE.agentName,
+            bets: APP_STATE.currentCart,
+            total: APP_STATE.currentCart.reduce((s, b) => s + b.amount, 0)
+        };
 
-            const bets = betsByDraw[drawId];
+        const res = await fetch(
+            `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.SAVE_TICKET}`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization':
+                        `Bearer ${localStorage.getItem('auth_token')}`
+                },
+                body: JSON.stringify(payload)
+            }
+        );
 
-            const total = bets.reduce((s, b) => s + b.amount, 0);
+        if (!res.ok) throw new Error("Erreur serveur");
 
-            const payload = {
+        const data = await res.json();
 
-                agentId: APP_STATE.agentId,
-                agentName: APP_STATE.agentName,
-                drawId,
-                drawName: bets[0].drawName,
-                bets,
-                total
-
-            };
-
-            const res = await fetch(
-                `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.SAVE_TICKET}`,
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization':
-                            `Bearer ${localStorage.getItem('auth_token')}`
-                    },
-                    body: JSON.stringify(payload)
-                }
-            );
-
-            if (!res.ok) throw new Error("Erreur serveur");
-
-            const data = await res.json();
-
-            printThermalTicket(data.ticket, printWindow);
-
-            APP_STATE.ticketsHistory.unshift(data.ticket);
-        }
+        printThermalTicket(data.ticket);
 
         APP_STATE.currentCart = [];
 
@@ -370,14 +298,67 @@ async function processFinalTicket() {
 
         alert("✅ Tikè sove & enprime");
 
-    }
-
-    catch (err) {
+    } catch (err) {
 
         console.error(err);
 
-        alert("❌ Erè pandan enpresyon");
-
-        printWindow.close();
+        alert("❌ Erè pandan sovgad tikè");
     }
 }
+
+// ---------- Print ----------
+function printThermalTicket(ticket) {
+
+    const printWindow = window.open('', '_blank');
+
+    const html = generateTicketHTML(ticket);
+
+    printWindow.document.write(html);
+
+    printWindow.document.close();
+
+    printWindow.onload = function () {
+        printWindow.print();
+    };
+}
+
+// ---------- HTML Ticket ----------
+function generateTicketHTML(ticket) {
+
+    const betsHTML = (ticket.bets || []).map(b => {
+
+        const gameAbbr = getGameAbbreviation(b.game || '', b);
+
+        return `
+        <div style="display:flex;justify-content:space-between;">
+            <span>${gameAbbr} ${b.number}</span>
+            <span>${b.amount} G</span>
+        </div>
+        `;
+
+    }).join('');
+
+    return `
+    <html>
+    <body style="font-family:monospace;font-size:20px">
+
+    <h2 style="text-align:center">LOTATO</h2>
+
+    ${betsHTML}
+
+    <hr>
+
+    <div style="display:flex;justify-content:space-between;">
+    <strong>TOTAL</strong>
+    <strong>${ticket.total} Gdes</strong>
+    </div>
+
+    </body>
+    </html>
+    `;
+}
+
+// ---------- Global ----------
+window.CartManager = CartManager;
+window.processFinalTicket = processFinalTicket;
+window.printThermalTicket = printThermalTicket;
