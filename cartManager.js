@@ -14,62 +14,58 @@ var CartManager = {
 
     // Met à jour le nombre de mariages gratuits pour chaque tirage en fonction du total payant
     updateFreeMarriages() {
-        // Regrouper les paris par drawId
+        // 1. Supprimer tous les anciens gratuits (spécial mariage)
+        APP_STATE.currentCart = APP_STATE.currentCart.filter(b => !(b.free && b.freeType === 'special_marriage'));
+
+        // 2. Regrouper les paris par tirage
         const betsByDraw = {};
         APP_STATE.currentCart.forEach(bet => {
             if (!betsByDraw[bet.drawId]) betsByDraw[bet.drawId] = [];
             betsByDraw[bet.drawId].push(bet);
         });
 
-        // Pour chaque tirage
+        // 3. Pour chaque tirage
         Object.keys(betsByDraw).forEach(drawId => {
             const bets = betsByDraw[drawId];
-            // Calculer le total des paris payants (amount > 0)
+            // Calculer le total des mises payantes (amount > 0)
             const totalPayant = bets.reduce((sum, b) => sum + (b.amount > 0 ? b.amount : 0), 0);
-            
-            // Déterminer le nombre de gratuits requis selon les nouveaux seuils
+
+            // Déterminer le nombre de gratuits requis selon les seuils
             let requiredFree = 0;
             if (totalPayant >= 1 && totalPayant <= 200) requiredFree = 1;
             else if (totalPayant >= 201 && totalPayant <= 500) requiredFree = 2;
             else if (totalPayant >= 501) requiredFree = 3;
 
-            // Compter les gratuits existants pour ce tirage
-            const existingFree = bets.filter(b => b.free && b.freeType === 'special_marriage').length;
+            if (requiredFree === 0) return;
 
-            // Trouver un modèle de pari normal (non gratuit) pour ce tirage
-            const normalBet = bets.find(b => !b.free);
-            if (!normalBet) {
-                // Si pas de pari normal, on ne peut pas ajouter de gratuit (mais normalement il y en a)
-                return;
-            }
+            // Générer des paires aléatoires uniques (pour éviter les doublons dans le même tirage)
+            const usedPairs = new Set();
+            for (let i = 0; i < requiredFree; i++) {
+                let num1, num2, pair;
+                do {
+                    num1 = Math.floor(Math.random() * 100).toString().padStart(2, '0');
+                    num2 = Math.floor(Math.random() * 100).toString().padStart(2, '0');
+                    pair = `${num1}&${num2}`;
+                } while (usedPairs.has(pair)); // éviter la même combinaison
+                usedPairs.add(pair);
 
-            if (existingFree < requiredFree) {
-                // Ajouter des gratuits
-                for (let i = 0; i < requiredFree - existingFree; i++) {
-                    const newFree = {
-                        ...normalBet,
-                        id: Date.now() + Math.random() + i,
-                        amount: 0,
-                        free: true,
-                        freeType: 'special_marriage'
-                    };
-                    APP_STATE.currentCart.push(newFree);
-                }
-            } else if (existingFree > requiredFree) {
-                // Supprimer des gratuits en trop (on supprime les derniers ajoutés)
-                const freeBets = bets.filter(b => b.free && b.freeType === 'special_marriage');
-                const toRemove = existingFree - requiredFree;
-                for (let i = 0; i < toRemove; i++) {
-                    const lastFree = freeBets[freeBets.length - 1 - i];
-                    if (lastFree) {
-                        const index = APP_STATE.currentCart.findIndex(b => b.id === lastFree.id);
-                        if (index !== -1) APP_STATE.currentCart.splice(index, 1);
-                    }
-                }
+                // Ajouter le mariage gratuit
+                APP_STATE.currentCart.push({
+                    id: Date.now() + Math.random() + i,
+                    game: 'auto_marriage',      // ou 'mariage' selon votre convention
+                    number: pair,
+                    cleanNumber: pair.replace('&', ''),
+                    amount: 0,
+                    drawId: drawId,
+                    drawName: bets[0]?.drawName || drawId,
+                    timestamp: new Date().toISOString(),
+                    free: true,
+                    freeType: 'special_marriage'
+                });
             }
         });
 
-        // Re-rendre le panier
+        // 4. Réafficher le panier
         this.renderCart();
     },
 
