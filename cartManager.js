@@ -1,674 +1,553 @@
-require('dotenv').config();
-const express = require('express');
-const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const cors = require('cors');
-const path = require('path');
+// ==========================
+// cartManager.js (corrigé - gestion dynamique des gratuits avec seuils modifiés)
+// ==========================
 
-// ==================== MODÈLES ====================
-const userSchema = new mongoose.Schema({
-  username: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
-  name: { type: String, required: true },
-  email: String,
-  role: { type: String, enum: ['master', 'subsystem', 'agent'], required: true },
-  subsystem_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Subsystem' },
-  is_active: { type: Boolean, default: true },
-  is_online: { type: Boolean, default: false },
-  last_login: Date,
-  created_at: { type: Date, default: Date.now }
-});
-userSchema.methods.comparePassword = async function(candidate) {
-  return await bcrypt.compare(candidate, this.password);
+// ---------- Utils ----------
+function isNumberBlocked(number, drawId) {
+    if (APP_STATE.globalBlockedNumbers.includes(number)) return true;
+    const drawBlocked = APP_STATE.drawBlockedNumbers[drawId] || [];
+    return drawBlocked.includes(number);
+}
+
+// ---------- Cart Manager ----------
+var CartManager = {
+
+    // Met à jour le nombre de mariages gratuits pour chaque tirage en fonction du total payant
+    updateFreeMarriages() {
+        // Regrouper les paris par drawId
+        const betsByDraw = {};
+        APP_STATE.currentCart.forEach(bet => {
+            if (!betsByDraw[bet.drawId]) betsByDraw[bet.drawId] = [];
+            betsByDraw[bet.drawId].push(bet);
+        });
+
+        // Pour chaque tirage
+        Object.keys(betsByDraw).forEach(drawId => {
+            const bets = betsByDraw[drawId];
+            // Calculer le total des paris payants (amount > 0)
+            const totalPayant = bets.reduce((sum, b) => sum + (b.amount > 0 ? b.amount : 0), 0);
+            
+            // Déterminer le nombre de gratuits requis selon les nouveaux seuils
+            let requiredFree = 0;
+            if (totalPayant >= 1 && totalPayant <= 200) requiredFree = 1;
+            else if (totalPayant >= 201 && totalPayant <= 500) requiredFree = 2;
+            else if (totalPayant >= 501) requiredFree = 3;
+
+            // Compter les gratuits existants pour ce tirage
+            const existingFree = bets.filter(b => b.free && b.freeType === 'special_marriage').length;
+
+            // Trouver un modèle de pari normal (non gratuit) pour ce tirage
+            const normalBet = bets.find(b => !b.free);
+            if (!normalBet) {
+                // Si pas de pari normal, on ne peut pas ajouter de gratuit (mais normalement il y en a)
+                return;
+            }
+
+            if (existingFree < requiredFree) {
+                // Ajouter des gratuits
+                for (let i = 0; i < requiredFree - existingFree; i++) {
+                    const newFree = {
+                        ...normalBet,
+                        id: Date.now() + Math.random() + i,
+                        amount: 0,
+                        free: true,
+                        freeType: 'special_marriage'
+                    };
+                    APP_STATE.currentCart.push(newFree);
+                }
+            } else if (existingFree > requiredFree) {
+                // Supprimer des gratuits en trop (on supprime les derniers ajoutés)
+                const freeBets = bets.filter(b => b.free && b.freeType === 'special_marriage');
+                const toRemove = existingFree - requiredFree;
+                for (let i = 0; i < toRemove; i++) {
+                    const lastFree = freeBets[freeBets.length - 1 - i];
+                    if (lastFree) {
+                        const index = APP_STATE.currentCart.findIndex(b => b.id === lastFree.id);
+                        if (index !== -1) APP_STATE.currentCart.splice(index, 1);
+                    }
+                }
+            }
+        });
+
+        // Re-rendre le panier
+        this.renderCart();
+    },
+
+    addBet() {
+        if (APP_STATE.isDrawBlocked) {
+            alert("Tiraj sa a ap rantre nan 3 minit.");
+            return;
+        }
+
+        const numInput = document.getElementById('num-input');
+        const amtInput = document.getElementById('amt-input');
+        const amt = parseFloat(amtInput.value);
+
+        if (isNaN(amt) || amt <= 0) {
+            alert("Montan pa valid");
+            return;
+        }
+
+        const game = APP_STATE.selectedGame;
+
+        // --- Gestion des jeux automatiques ---
+        if (game === 'auto_marriage' || game === 'bo' || game === 'grap' || game === 'auto_lotto4' || game === 'auto_lotto5') {
+            let autoBets = [];
+            switch (game) {
+                case 'auto_marriage':
+                    // On ne prend que les paris normaux, sans gratuits (ils seront ajoutés via updateFreeMarriages)
+                    autoBets = GameEngine.generateAutoMarriageBets(amt);
+                    break;
+                case 'bo':
+                    autoBets = SpecialGames.generateBOBets(amt);
+                    break;
+                case 'grap':
+                    autoBets = SpecialGames.generateGRAPBets(amt);
+                    break;
+                case 'auto_lotto4':
+                    autoBets = GameEngine.generateAutoLotto4Bets(amt);
+                    break;
+                case 'auto_lotto5':
+                    autoBets = GameEngine.generateAutoLotto5Bets(amt);
+                    break;
+            }
+
+            if (autoBets.length === 0) {
+                alert("Pa gen ase nimevo nan panye pou jenere " + game);
+                return;
+            }
+
+            // Récupérer les tirages sélectionnés
+            const draws = APP_STATE.multiDrawMode
+                ? APP_STATE.selectedDraws
+                : [APP_STATE.selectedDraw];
+
+            // Pour chaque tirage, ajouter une copie de chaque pari normal
+            draws.forEach(drawId => {
+                const drawName = CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId;
+                autoBets.forEach(bet => {
+                    APP_STATE.currentCart.push({
+                        ...bet,
+                        id: Date.now() + Math.random(), // nouvel ID unique
+                        drawId: drawId,
+                        drawName: drawName
+                    });
+                });
+            });
+
+            // Ajuster les gratuits en fonction du nouveau total
+            this.updateFreeMarriages();
+
+            amtInput.value = '';
+            numInput.focus();
+            return;
+        }
+
+        // --- Gestion des jeux NX (n0 à n9) ---
+        if (/^n[0-9]$/.test(game)) {
+            const lastDigit = parseInt(game.substring(1), 10);
+            const numbers = [];
+            for (let tens = 0; tens <= 9; tens++) {
+                numbers.push(tens.toString() + lastDigit.toString());
+            }
+
+            const draws = APP_STATE.multiDrawMode
+                ? APP_STATE.selectedDraws
+                : [APP_STATE.selectedDraw];
+
+            // Vérification des numéros bloqués
+            for (const drawId of draws) {
+                for (const num of numbers) {
+                    if (isNumberBlocked(num, drawId)) {
+                        alert(`Nimewo ${num} bloke pou tiraj sa a`);
+                        return;
+                    }
+                }
+            }
+
+            // Ajout des paris
+            draws.forEach(drawId => {
+                const drawName = CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId;
+                numbers.forEach(num => {
+                    APP_STATE.currentCart.push({
+                        id: Date.now() + Math.random(),
+                        game: game,
+                        number: num,
+                        cleanNumber: num,
+                        amount: amt,
+                        drawId: drawId,
+                        drawName: drawName,
+                        timestamp: new Date().toISOString()
+                    });
+                });
+            });
+
+            this.renderCart();
+            numInput.value = '';
+            amtInput.value = '';
+            numInput.focus();
+            return;
+        }
+
+        // --- Gestion des jeux normaux (saisie manuelle) ---
+        let num = numInput.value.trim();
+
+        if (!GameEngine.validateEntry(game, num)) {
+            alert("Nimewo pa valid");
+            return;
+        }
+
+        num = GameEngine.getCleanNumber(num);
+
+        const draws = APP_STATE.multiDrawMode
+            ? APP_STATE.selectedDraws
+            : [APP_STATE.selectedDraw];
+
+        for (const drawId of draws) {
+            if (isNumberBlocked(num, drawId)) {
+                alert(`Nimewo ${num} bloke`);
+                return;
+            }
+        }
+
+        draws.forEach(drawId => {
+            if (game === 'lotto4' || game === 'lotto5') {
+                const optionBets = GameEngine.generateLottoBetsWithOptions(game, num, amt);
+                optionBets.forEach(bet => {
+                    APP_STATE.currentCart.push({
+                        ...bet,
+                        drawId: drawId,
+                        drawName: CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId
+                    });
+                });
+            } else {
+                APP_STATE.currentCart.push({
+                    id: Date.now() + Math.random(),
+                    game: game,
+                    number: num,
+                    cleanNumber: num,
+                    amount: amt,
+                    drawId: drawId,
+                    drawName: CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId,
+                    timestamp: new Date().toISOString()
+                });
+            }
+        });
+
+        this.renderCart();
+        numInput.value = '';
+        amtInput.value = '';
+        numInput.focus();
+    },
+
+    removeBet(id) {
+        APP_STATE.currentCart = APP_STATE.currentCart.filter(b => b.id != id);
+        // Après suppression, on ajuste les gratuits
+        this.updateFreeMarriages();
+    },
+
+    renderCart() {
+        const display = document.getElementById('cart-display');
+        const totalEl = document.getElementById('cart-total-display');
+        const itemsCount = document.getElementById('items-count');
+
+        if (!APP_STATE.currentCart.length) {
+            display.innerHTML = '<div class="empty-msg">Panye vid</div>';
+            totalEl.innerText = '0 Gdes';
+            if (itemsCount) itemsCount.innerText = '0 jwèt';
+            return;
+        }
+
+        let total = 0;
+        let count = 0;
+
+        display.innerHTML = APP_STATE.currentCart.map(bet => {
+            total += bet.amount;
+            count++;
+            const gameAbbr = getGameAbbreviation(bet.game, bet);
+            let displayNumber = bet.number;
+            if (bet.game === 'auto_marriage' && bet.number && bet.number.includes('&')) {
+                displayNumber = bet.number.replace('&', '*');
+            }
+            return `
+                <div class="cart-item">
+                    <span>${gameAbbr} ${displayNumber}</span>
+                    <span>${bet.amount} G</span>
+                    <button onclick="CartManager.removeBet('${bet.id}')">✕</button>
+                </div>
+            `;
+        }).join('');
+
+        totalEl.innerText = total.toLocaleString('fr-FR') + ' Gdes';
+        if (itemsCount) itemsCount.innerText = count + ' jwèt';
+    }
 };
 
-const subsystemSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  subdomain: { type: String, required: true, unique: true },
-  contact_email: { type: String, required: true },
-  contact_phone: String,
-  max_users: { type: Number, default: 10 },
-  is_active: { type: Boolean, default: true },
-  subscription_type: { type: String, default: 'basic' },
-  subscription_expires: Date,
-  created_at: { type: Date, default: Date.now },
-  stats: {
-    active_users: { type: Number, default: 0 },
-    today_sales: { type: Number, default: 0 },
-    today_tickets: { type: Number, default: 0 },
-    total_sales: { type: Number, default: 0 }
-  }
-});
-
-const betSchema = new mongoose.Schema({
-  type: String, name: String, number: String, amount: Number, multiplier: Number,
-  isGroup: Boolean, details: Array, options: Object, perOptionAmount: Number,
-  isLotto4: Boolean, isLotto5: Boolean, isAuto: Boolean
-}, { _id: false });
-
-const ticketSchema = new mongoose.Schema({
-  subsystem_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Subsystem', required: true },
-  agent_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  agent_name: String,
-  number: { type: Number, required: true },
-  date: { type: Date, default: Date.now },
-  draw: String,
-  draw_time: String,
-  bets: [betSchema],
-  total: Number,
-  status: { type: String, default: 'active' },
-  syncStatus: { type: String, default: 'synced' },
-  is_synced: { type: Boolean, default: true },
-  synced_at: Date
-});
-ticketSchema.index({ subsystem_id: 1, date: -1 });
-ticketSchema.index({ agent_id: 1, date: -1 });
-
-const resultSchema = new mongoose.Schema({
-  draw: { type: String, required: true },
-  time: { type: String, enum: ['morning', 'evening'], required: true },
-  date: { type: Date, required: true },
-  lot1: { type: String, required: true },
-  lot2: String,
-  lot3: String,
-  verified: { type: Boolean, default: false },
-  subsystem_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Subsystem' }
-});
-resultSchema.index({ draw: 1, time: 1, date: 1 }, { unique: true });
-
-const restrictionSchema = new mongoose.Schema({
-  subsystem_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Subsystem', required: true },
-  number: { type: String, required: true },
-  type: { type: String, enum: ['block', 'limit'], required: true },
-  limitAmount: Number,
-  draw: { type: String, default: 'all' },
-  time: { type: String, default: 'all' },
-  created_at: { type: Date, default: Date.now }
-});
-
-const companyInfoSchema = new mongoose.Schema({
-  subsystem_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Subsystem', unique: true },
-  name: String,
-  phone: String,
-  address: String,
-  reportTitle: String,
-  reportPhone: String,
-  logoUrl: String
-});
-
-const User = mongoose.model('User', userSchema);
-const Subsystem = mongoose.model('Subsystem', subsystemSchema);
-const Ticket = mongoose.model('Ticket', ticketSchema);
-const Result = mongoose.model('Result', resultSchema);
-const Restriction = mongoose.model('Restriction', restrictionSchema);
-const CompanyInfo = mongoose.model('CompanyInfo', companyInfoSchema);
-
-// ==================== MIDDLEWARE AUTH ====================
-const auth = async (req, res, next) => {
-  try {
-    const token = req.header('x-auth-token');
-    if (!token) return res.status(401).json({ error: 'Accès refusé. Token manquant.' });
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.userId).select('-password');
-    if (!user || !user.is_active) return res.status(401).json({ error: 'Utilisateur invalide.' });
-    req.user = user;
-    next();
-  } catch (err) {
-    res.status(401).json({ error: 'Token invalide.' });
-  }
-};
-
-const authorize = (...roles) => (req, res, next) => {
-  if (!roles.includes(req.user.role)) return res.status(403).json({ error: 'Accès interdit.' });
-  next();
-};
-
-// ==================== EXPRESS APP ====================
-const app = express();
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname))); // sert les fichiers HTML/CSS/JS
-
-// ==================== ROUTES ====================
-
-// --- AUTH ---
-app.post('/api/auth/login', async (req, res) => {
-  try {
-    const { username, password } = req.body;
-    if (!username || !password) return res.status(400).json({ success: false, error: 'Champs requis.' });
-    const user = await User.findOne({ username });
-    if (!user) return res.status(401).json({ success: false, error: 'Identifiants incorrects.' });
-    const isMatch = await user.comparePassword(password);
-    if (!isMatch) return res.status(401).json({ success: false, error: 'Identifiants incorrects.' });
-    if (!user.is_active) return res.status(403).json({ success: false, error: 'Compte désactivé.' });
-
-    user.last_login = new Date();
-    user.is_online = true;
-    await user.save();
-
-    const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
-    const userData = {
-      id: user._id,
-      username: user.username,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      subsystem_id: user.subsystem_id
+// ---------- Fonction d'abréviation des jeux (version courte) ----------
+function getGameAbbreviation(gameName, bet) {
+    // Cas spécial : mariage gratuit (freeType 'special_marriage')
+    if (bet && bet.free && bet.freeType === 'special_marriage') {
+        return 'marg';
+    }
+    const map = {
+        'borlette': 'bor',
+        'lotto3': 'lo3',
+        'lotto4': 'lo4',
+        'lotto5': 'lo5',
+        'auto_marriage': 'mara',
+        'auto_lotto4': 'loa4',
+        'auto_lotto5': 'loa5',
+        'mariage': 'mar',
+        'lotto 3': 'lo3',
+        'lotto 4': 'lo4',
+        'lotto 5': 'lo5',
+        'loto3': 'lo3',
+        'loto4': 'lo4',
+        'loto5': 'lo5',
+        'bo': 'bo',
+        'grap': 'grap',
+        'n0': 'n0',
+        'n1': 'n1',
+        'n2': 'n2',
+        'n3': 'n3',
+        'n4': 'n4',
+        'n5': 'n5',
+        'n6': 'n6',
+        'n7': 'n7',
+        'n8': 'n8',
+        'n9': 'n9'
     };
-    res.json({ success: true, admin: userData, token });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, error: 'Erreur serveur.' });
-  }
-});
+    const key = (gameName || '').trim().toLowerCase();
+    return map[key] || gameName;
+}
 
-// --- Vérification de session (pour les applications frontend) ---
-app.get('/api/auth/check', auth, async (req, res) => {
-  // auth middleware a déjà vérifié le token et attaché req.user
-  const userData = {
-    id: req.user._id,
-    username: req.user.username,
-    name: req.user.name,
-    email: req.user.email,
-    role: req.user.role,
-    subsystem_id: req.user.subsystem_id
-  };
-  res.json({ success: true, admin: userData });
-});
+// ---------- Save & Print Ticket ----------
+async function processFinalTicket() {
+    if (!APP_STATE.currentCart.length) {
+        alert("Panye vid");
+        return;
+    }
 
-// --- MASTER (protégé) ---
-app.get('/api/master/subsystems', auth, authorize('master'), async (req, res) => {
-  try {
-    const { page = 1, limit = 10, status = 'all', search } = req.query;
-    const query = {};
-    if (status !== 'all') query.is_active = status === 'active';
-    if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { subdomain: { $regex: search, $options: 'i' } },
-        { contact_email: { $regex: search, $options: 'i' } }
-      ];
+    const printWindow = window.open('', '_blank', 'width=500,height=700');
+    if (!printWindow) {
+        alert("Veuillez autoriser les pop-ups pour imprimer le ticket.");
+        return;
     }
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    const total = await Subsystem.countDocuments(query);
-    const subsystems = await Subsystem.find(query).skip(skip).limit(parseInt(limit)).sort({ created_at: -1 });
-    for (let sub of subsystems) {
-      const activeUsers = await User.countDocuments({ subsystem_id: sub._id, role: 'agent', is_active: true });
-      sub.stats = sub.stats || {};
-      sub.stats.active_users = activeUsers;
-      sub.stats.usage_percentage = sub.max_users ? Math.round((activeUsers / sub.max_users) * 100) : 0;
-    }
-    res.json({
-      success: true,
-      subsystems,
-      pagination: { page: parseInt(page), limit: parseInt(limit), total, total_pages: Math.ceil(total / limit) }
+
+    printWindow.document.write('<html><head><title>Chargement...</title></head><body><p style="font-size:20px; text-align:center;">Génération du ticket en cours...</p></body></html>');
+    printWindow.document.close();
+
+    const betsByDraw = {};
+    APP_STATE.currentCart.forEach(b => {
+        if (!betsByDraw[b.drawId]) betsByDraw[b.drawId] = [];
+        betsByDraw[b.drawId].push(b);
     });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, error: 'Erreur serveur.' });
-  }
-});
 
-app.post('/api/master/subsystems', auth, authorize('master'), async (req, res) => {
-  try {
-    const { name, subdomain, contact_email, contact_phone, max_users = 10, subscription_type = 'basic', subscription_months = 1 } = req.body;
-    if (!name || !subdomain || !contact_email) return res.status(400).json({ success: false, error: 'Champs manquants.' });
-    const existing = await Subsystem.findOne({ subdomain });
-    if (existing) return res.status(400).json({ success: false, error: 'Sous-domaine déjà utilisé.' });
+    try {
+        for (const drawId in betsByDraw) {
+            const bets = betsByDraw[drawId];
+            const total = bets.reduce((s, b) => s + b.amount, 0);
 
-    const subscription_expires = new Date();
-    subscription_expires.setMonth(subscription_expires.getMonth() + subscription_months);
+            const payload = {
+                agentId: APP_STATE.agentId,
+                agentName: APP_STATE.agentName,
+                drawId,
+                drawName: bets[0].drawName,
+                bets,
+                total
+            };
 
-    const subsystem = new Subsystem({ name, subdomain, contact_email, contact_phone, max_users, subscription_type, subscription_expires });
-    await subsystem.save();
+            const res = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.SAVE_TICKET}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+                },
+                body: JSON.stringify(payload)
+            });
 
-    // Créer l'admin du sous-système
-    const adminUsername = `admin_${subdomain.replace(/[^a-z0-9]/g, '')}`;
-    const adminPassword = Math.random().toString(36).slice(-8);
-    const hashedPassword = await bcrypt.hash(adminPassword, 10);
-    const adminUser = new User({
-      username: adminUsername,
-      password: hashedPassword,
-      name: `Admin ${name}`,
-      email: contact_email,
-      role: 'subsystem',
-      subsystem_id: subsystem._id
-    });
-    await adminUser.save();
+            if (!res.ok) throw new Error("Erreur serveur");
 
-    res.json({
-      success: true,
-      subsystem,
-      admin_credentials: { username: adminUsername, password: adminPassword, email: contact_email },
-      access_url: `https://${subdomain}.${req.get('host')}`
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, error: 'Erreur serveur.' });
-  }
-});
+            const data = await res.json();
+            printThermalTicket(data.ticket, printWindow);
+            APP_STATE.ticketsHistory.unshift(data.ticket);
+        }
 
-app.get('/api/master/subsystems/:id', auth, authorize('master'), async (req, res) => {
-  try {
-    const subsystem = await Subsystem.findById(req.params.id);
-    if (!subsystem) return res.status(404).json({ success: false, error: 'Sous-système non trouvé.' });
-    const activeUsers = await User.countDocuments({ subsystem_id: subsystem._id, role: 'agent', is_active: true });
-    subsystem.stats = subsystem.stats || {};
-    subsystem.stats.active_users = activeUsers;
-    subsystem.stats.usage_percentage = subsystem.max_users ? Math.round((activeUsers / subsystem.max_users) * 100) : 0;
-    res.json({ success: true, subsystem });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Erreur serveur.' });
-  }
-});
+        APP_STATE.currentCart = [];
+        CartManager.renderCart();
+        alert("✅ Tikè sove & enprime");
 
-app.put('/api/master/subsystems/:id/deactivate', auth, authorize('master'), async (req, res) => {
-  try {
-    const subsystem = await Subsystem.findByIdAndUpdate(req.params.id, { is_active: false }, { new: true });
-    if (!subsystem) return res.status(404).json({ success: false, error: 'Non trouvé.' });
-    // Désactiver aussi les utilisateurs du sous-système ?
-    await User.updateMany({ subsystem_id: subsystem._id }, { is_active: false });
-    res.json({ success: true, subsystem });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Erreur serveur.' });
-  }
-});
-
-app.put('/api/master/subsystems/:id/activate', auth, authorize('master'), async (req, res) => {
-  try {
-    const subsystem = await Subsystem.findByIdAndUpdate(req.params.id, { is_active: true }, { new: true });
-    if (!subsystem) return res.status(404).json({ success: false, error: 'Non trouvé.' });
-    await User.updateMany({ subsystem_id: subsystem._id }, { is_active: true });
-    res.json({ success: true, subsystem });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Erreur serveur.' });
-  }
-});
-
-app.get('/api/master/subsystems/:id/users', auth, authorize('master'), async (req, res) => {
-  try {
-    const { page = 1, limit = 10 } = req.query;
-    const query = { subsystem_id: req.params.id, role: 'agent' };
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    const total = await User.countDocuments(query);
-    const users = await User.find(query).skip(skip).limit(parseInt(limit)).sort({ created_at: -1 });
-    res.json({
-      success: true,
-      users,
-      pagination: { page: parseInt(page), limit: parseInt(limit), total, total_pages: Math.ceil(total / limit) }
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Erreur serveur.' });
-  }
-});
-
-// --- SUBSYSTEM (protégé, rôle subsystem) ---
-app.get('/api/subsystem/mine', auth, authorize('subsystem'), async (req, res) => {
-  const subsystem = await Subsystem.findById(req.user.subsystem_id);
-  res.json({ success: true, subsystems: [subsystem] });
-});
-
-app.get('/api/subsystem/users', auth, authorize('subsystem'), async (req, res) => {
-  try {
-    const { limit = 100 } = req.query;
-    const users = await User.find({ subsystem_id: req.user.subsystem_id, role: 'agent' }).limit(parseInt(limit)).sort({ created_at: -1 });
-    res.json({ success: true, users });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Erreur serveur.' });
-  }
-});
-
-app.post('/api/subsystem/users/create', auth, authorize('subsystem'), async (req, res) => {
-  try {
-    const { name, username, email, password } = req.body;
-    if (!name || !username || !password) return res.status(400).json({ success: false, error: 'Champs manquants.' });
-    const subsystem = await Subsystem.findById(req.user.subsystem_id);
-    const activeCount = await User.countDocuments({ subsystem_id: subsystem._id, role: 'agent', is_active: true });
-    if (activeCount >= subsystem.max_users) return res.status(400).json({ success: false, error: 'Quota d\'agents atteint.' });
-
-    const existing = await User.findOne({ username });
-    if (existing) return res.status(400).json({ success: false, error: 'Nom d\'utilisateur déjà pris.' });
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const user = new User({
-      username,
-      password: hashedPassword,
-      name,
-      email,
-      role: 'agent',
-      subsystem_id: subsystem._id
-    });
-    await user.save();
-
-    res.json({ success: true, user: { id: user._id, username, name, email, created_at: user.created_at } });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, error: 'Erreur serveur.' });
-  }
-});
-
-app.put('/api/subsystem/users/:id', auth, authorize('subsystem'), async (req, res) => {
-  try {
-    const { name, email, is_active, password } = req.body;
-    const update = { name, email, is_active };
-    if (password) {
-      update.password = await bcrypt.hash(password, 10);
+    } catch (err) {
+        console.error(err);
+        alert("❌ Erè pandan enpresyon");
+        printWindow.close();
     }
-    const user = await User.findOneAndUpdate(
-      { _id: req.params.id, subsystem_id: req.user.subsystem_id },
-      update,
-      { new: true }
-    );
-    if (!user) return res.status(404).json({ success: false, error: 'Utilisateur non trouvé.' });
-    res.json({ success: true, user });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Erreur serveur.' });
-  }
-});
+}
 
-app.put('/api/subsystem/users/:id/status', auth, authorize('subsystem'), async (req, res) => {
-  try {
-    const { is_active } = req.body;
-    const user = await User.findOneAndUpdate(
-      { _id: req.params.id, subsystem_id: req.user.subsystem_id },
-      { is_active },
-      { new: true }
-    );
-    if (!user) return res.status(404).json({ success: false, error: 'Utilisateur non trouvé.' });
-    res.json({ success: true, user });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Erreur serveur.' });
-  }
-});
+// ---------- PRINT ----------
+function printThermalTicket(ticket, printWindow) {
+    const html = generateTicketHTML(ticket);
 
-app.delete('/api/subsystem/users/:id', auth, authorize('subsystem'), async (req, res) => {
-  try {
-    const user = await User.findOneAndDelete({ _id: req.params.id, subsystem_id: req.user.subsystem_id });
-    if (!user) return res.status(404).json({ success: false, error: 'Utilisateur non trouvé.' });
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Erreur serveur.' });
-  }
-});
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Ticket</title>
+            <style>
+                @page {
+                    size: 80mm auto;
+                    margin: 2mm;
+                }
+                body {
+                    font-family: 'Courier New', monospace;
+                    font-size: 32px;
+                    font-weight: bold;
+                    width: 76mm;
+                    margin: 0 auto;
+                    padding: 4mm;
+                    background: white;
+                    color: black;
+                }
+                .header {
+                    text-align: center !important;
+                    border-bottom: 2px dashed #000;
+                    padding: 0 !important;
+                    margin: 0 0 2px 0 !important;
+                    line-height: 1;
+                }
+                .header img {
+                    display: block !important;
+                    margin: 0 auto !important;
+                    vertical-align: bottom !important;
+                    max-height: 350px;
+                    max-width: 100%;
+                }
+                .header strong {
+                    display: block;
+                    font-size: 40px;
+                    font-weight: bold;
+                    margin: 0;
+                    line-height: 1;
+                }
+                .header small {
+                    display: block;
+                    font-size: 26px;
+                    color: #555;
+                    margin: 0;
+                    line-height: 1;
+                }
+                .info {
+                    margin: 10px 0;
+                }
+                .info p {
+                    margin: 5px 0;
+                    font-size: 20px;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+                hr {
+                    border: none;
+                    border-top: 2px dashed #000;
+                    margin: 10px 0;
+                }
+                .bet-row {
+                    display: flex;
+                    justify-content: space-between;
+                    margin: 5px 0;
+                    font-weight: bold;
+                    font-size: 32px;
+                }
+                .total-row {
+                    display: flex;
+                    justify-content: space-between;
+                    font-weight: bold;
+                    margin-top: 10px;
+                    font-size: 36px;
+                }
+                .footer {
+                    text-align: center;
+                    margin-top: 20px;
+                    font-style: italic;
+                    font-size: 28px;
+                }
+                .footer p {
+                    font-weight: bold;
+                    margin: 3px 0;
+                }
+            </style>
+        </head>
+        <body>
+            ${html}
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
 
-app.get('/api/subsystem/tickets', auth, authorize('subsystem'), async (req, res) => {
-  try {
-    const { period = 'today', limit = 10, status } = req.query;
-    let startDate;
-    if (period === 'today') {
-      startDate = new Date(); startDate.setHours(0,0,0,0);
-    } else if (period === 'month') {
-      startDate = new Date(); startDate.setDate(1); startDate.setHours(0,0,0,0);
-    }
-    const query = { subsystem_id: req.user.subsystem_id };
-    if (startDate) query.date = { $gte: startDate };
-    if (status === 'pending') query.syncStatus = 'pending';
-    const tickets = await Ticket.find(query).sort({ date: -1 }).limit(parseInt(limit));
-    res.json({ success: true, tickets });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Erreur serveur.' });
-  }
-});
+    printWindow.onload = function() {
+        printWindow.focus();
+        printWindow.print();
+    };
+}
 
-app.get('/api/subsystem/stats', auth, authorize('subsystem'), async (req, res) => {
-  try {
-    const subsystem = await Subsystem.findById(req.user.subsystem_id);
-    const today = new Date(); today.setHours(0,0,0,0);
-    const todayTickets = await Ticket.countDocuments({ subsystem_id: subsystem._id, date: { $gte: today } });
-    const todaySalesAgg = await Ticket.aggregate([
-      { $match: { subsystem_id: subsystem._id, date: { $gte: today } } },
-      { $group: { _id: null, total: { $sum: '$total' } } }
-    ]);
-    const todaySales = todaySalesAgg[0]?.total || 0;
-    const activeUsers = await User.countDocuments({ subsystem_id: subsystem._id, role: 'agent', is_active: true });
-    const onlineUsers = await User.countDocuments({ subsystem_id: subsystem._id, role: 'agent', is_online: true });
-    const pendingPayout = 0; // à calculer selon les tickets gagnants non payés
+// ---------- Ticket HTML ----------
+function generateTicketHTML(ticket) {
+    const cfg = APP_STATE.lotteryConfig || CONFIG;
 
-    res.json({
-      success: true,
-      stats: {
-        active_users: activeUsers,
-        max_users: subsystem.max_users,
-        today_tickets: todayTickets,
-        today_sales: todaySales,
-        online_agents: onlineUsers,
-        pending_payout: pendingPayout,
-        pending_issues: 0
-      }
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Erreur serveur.' });
-  }
-});
+    const lotteryName = cfg.LOTTERY_NAME || cfg.name || 'LOTATO';
+    const slogan = cfg.slogan || '';
+    const logoUrl = cfg.LOTTERY_LOGO || cfg.logo || cfg.logoUrl || '';
 
-app.get('/api/subsystem/activities', auth, authorize('subsystem'), async (req, res) => {
-  // Pour simplifier, on retourne un tableau vide (à implémenter plus tard)
-  res.json({ success: true, activities: [] });
-});
+    const dateObj = new Date(ticket.date);
+    const formattedDate = dateObj.toLocaleDateString('fr-FR') + ' ' + 
+                          dateObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
-// --- TICKETS (protégé) ---
-app.post('/api/tickets', auth, authorize('agent', 'subsystem'), async (req, res) => {
-  try {
-    const { subsystem_id, agent_id, agent_name, number, draw, draw_time, bets, total } = req.body;
-    // Vérifier que l'agent appartient au bon sous-système
-    if (req.user.role === 'agent' && req.user._id.toString() !== agent_id) {
-      return res.status(403).json({ success: false, error: 'Accès interdit.' });
-    }
-    const ticket = new Ticket({
-      subsystem_id: subsystem_id || req.user.subsystem_id,
-      agent_id,
-      agent_name,
-      number,
-      draw,
-      draw_time,
-      bets,
-      total,
-      status: 'active',
-      syncStatus: 'synced'
-    });
-    await ticket.save();
-    res.json({ success: true, ticket });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, error: 'Erreur serveur.' });
-  }
-});
+    const betsHTML = (ticket.bets || []).map(b => {
+        const gameAbbr = getGameAbbreviation(b.game || '', b);
+        let displayNumber = b.number || '';
+        if (b.game === 'auto_marriage' && displayNumber.includes('&')) {
+            displayNumber = displayNumber.replace('&', '*');
+        }
+        return `
+            <div class="bet-row">
+                <span>${gameAbbr} ${displayNumber}</span>
+                <span>${b.amount || 0} G</span>
+            </div>
+        `;
+    }).join('');
 
-app.get('/api/tickets', auth, authorize('agent', 'subsystem', 'master'), async (req, res) => {
-  try {
-    let query = {};
-    if (req.user.role === 'agent') {
-      query.agent_id = req.user._id;
-    } else if (req.user.role === 'subsystem') {
-      query.subsystem_id = req.user.subsystem_id;
-    } else if (req.user.role === 'master') {
-      // master peut tout voir, on peut filtrer par subsystem_id si fourni
-      if (req.query.subsystem_id) query.subsystem_id = req.query.subsystem_id;
-    }
-    const tickets = await Ticket.find(query).sort({ date: -1 }).limit(parseInt(req.query.limit || 100));
-    res.json({ success: true, tickets });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Erreur serveur.' });
-  }
-});
+    return `
+        <div class="header">
+            ${logoUrl ? `<img src="${logoUrl}" alt="Logo">` : ''}
+            <strong>${lotteryName}</strong>
+            ${slogan ? `<small>${slogan}</small>` : ''}
+        </div>
 
-app.get('/api/tickets/:id', auth, authorize('agent', 'subsystem', 'master'), async (req, res) => {
-  try {
-    const ticket = await Ticket.findById(req.params.id);
-    if (!ticket) return res.status(404).json({ success: false, error: 'Ticket non trouvé.' });
-    // Vérification des droits
-    if (req.user.role === 'agent' && ticket.agent_id.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ success: false, error: 'Accès interdit.' });
-    }
-    if (req.user.role === 'subsystem' && ticket.subsystem_id.toString() !== req.user.subsystem_id.toString()) {
-      return res.status(403).json({ success: false, error: 'Accès interdit.' });
-    }
-    res.json({ success: true, ticket });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Erreur serveur.' });
-  }
-});
+        <div class="info">
+            <p>Ticket #: ${ticket.ticket_id || ticket.id}</p>
+            <p>Tiraj: ${ticket.draw_name || ticket.drawName || ''}</p>
+            <p>Date: ${formattedDate}</p>
+            <p>Ajan: ${ticket.agent_name || ticket.agentName || ''}</p>
+        </div>
 
-app.put('/api/tickets/:id/sync', auth, authorize('subsystem'), async (req, res) => {
-  try {
-    const ticket = await Ticket.findOneAndUpdate(
-      { _id: req.params.id, subsystem_id: req.user.subsystem_id },
-      { syncStatus: 'synced', is_synced: true, synced_at: new Date() },
-      { new: true }
-    );
-    if (!ticket) return res.status(404).json({ success: false, error: 'Ticket non trouvé.' });
-    res.json({ success: true, ticket });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Erreur serveur.' });
-  }
-});
+        <hr>
+        ${betsHTML}
+        <hr>
 
-app.delete('/api/tickets/:id', auth, authorize('subsystem'), async (req, res) => {
-  try {
-    const ticket = await Ticket.findOneAndDelete({ _id: req.params.id, subsystem_id: req.user.subsystem_id });
-    if (!ticket) return res.status(404).json({ success: false, error: 'Ticket non trouvé.' });
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Erreur serveur.' });
-  }
-});
+        <div class="total-row">
+            <span>TOTAL</span>
+            <span>${ticket.total_amount || ticket.total || 0} Gdes</span>
+        </div>
 
-// --- RESULTS ---
-app.post('/api/results', auth, authorize('subsystem'), async (req, res) => {
-  try {
-    const { draw, time, date, lot1, lot2, lot3, verified } = req.body;
-    const result = new Result({
-      draw, time, date: new Date(date), lot1, lot2, lot3, verified,
-      subsystem_id: req.user.subsystem_id
-    });
-    await result.save();
-    res.json({ success: true, result });
-  } catch (err) {
-    if (err.code === 11000) return res.status(400).json({ success: false, error: 'Ce résultat existe déjà.' });
-    res.status(500).json({ success: false, error: 'Erreur serveur.' });
-  }
-});
+        <div class="footer">
+            <p>tickets valable jusqu'à 90 jours</p>
+            <p>Ref : +509 40 64 3557</p>
+            <p><strong>LOTATO S.A.</strong></p>
+        </div>
+    `;
+}
 
-app.get('/api/results', auth, authorize('subsystem', 'master', 'agent'), async (req, res) => {
-  try {
-    const { draw, time, date, limit = 10 } = req.query;
-    let query = {};
-    if (req.user.role === 'subsystem') {
-      query.subsystem_id = req.user.subsystem_id;
-    } else if (req.user.role === 'agent') {
-      query.subsystem_id = req.user.subsystem_id;
-    }
-    if (draw) query.draw = draw;
-    if (time) query.time = time;
-    if (date) query.date = { $gte: new Date(date), $lt: new Date(new Date(date).setDate(new Date(date).getDate()+1)) };
-    const results = await Result.find(query).sort({ date: -1 }).limit(parseInt(limit));
-    res.json({ success: true, results });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Erreur serveur.' });
-  }
-});
-
-// --- RESTRICTIONS ---
-app.post('/api/restrictions', auth, authorize('subsystem'), async (req, res) => {
-  try {
-    const { number, type, limitAmount, draw, time } = req.body;
-    const restriction = new Restriction({
-      subsystem_id: req.user.subsystem_id,
-      number, type, limitAmount, draw, time
-    });
-    await restriction.save();
-    res.json({ success: true, restriction });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Erreur serveur.' });
-  }
-});
-
-app.get('/api/restrictions', auth, authorize('subsystem'), async (req, res) => {
-  try {
-    const restrictions = await Restriction.find({ subsystem_id: req.user.subsystem_id });
-    res.json({ success: true, restrictions });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Erreur serveur.' });
-  }
-});
-
-app.put('/api/restrictions/:id', auth, authorize('subsystem'), async (req, res) => {
-  try {
-    const restriction = await Restriction.findOneAndUpdate(
-      { _id: req.params.id, subsystem_id: req.user.subsystem_id },
-      req.body,
-      { new: true }
-    );
-    if (!restriction) return res.status(404).json({ success: false, error: 'Restriction non trouvée.' });
-    res.json({ success: true, restriction });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Erreur serveur.' });
-  }
-});
-
-app.delete('/api/restrictions/:id', auth, authorize('subsystem'), async (req, res) => {
-  try {
-    const restriction = await Restriction.findOneAndDelete({ _id: req.params.id, subsystem_id: req.user.subsystem_id });
-    if (!restriction) return res.status(404).json({ success: false, error: 'Restriction non trouvée.' });
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Erreur serveur.' });
-  }
-});
-
-// --- UTILS ---
-app.get('/api/health', (req, res) => res.json({ status: 'OK' }));
-app.get('/api/logo', (req, res) => res.json({ logoUrl: '/logo-borlette.jpg' }));
-app.get('/api/company-info', (req, res) => {
-  res.json({
-    name: "Nova Lotto",
-    phone: "+509 32 53 49 58",
-    address: "Cap Haïtien",
-    reportTitle: "Nova Lotto",
-    reportPhone: "40104585"
-  });
-});
-
-// ==================== SERVEUR STATIQUE ET FALLBACK ====================
-// Route catch-all pour les applications monopages (si nécessaire)
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// ==================== DÉMARRAGE ====================
-mongoose.connect(process.env.MONGODB_URI)
-  .then(async () => {
-    console.log('✅ MongoDB connecté');
-    // Créer le master par défaut si inexistant
-    const masterExists = await User.findOne({ role: 'master' });
-    if (!masterExists) {
-      let masterUsername, masterPassword;
-      if (process.env.DEFAULT_MASTER_USERNAME && process.env.DEFAULT_MASTER_PASSWORD) {
-        masterUsername = process.env.DEFAULT_MASTER_USERNAME;
-        masterPassword = process.env.DEFAULT_MASTER_PASSWORD;
-        console.log('Création du master avec les variables d\'environnement');
-      } else {
-        // Fallback pour le développement : identifiants par défaut
-        masterUsername = 'admin';
-        masterPassword = 'admin123';
-        console.warn('⚠️  ATTENTION: Utilisation des identifiants par défaut pour le master (admin/admin123). Changez-les dès que possible.');
-      }
-      const hashedPassword = await bcrypt.hash(masterPassword, 10);
-      await User.create({
-        username: masterUsername,
-        password: hashedPassword,
-        name: 'Master Admin',
-        role: 'master',
-        is_active: true
-      });
-      console.log('✅ Master par défaut créé');
-    }
-    const PORT = process.env.PORT || 5000;
-    app.listen(PORT, () => console.log(`🚀 Serveur sur le port ${PORT}`));
-  })
-  .catch(err => {
-    console.error('❌ Erreur MongoDB:', err);
-    process.exit(1);
-  });
+// ---------- Global ----------
+window.CartManager = CartManager;
+window.processFinalTicket = processFinalTicket;
+window.printThermalTicket = printThermalTicket;
