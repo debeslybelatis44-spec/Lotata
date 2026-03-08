@@ -1,4 +1,4 @@
-// uiManager.js
+// uiManager.js (version complète avec replayTicket corrigé)
 
 // Variable globale pour le terme de recherche
 window.historySearchTerm = '';
@@ -371,7 +371,7 @@ function editTicket(ticketId) {
     alert(`Tikè #${ticket.ticket_id || ticket.id} charge nan panye. Ou kapab modifye l.`);
 }
 
-// Nouvelle fonction pour rejouer un ticket
+// ========== FONCTION REPLAY TICKET CORRIGÉE ==========
 function replayTicket(ticketId) {
     const ticket = APP_STATE.ticketsHistory.find(t => t.id === ticketId || t.ticket_id === ticketId);
     if (!ticket) {
@@ -404,20 +404,28 @@ function replayTicket(ticketId) {
         bets = Object.entries(ticket.bets).map(([num, amt]) => ({ number: num, amount: amt }));
     }
 
-    // Pour chaque tirage sélectionné, ajouter une copie de chaque pari
+    // Pour chaque tirage sélectionné, ajouter une copie propre de chaque pari
     draws.forEach(drawId => {
         const drawName = CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId;
         bets.forEach(bet => {
+            // Ne garder que les champs essentiels, supprimer les anciens IDs et infos de gain
             const newBet = {
-                ...bet,
-                id: Date.now() + Math.random(),
+                id: Date.now() + Math.random(), // nouvel ID unique
+                game: bet.game || 'borlette',
+                number: bet.number || bet.numero || '',
+                amount: bet.amount || 0,
                 drawId: drawId,
                 drawName: drawName,
-                // Supprimer les éventuelles informations de gain
-                win_amount: undefined,
-                paid: undefined,
-                checked: undefined
+                timestamp: new Date().toISOString()
             };
+            // Si c'est un lotto avec option, la conserver
+            if (bet.option) newBet.option = bet.option;
+            // Si c'est un pari gratuit (spécial mariage), on peut le signaler mais le serveur le gérera peut-être
+            if (bet.free) newBet.free = bet.free;
+            if (bet.freeType) newBet.freeType = bet.freeType;
+            // Si le pari a un cleanNumber, le conserver (utile pour certaines validations)
+            if (bet.cleanNumber) newBet.cleanNumber = bet.cleanNumber;
+
             APP_STATE.currentCart.push(newBet);
         });
     });
