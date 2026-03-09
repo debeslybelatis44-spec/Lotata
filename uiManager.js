@@ -532,7 +532,7 @@ function editTicket(ticketId) {
     alert(`Tikè #${ticket.ticket_id || ticket.id} charge nan panye. Ou kapab modifye l.`);
 }
 
-// NOUVELLE FONCTION POUR REJOUER UN TICKET (MODIFIÉE)
+// NOUVELLE FONCTION POUR REJOUER UN TICKET (FUSIONNE LES PARIS)
 function replayTicket(ticketId) {
     const ticket = APP_STATE.ticketsHistory.find(t => t.id === ticketId || t.ticket_id === ticketId);
     if (!ticket) {
@@ -540,6 +540,7 @@ function replayTicket(ticketId) {
         return;
     }
 
+    // Récupérer les tirages sélectionnés
     const draws = APP_STATE.multiDrawMode
         ? APP_STATE.selectedDraws
         : [APP_STATE.selectedDraw];
@@ -549,18 +550,18 @@ function replayTicket(ticketId) {
         return;
     }
 
-    // Extraire les paris payants uniquement
+    // Extraire les paris payants du ticket (montant > 0)
     let bets = [];
     if (Array.isArray(ticket.bets)) {
-        bets = ticket.bets.filter(b => b.amount > 0);
+        bets = ticket.bets.filter(b => parseFloat(b.amount) > 0);
     } else if (typeof ticket.bets === 'string') {
         try {
             const parsed = JSON.parse(ticket.bets);
             if (Array.isArray(parsed)) {
-                bets = parsed.filter(b => b.amount > 0);
+                bets = parsed.filter(b => parseFloat(b.amount) > 0);
             } else if (typeof parsed === 'object') {
                 bets = Object.entries(parsed)
-                    .filter(([_, amt]) => amt > 0)
+                    .filter(([_, amt]) => parseFloat(amt) > 0)
                     .map(([num, amt]) => ({ number: num, amount: amt }));
             }
         } catch (e) {
@@ -568,7 +569,7 @@ function replayTicket(ticketId) {
         }
     } else if (ticket.bets && typeof ticket.bets === 'object') {
         bets = Object.entries(ticket.bets)
-            .filter(([_, amt]) => amt > 0)
+            .filter(([_, amt]) => parseFloat(amt) > 0)
             .map(([num, amt]) => ({ number: num, amount: amt }));
     }
 
@@ -577,29 +578,58 @@ function replayTicket(ticketId) {
         return;
     }
 
-    // Ajouter les paris au panier pour chaque tirage sélectionné
+    // Fonction pour générer une clé unique d'un pari (type + numéro + option)
+    function getBetKey(bet) {
+        const game = bet.game || bet.specialType || 'borlette';
+        // Utiliser cleanNumber si disponible, sinon number
+        const number = bet.cleanNumber || bet.number || '';
+        const option = bet.option || '';
+        return `${game}_${number}_${option}`;
+    }
+
+    // Pour chaque tirage sélectionné
     draws.forEach(drawId => {
         const drawName = CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId;
+
+        // Pour chaque pari du ticket rejoué
         bets.forEach(bet => {
-            // Créer un nouveau pari sans l'ID de tirage original
-            const newBet = {
-                ...bet,
-                id: Date.now() + Math.random(),
-                // NE PAS conserver l'ancien drawId
-                drawId: drawId,
-                drawName: drawName,
-                win_amount: undefined,
-                paid: undefined,
-                checked: undefined,
-                // Optionnel: garder une trace que c'est un replay
-                replayFrom: ticket.ticket_id || ticket.id
-            };
-            APP_STATE.currentCart.push(newBet);
+            const betKey = getBetKey(bet);
+
+            // Chercher un pari existant dans le panier pour ce même tirage et avec la même clé
+            const existingIndex = APP_STATE.currentCart.findIndex(existing => 
+                existing.drawId === drawId && getBetKey(existing) === betKey
+            );
+
+            if (existingIndex >= 0) {
+                // Fusion : additionner les montants
+                const existingAmount = parseFloat(APP_STATE.currentCart[existingIndex].amount) || 0;
+                const newAmount = parseFloat(bet.amount) || 0;
+                APP_STATE.currentCart[existingIndex].amount = existingAmount + newAmount;
+            } else {
+                // Ajouter un nouveau pari
+                const newBet = {
+                    ...bet,
+                    id: Date.now() + Math.random(),
+                    drawId: drawId,
+                    drawName: drawName,
+                    win_amount: undefined,
+                    paid: undefined,
+                    checked: undefined,
+                    replayFrom: ticket.ticket_id || ticket.id
+                };
+                APP_STATE.currentCart.push(newBet);
+            }
         });
     });
 
-    CartManager.updateFreeMarriages();
+    // Mettre à jour les mariages gratuits si nécessaire
+    if (typeof CartManager.updateFreeMarriages === 'function') {
+        CartManager.updateFreeMarriages();
+    }
+
+    // Aller à l'écran d'accueil
     switchTab('home');
+
     alert(`Tikè #${ticket.ticket_id || ticket.id} rejwete nan panye. Ou kapab modifye l.`);
 }
 
