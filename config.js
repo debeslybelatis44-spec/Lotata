@@ -31,16 +31,16 @@ const CONFIG = {
     },
     // Tirages par défaut (fallback si serveur indisponible)
     DRAWS: [
-        { id: 'tn_matin', name: 'Tunisia Matin', time: '10:00', color: 'var(--tunisia)' },
+        { id: 'tn_matin', name: 'Tunisia Matin', time: '10:28', color: 'var(--tunisia)' },
         { id: 'tn_soir', name: 'Tunisia Soir', time: '17:00', color: 'var(--tunisia)' },
         { id: 'fl_matin', name: 'Florida Matin', time: '13:30', color: 'var(--florida)' },
         { id: 'fl_soir', name: 'Florida Soir', time: '21:50', color: 'var(--florida)' },
         { id: 'ny_matin', name: 'New York Matin', time: '14:30', color: 'var(--newyork)' },
-        { id: 'ny_soir', name: 'New York Soir', time: '20:00', color: 'var(--newyork)' },
+        { id: 'ny_soir', name: 'New York Soir', time: '22:28', color: 'var(--newyork)' },
         { id: 'ga_matin', name: 'Georgia Matin', time: '12:30', color: 'var(--georgia)' },
         { id: 'ga_soir', name: 'Georgia Soir', time: '19:00', color: 'var(--georgia)' },
         { id: 'tx_matin', name: 'Texas Matin', time: '11:30', color: 'var(--texas)' },
-        { id: 'tx_soir', name: 'Texas Soir', time: '18:30', color: 'var(--texas)' }
+        { id: 'tx_soir', name: 'Texas Soir', time: '19:28', color: 'var(--texas)' }
     ],
     LOTTERY_NAME: 'LOTATO PRO',
     LOTTERY_LOGO: 'https://raw.githubusercontent.com/your-username/your-repo/main/logo.png',

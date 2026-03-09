@@ -11,7 +11,7 @@ function isNumberBlocked(number, drawId) {
 
 // ---------- Fonction utilitaire pour générer un mariage aléatoire ----------
 function generateRandomMarriageBet(amount) {
-    // Génère deux nombres à deux chiffres (00 à 99)
+    // Génère deux nombres à deux chiffres (00 à 99) de manière aléatoire
     const num1 = Math.floor(Math.random() * 100).toString().padStart(2, '0');
     const num2 = Math.floor(Math.random() * 100).toString().padStart(2, '0');
     const number = `${num1}&${num2}`;
@@ -107,7 +107,6 @@ var CartManager = {
             let autoBets = [];
             switch (game) {
                 case 'auto_marriage':
-                    // On ne prend que les paris normaux, sans gratuits (ils seront ajoutés via updateFreeMarriages)
                     autoBets = GameEngine.generateAutoMarriageBets(amt);
                     break;
                 case 'bo':
@@ -134,20 +133,19 @@ var CartManager = {
                 ? APP_STATE.selectedDraws
                 : [APP_STATE.selectedDraw];
 
-            // Pour chaque tirage, ajouter une copie de chaque pari normal
             draws.forEach(drawId => {
                 const drawName = CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId;
                 autoBets.forEach(bet => {
                     APP_STATE.currentCart.push({
                         ...bet,
-                        id: Date.now() + Math.random(), // nouvel ID unique
+                        id: Date.now() + Math.random(),
                         drawId: drawId,
                         drawName: drawName
                     });
                 });
             });
 
-            // Ajuster les gratuits en fonction du nouveau total
+            // Ajuster les gratuits
             this.updateFreeMarriages();
 
             amtInput.value = '';
@@ -177,7 +175,6 @@ var CartManager = {
                 }
             }
 
-            // Ajout des paris
             draws.forEach(drawId => {
                 const drawName = CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId;
                 numbers.forEach(num => {
@@ -194,7 +191,8 @@ var CartManager = {
                 });
             });
 
-            this.renderCart();
+            // Mettre à jour les gratuits (même pour les jeux NX, car ils sont payants)
+            this.updateFreeMarriages();
             numInput.value = '';
             amtInput.value = '';
             numInput.focus();
@@ -246,7 +244,8 @@ var CartManager = {
             }
         });
 
-        this.renderCart();
+        // Mettre à jour les gratuits après ajout manuel
+        this.updateFreeMarriages();
         numInput.value = '';
         amtInput.value = '';
         numInput.focus();
