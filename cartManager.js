@@ -13,6 +13,7 @@ function isNumberBlocked(number, drawId) {
 function generateRandomMarriageBet(amount) {
     const num1 = Math.floor(Math.random() * 100).toString().padStart(2, '0');
     const num2 = Math.floor(Math.random() * 100).toString().padStart(2, '0');
+    console.log(`🎲 Génération aléatoire: ${num1}&${num2}`);
     return {
         game: 'auto_marriage',
         number: `${num1}&${num2}`,
@@ -26,8 +27,17 @@ var CartManager = {
 
     // Met à jour les mariages gratuits : supprime tous les anciens et recrée selon le total payant
     updateFreeMarriages() {
+        console.log("=== updateFreeMarriages ===");
+        console.log("Avant suppression, gratuits:", APP_STATE.currentCart.filter(b => b.free && b.freeType === 'special_marriage'));
+
         // 1. Supprimer tous les gratuits existants
-        APP_STATE.currentCart = APP_STATE.currentCart.filter(b => !(b.free && b.freeType === 'special_marriage'));
+        APP_STATE.currentCart = APP_STATE.currentCart.filter(b => {
+            if (b.free && b.freeType === 'special_marriage') {
+                console.log("🗑️ Suppression gratuit:", b);
+                return false;
+            }
+            return true;
+        });
 
         // 2. Regrouper les paris payants par tirage
         const payantsByDraw = {};
@@ -38,16 +48,21 @@ var CartManager = {
             }
         });
 
+        console.log("Payants par tirage:", payantsByDraw);
+
         // 3. Pour chaque tirage, calculer le nombre de gratuits requis
         Object.keys(payantsByDraw).forEach(drawId => {
             const payants = payantsByDraw[drawId];
             const totalPayant = payants.reduce((sum, b) => sum + b.amount, 0);
+            console.log(`Tirage ${drawId} - total payant: ${totalPayant}`);
 
             let requiredFree = 0;
             if (totalPayant >= 100 && totalPayant <= 200) requiredFree = 1;
             else if (totalPayant >= 201 && totalPayant <= 500) requiredFree = 2;
             else if (totalPayant >= 501) requiredFree = 3;
             // Si totalPayant < 100, requiredFree = 0 → pas de gratuit
+
+            console.log(`   → ${requiredFree} gratuit(s) requis`);
 
             // 4. Ajouter les gratuits avec des numéros aléatoires
             for (let i = 0; i < requiredFree; i++) {
@@ -60,10 +75,12 @@ var CartManager = {
                     free: true,
                     freeType: 'special_marriage'
                 };
+                console.log("   ➕ Ajout gratuit:", newFree);
                 APP_STATE.currentCart.push(newFree);
             }
         });
 
+        console.log("Après mise à jour, gratuits:", APP_STATE.currentCart.filter(b => b.free && b.freeType === 'special_marriage'));
         this.renderCart();
     },
 
