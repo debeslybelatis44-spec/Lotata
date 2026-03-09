@@ -371,7 +371,7 @@ function editTicket(ticketId) {
     alert(`Tikè #${ticket.ticket_id || ticket.id} charge nan panye. Ou kapab modifye l.`);
 }
 
-// Nouvelle fonction pour rejouer un ticket
+// Nouvelle fonction pour rejouer un ticket (corrigée)
 function replayTicket(ticketId) {
     const ticket = APP_STATE.ticketsHistory.find(t => t.id === ticketId || t.ticket_id === ticketId);
     if (!ticket) {
@@ -389,19 +389,33 @@ function replayTicket(ticketId) {
         return;
     }
 
-    // Extraire les paris du ticket
+    // Extraire les paris du ticket (uniquement ceux avec montant > 0, pas les gratuits)
     let bets = [];
     if (Array.isArray(ticket.bets)) {
-        bets = ticket.bets;
+        bets = ticket.bets.filter(b => b.amount > 0); // Garder seulement les payants
     } else if (typeof ticket.bets === 'string') {
         try {
-            bets = JSON.parse(ticket.bets);
+            const parsed = JSON.parse(ticket.bets);
+            if (Array.isArray(parsed)) {
+                bets = parsed.filter(b => b.amount > 0);
+            } else if (typeof parsed === 'object') {
+                // Si c'est un objet { num: montant }, on le convertit
+                bets = Object.entries(parsed)
+                    .filter(([_, amt]) => amt > 0)
+                    .map(([num, amt]) => ({ number: num, amount: amt }));
+            }
         } catch (e) {
             bets = [];
         }
     } else if (ticket.bets && typeof ticket.bets === 'object') {
-        // Si c'est un objet, on le convertit en tableau (ex: { "12": 50, "34": 100 })
-        bets = Object.entries(ticket.bets).map(([num, amt]) => ({ number: num, amount: amt }));
+        bets = Object.entries(ticket.bets)
+            .filter(([_, amt]) => amt > 0)
+            .map(([num, amt]) => ({ number: num, amount: amt }));
+    }
+
+    if (bets.length === 0) {
+        alert("Pa gen paryaj valab (montant > 0) nan tikè sa a.");
+        return;
     }
 
     // Pour chaque tirage sélectionné, ajouter une copie de chaque pari
@@ -422,13 +436,13 @@ function replayTicket(ticketId) {
         });
     });
 
-    // Mettre à jour l'affichage du panier
-    CartManager.renderCart();
+    // Mettre à jour les mariages gratuits en fonction du nouveau total payant
+    CartManager.updateFreeMarriages();
 
     // Basculer vers l'écran d'accueil pour visualiser/modifier
     switchTab('home');
 
-    alert(`Tikè #${ticket.ticket_id || ticket.id} rejwete nan panye.`);
+    alert(`Tikè #${ticket.ticket_id || ticket.id} rejwete nan panye. Ou kapab modifye l.`);
 }
 
 // Réimpression d'un ticket depuis l'historique

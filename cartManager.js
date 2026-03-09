@@ -9,10 +9,25 @@ function isNumberBlocked(number, drawId) {
     return drawBlocked.includes(number);
 }
 
+// ---------- Fonction utilitaire pour générer un mariage aléatoire ----------
+function generateRandomMarriageBet(amount) {
+    // Génère deux nombres à deux chiffres (00 à 99)
+    const num1 = Math.floor(Math.random() * 100).toString().padStart(2, '0');
+    const num2 = Math.floor(Math.random() * 100).toString().padStart(2, '0');
+    const number = `${num1}&${num2}`;
+    return {
+        game: 'auto_marriage',
+        number: number,
+        cleanNumber: number,
+        amount: amount,
+        // Les autres propriétés (drawId, drawName, etc.) seront ajoutées lors de l'insertion
+    };
+}
+
 // ---------- Cart Manager ----------
 var CartManager = {
 
-    // Met à jour le nombre de mariages gratuits pour chaque tirage en fonction du total payant
+    // Met à jour le nombre de mariages gratuits pour chaque tirage
     updateFreeMarriages() {
         // Regrouper les paris par drawId
         const betsByDraw = {};
@@ -26,30 +41,27 @@ var CartManager = {
             const bets = betsByDraw[drawId];
             // Calculer le total des paris payants (amount > 0)
             const totalPayant = bets.reduce((sum, b) => sum + (b.amount > 0 ? b.amount : 0), 0);
-            
-            // Déterminer le nombre de gratuits requis selon les nouveaux seuils
+
+            // Déterminer le nombre de gratuits requis selon les nouveaux seuils (à partir de 100 G)
             let requiredFree = 0;
-            if (totalPayant >= 1 && totalPayant <= 200) requiredFree = 1;
+            if (totalPayant >= 100 && totalPayant <= 200) requiredFree = 1;
             else if (totalPayant >= 201 && totalPayant <= 500) requiredFree = 2;
             else if (totalPayant >= 501) requiredFree = 3;
+            // Si totalPayant < 100, requiredFree reste 0
 
             // Compter les gratuits existants pour ce tirage
             const existingFree = bets.filter(b => b.free && b.freeType === 'special_marriage').length;
 
-            // Trouver un modèle de pari normal (non gratuit) pour ce tirage
-            const normalBet = bets.find(b => !b.free);
-            if (!normalBet) {
-                // Si pas de pari normal, on ne peut pas ajouter de gratuit (mais normalement il y en a)
-                return;
-            }
-
             if (existingFree < requiredFree) {
                 // Ajouter des gratuits
                 for (let i = 0; i < requiredFree - existingFree; i++) {
+                    // Générer un nouveau pari de mariage gratuit (montant 0)
+                    const freeBetTemplate = generateRandomMarriageBet(0);
                     const newFree = {
-                        ...normalBet,
+                        ...freeBetTemplate,
                         id: Date.now() + Math.random() + i,
-                        amount: 0,
+                        drawId: drawId,
+                        drawName: bets[0]?.drawName || 'Tiraj',
                         free: true,
                         freeType: 'special_marriage'
                     };

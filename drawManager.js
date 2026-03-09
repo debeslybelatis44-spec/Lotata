@@ -1,5 +1,4 @@
 // drawManager.js complet
-
 function isDrawBlocked(drawTime) {
     const now = new Date();
     const [hours, minutes] = drawTime.split(':').map(Number);
@@ -7,18 +6,14 @@ function isDrawBlocked(drawTime) {
     const drawDate = new Date();
     drawDate.setHours(hours, minutes, 0, 0);
     
+    // Si l'heure du tirage est déjà passée aujourd'hui → bloqué définitivement
     if (now > drawDate) {
         return true;
     }
     
+    // Période de blocage : 3 minutes avant l'heure
     const blockedStart = new Date(drawDate.getTime() - (3 * 60 * 1000));
     return now >= blockedStart;
-}
-
-function isNumberBlocked(number, drawId) {
-    if (APP_STATE.globalBlockedNumbers.includes(number)) return true;
-    const drawBlocked = APP_STATE.drawBlockedNumbers[drawId] || [];
-    return drawBlocked.includes(number);
 }
 
 function checkSelectedDrawStatus() {
@@ -26,6 +21,7 @@ function checkSelectedDrawStatus() {
     const selectedDraw = draws.find(d => d.id === APP_STATE.selectedDraw);
     if (!selectedDraw) return false;
     
+    // Blocage si tirage désactivé par admin OU dans la fenêtre 3 min
     const blocked = !selectedDraw.active || isDrawBlocked(selectedDraw.time);
     APP_STATE.isDrawBlocked = blocked;
     
@@ -91,35 +87,6 @@ function selectDraw(id) {
     APP_STATE.selectedDraw = id;
     APP_STATE.selectedDraws = [id];
     document.getElementById('current-draw-title').textContent = draw.name;
-    
-    // Si on a des paris en attente de rejeu, on les ajoute au panier
-    if (APP_STATE.pendingReplayBets && APP_STATE.pendingReplayBets.length > 0) {
-        let blockedFound = false;
-        for (const bet of APP_STATE.pendingReplayBets) {
-            const number = bet.cleanNumber || bet.number;
-            if (isNumberBlocked(number, id)) {
-                alert(`Nimewo ${number} bloke pou tiraj sa a. Ou pa ka rejwe li.`);
-                blockedFound = true;
-                break;
-            }
-        }
-        if (!blockedFound) {
-            APP_STATE.pendingReplayBets.forEach(bet => {
-                APP_STATE.currentCart.push({
-                    ...bet,
-                    id: Date.now() + Math.random(),
-                    drawId: id,
-                    drawName: draw.name,
-                    win_amount: undefined,
-                    paid: undefined,
-                    checked: undefined
-                });
-            });
-            CartManager.renderCart();
-            alert(`${APP_STATE.pendingReplayBets.length} pari ajoute nan panye.`);
-        }
-        APP_STATE.pendingReplayBets = [];
-    }
     
     document.getElementById('multi-draw-indicator').style.display = 'none';
     
@@ -219,6 +186,7 @@ function continueToBettingWithMultiDraw() {
         return;
     }
     
+    // Vérifier qu'aucun tirage sélectionné n'est bloqué
     const draws = APP_STATE.draws || CONFIG.DRAWS;
     for (const drawId of APP_STATE.selectedDraws) {
         const draw = draws.find(d => d.id === drawId);
