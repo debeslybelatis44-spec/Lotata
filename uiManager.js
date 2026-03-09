@@ -1,4 +1,4 @@
-// uiManager.js (version complète avec replayTicket corrigé)
+// uiManager.js
 
 // Variable globale pour le terme de recherche
 window.historySearchTerm = '';
@@ -371,7 +371,7 @@ function editTicket(ticketId) {
     alert(`Tikè #${ticket.ticket_id || ticket.id} charge nan panye. Ou kapab modifye l.`);
 }
 
-// ========== FONCTION REPLAY TICKET CORRIGÉE ==========
+// ==================== FONCTION REPLAY CORRIGÉE ====================
 function replayTicket(ticketId) {
     const ticket = APP_STATE.ticketsHistory.find(t => t.id === ticketId || t.ticket_id === ticketId);
     if (!ticket) {
@@ -379,27 +379,32 @@ function replayTicket(ticketId) {
         return;
     }
 
-    // Récupérer le tirage d'origine du ticket
-    const originalDrawId = ticket.draw_id || ticket.drawId;
-    if (!originalDrawId) {
-        alert("Tikè sa pa gen tiraj asosye!");
+    // Récupérer l'ID du tirage original
+    const drawId = ticket.draw_id || ticket.drawId;
+    if (!drawId) {
+        alert("Tikè pa gen tiraj asosye.");
         return;
     }
 
-    // Vérifier que le tirage est toujours disponible
-    const drawExists = CONFIG.DRAWS.find(d => d.id === originalDrawId);
-    if (!drawExists) {
-        alert("Tiraj orijinal la pa disponib ankò!");
+    // Vérifier que le tirage est toujours actif et non bloqué
+    const draws = APP_STATE.draws || CONFIG.DRAWS;
+    const draw = draws.find(d => d.id === drawId);
+    if (!draw) {
+        alert("Tiraj pa jwenn.");
+        return;
+    }
+    if (!draw.active || isDrawBlocked(draw.time)) {
+        alert("Tiraj sa a bloke, ou pa ka rejwe tikè sa a kounye a.");
         return;
     }
 
-    // Vider le panier actuel (optionnel : on peut proposer de conserver l'ancien)
-    if (APP_STATE.currentCart.length > 0) {
-        if (!confirm("Panye a pa vid. Vle retire tout epi rejwe tikè sa a?")) {
-            return;
-        }
-        APP_STATE.currentCart = [];
+    // Désactiver le mode multi-tirage s'il est actif
+    if (APP_STATE.multiDrawMode) {
+        toggleMultiDrawMode(); // éteint le mode multi-tirage
     }
+
+    // Vider le panier
+    APP_STATE.currentCart = [];
 
     // Extraire les paris du ticket
     let bets = [];
@@ -412,50 +417,33 @@ function replayTicket(ticketId) {
             bets = [];
         }
     } else if (ticket.bets && typeof ticket.bets === 'object') {
-        bets = Object.entries(ticket.bets).map(([num, amt]) => ({ 
-            number: num, 
-            amount: amt,
-            game: 'borlette' // jeu par défaut
-        }));
+        bets = Object.entries(ticket.bets).map(([num, amt]) => ({ number: num, amount: amt }));
     }
 
-    // Ajouter les paris au panier (un seul tirage : celui d'origine)
+    // Ajouter chaque pari au panier (avec le drawId original)
     bets.forEach(bet => {
-        // Ne garder que les champs essentiels
         const newBet = {
+            ...bet,
             id: Date.now() + Math.random(),
-            game: bet.game || 'borlette',
-            number: bet.number || bet.numero || '',
-            amount: bet.amount || 0,
-            drawId: originalDrawId,
-            drawName: drawExists.name,
-            timestamp: new Date().toISOString()
+            drawId: drawId,
+            drawName: draw.name || drawId,
+            // Supprimer les infos de gain
+            win_amount: undefined,
+            paid: undefined,
+            checked: undefined
         };
-        
-        // Conserver l'option pour lotto4/5
-        if (bet.option) newBet.option = bet.option;
-        
-        // NE PAS conserver free/freeType car ils seront recalculés
-        // NE PAS conserver win_amount, paid, checked, etc.
-        
         APP_STATE.currentCart.push(newBet);
     });
 
-    // IMPORTANT: Mettre à jour le tirage sélectionné dans l'interface
-    APP_STATE.selectedDraw = originalDrawId;
-    if (APP_STATE.multiDrawMode) {
-        APP_STATE.multiDrawMode = false;
-        APP_STATE.selectedDraws = [originalDrawId];
-    }
-
-    // Mettre à jour l'affichage du panier (ce qui déclenchera le recalcul des mariages gratuits)
+    // Mettre à jour l'affichage du panier
     CartManager.renderCart();
 
-    // Basculer vers l'écran d'accueil
-    switchTab('home');
+    // Aller directement à l'écran de mise pour ce tirage
+    selectDraw(drawId);
 
-    alert(`Tikè #${ticket.ticket_id || ticket.id} rejwete nan panye sou tiraj ${drawExists.name}.`);
+    alert(`Tikè #${ticket.ticket_id || ticket.id} rejwete nan panye.`);
 }
+// ==================== FIN CORRECTION ====================
 
 // Réimpression d'un ticket depuis l'historique
 function reprintTicket(ticketId) {
