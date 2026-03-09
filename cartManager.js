@@ -1,247 +1,339 @@
-// drawManager.js complet
+// ==========================
+// cartManager.js (corrigé - gestion mariage gratuit)
+// ==========================
 
-function isDrawBlocked(drawTime) {
-    const now = new Date();
-    const [hours, minutes] = drawTime.split(':').map(Number);
-    
-    const drawDate = new Date();
-    drawDate.setHours(hours, minutes, 0, 0);
-    
-    if (now > drawDate) {
-        return true;
-    }
-    
-    const blockedStart = new Date(drawDate.getTime() - (3 * 60 * 1000));
-    return now >= blockedStart;
-}
-
-// Fonction utilitaire pour vérifier si un numéro est bloqué
+// ---------- Utils ----------
 function isNumberBlocked(number, drawId) {
     if (APP_STATE.globalBlockedNumbers.includes(number)) return true;
     const drawBlocked = APP_STATE.drawBlockedNumbers[drawId] || [];
     return drawBlocked.includes(number);
 }
 
-function checkSelectedDrawStatus() {
-    const draws = APP_STATE.draws || CONFIG.DRAWS;
-    const selectedDraw = draws.find(d => d.id === APP_STATE.selectedDraw);
-    if (!selectedDraw) return false;
-    
-    const blocked = !selectedDraw.active || isDrawBlocked(selectedDraw.time);
-    APP_STATE.isDrawBlocked = blocked;
-    
-    const warningEl = document.getElementById('draw-blocked-warning');
-    const addBetBtn = document.getElementById('add-bet-btn');
-    
-    if (blocked) {
-        warningEl.style.display = 'flex';
-        addBetBtn.disabled = true;
-        addBetBtn.style.opacity = '0.5';
-        addBetBtn.style.cursor = 'not-allowed';
-        addBetBtn.innerHTML = '<i class="fas fa-ban"></i>';
-    } else {
-        warningEl.style.display = 'none';
-        addBetBtn.disabled = false;
-        addBetBtn.style.opacity = '1';
-        addBetBtn.style.cursor = 'pointer';
-        addBetBtn.innerHTML = '<i class="fas fa-plus"></i>';
-    }
-    
-    return blocked;
-}
+// ---------- Cart Manager ----------
+var CartManager = {
 
-function renderDraws() {
-    const container = document.getElementById('draws-container');
-    const draws = APP_STATE.draws || CONFIG.DRAWS;
-    container.innerHTML = draws.map(draw => {
-        const timeBlocked = isDrawBlocked(draw.time);
-        const adminBlocked = draw.active === false;
-        const blocked = timeBlocked || adminBlocked;
-        const isActive = APP_STATE.selectedDraw === draw.id && !blocked;
-        
-        let blockReason = '';
-        if (adminBlocked) blockReason = 'BLOKÉ (admin)';
-        else if (timeBlocked) blockReason = 'BLOKÉ (3 min)';
-        
-        return `
-            <div class="draw-card ${isActive ? 'active' : ''} ${blocked ? 'blocked' : ''}" 
-                 onclick="${blocked ? '' : `selectDraw('${draw.id}')`}" 
-                 style="--draw-color: ${draw.color}">
-                <span class="draw-name">${draw.name}</span>
-                <span class="draw-time"><i class="far fa-clock"></i> ${draw.time}</span>
-                ${blocked ? `<span class="blocked-badge">${blockReason}</span>` : ''}
-            </div>
-        `;
-    }).join('');
-}
+    // Correction mariage gratuit
+    updateFreeMarriages() {
 
-function selectDraw(id) {
-    if (APP_STATE.multiDrawMode) return;
-    
-    const draws = APP_STATE.draws || CONFIG.DRAWS;
-    const draw = draws.find(d => d.id === id);
-    if (!draw.active) {
-        alert("Tiraj sa a bloke pa administratè a. Ou pa ka jwe li.");
-        return;
-    }
-    if (isDrawBlocked(draw.time)) {
-        alert("Tiraj sa a ap rantre nan 3 minit. Ou pa ka ajoute paray.");
-        return;
-    }
-    
-    APP_STATE.selectedDraw = id;
-    APP_STATE.selectedDraws = [id];
-    document.getElementById('current-draw-title').textContent = draw.name;
-    
-    // === NOUVEAU : gestion des paris en attente de rejeu ===
-    if (APP_STATE.pendingReplayBets && APP_STATE.pendingReplayBets.length > 0) {
-        let blockedFound = false;
-        for (const bet of APP_STATE.pendingReplayBets) {
-            const number = bet.cleanNumber || bet.number;
-            if (isNumberBlocked(number, id)) {
-                alert(`Nimewo ${number} bloke pou tiraj sa a. Ou pa ka rejwe li.`);
-                blockedFound = true;
-                break;
+        const betsByDraw = {};
+
+        APP_STATE.currentCart.forEach(bet => {
+            if (!betsByDraw[bet.drawId]) betsByDraw[bet.drawId] = [];
+            betsByDraw[bet.drawId].push(bet);
+        });
+
+        Object.keys(betsByDraw).forEach(drawId => {
+
+            const bets = betsByDraw[drawId];
+
+            // total seulement auto_marriage payant
+            const totalMarriage = bets
+                .filter(b => b.game === 'auto_marriage' && !b.free)
+                .reduce((sum, b) => sum + b.amount, 0);
+
+            let requiredFree = 0;
+
+            if (totalMarriage >= 100 && totalMarriage <= 200) requiredFree = 1;
+            else if (totalMarriage >= 201 && totalMarriage <= 500) requiredFree = 2;
+            else if (totalMarriage >= 501) requiredFree = 3;
+
+            const existingFree = bets.filter(
+                b => b.free && b.freeType === 'special_marriage'
+            );
+
+            const existingCount = existingFree.length;
+
+            if (existingCount > requiredFree) {
+
+                const toRemove = existingCount - requiredFree;
+
+                for (let i = 0; i < toRemove; i++) {
+
+                    const freeBet = existingFree[i];
+
+                    const index = APP_STATE.currentCart.findIndex(
+                        b => b.id === freeBet.id
+                    );
+
+                    if (index !== -1) {
+                        APP_STATE.currentCart.splice(index, 1);
+                    }
+                }
             }
-        }
-        if (!blockedFound) {
-            APP_STATE.pendingReplayBets.forEach(bet => {
-                APP_STATE.currentCart.push({
-                    ...bet,
-                    id: Date.now() + Math.random(),
-                    drawId: id,
-                    drawName: draw.name,
-                    win_amount: undefined,
-                    paid: undefined,
-                    checked: undefined
-                });
-            });
-            CartManager.renderCart();
-            alert(`${APP_STATE.pendingReplayBets.length} pari ajoute nan panye.`);
-        }
-        APP_STATE.pendingReplayBets = [];
-    }
-    // === FIN NOUVEAU ===
-    
-    document.getElementById('multi-draw-indicator').style.display = 'none';
-    
-    document.getElementById('draw-selection-screen').classList.remove('active');
-    document.getElementById('betting-screen').classList.add('active');
-    document.querySelector('.back-button').style.display = 'flex';
-    
-    updateGameSelector();
-    checkSelectedDrawStatus();
-}
 
-function goBackToDraws() {
-    document.getElementById('betting-screen').classList.remove('active');
-    document.getElementById('draw-selection-screen').classList.add('active');
-    document.querySelector('.back-button').style.display = 'none';
-    
-    APP_STATE.multiDrawMode = false;
-    const btn = document.getElementById('multi-draw-btn');
-    btn.innerHTML = '<i class="fas fa-layer-group"></i> Plizyè Tiraj';
-    btn.style.background = 'rgba(0, 212, 255, 0.2)';
-    btn.style.borderColor = 'var(--secondary)';
-    btn.style.color = 'var(--secondary)';
-    
-    document.getElementById('multi-draw-container').style.display = 'none';
-    document.getElementById('multi-draw-continue').style.display = 'none';
-    document.getElementById('draws-container').style.display = 'grid';
-    
-    renderDraws();
-}
+            if (existingCount < requiredFree) {
 
-function toggleMultiDrawMode() {
-    APP_STATE.multiDrawMode = !APP_STATE.multiDrawMode;
-    const btn = document.getElementById('multi-draw-btn');
-    const multiContainer = document.getElementById('multi-draw-container');
-    const continueBtn = document.getElementById('multi-draw-continue');
-    const drawGrid = document.getElementById('draws-container');
-    
-    if (APP_STATE.multiDrawMode) {
-        btn.innerHTML = '<i class="fas fa-times"></i> Sispann Plizyè Tiraj';
-        btn.style.background = 'rgba(255, 77, 77, 0.2)';
-        btn.style.borderColor = 'var(--danger)';
-        btn.style.color = 'var(--danger)';
-        multiContainer.style.display = 'grid';
-        continueBtn.style.display = 'block';
-        drawGrid.style.display = 'none';
-        renderMultiDrawSelector();
-    } else {
-        btn.innerHTML = '<i class="fas fa-layer-group"></i> Plizyè Tiraj';
-        btn.style.background = 'rgba(0, 212, 255, 0.2)';
-        btn.style.borderColor = 'var(--secondary)';
-        btn.style.color = 'var(--secondary)';
-        multiContainer.style.display = 'none';
-        continueBtn.style.display = 'none';
-        drawGrid.style.display = 'grid';
-    }
-}
+                const normalMarriage = bets.find(
+                    b => b.game === 'auto_marriage' && !b.free
+                );
 
-function renderMultiDrawSelector() {
-    const container = document.getElementById('multi-draw-container');
-    const draws = APP_STATE.draws || CONFIG.DRAWS;
-    container.innerHTML = draws.map(draw => {
-        const timeBlocked = isDrawBlocked(draw.time);
-        const adminBlocked = draw.active === false;
-        const blocked = timeBlocked || adminBlocked;
-        const isSelected = APP_STATE.selectedDraws.includes(draw.id);
-        return `
-            <input type="checkbox" class="multi-draw-checkbox" id="multi-${draw.id}" 
-                   value="${draw.id}" ${isSelected && !blocked ? 'checked' : ''}
-                   ${blocked ? 'disabled' : ''}
-                   onchange="toggleMultiDrawSelection('${draw.id}')">
-            <label for="multi-${draw.id}" class="multi-draw-label" style="border-left: 3px solid ${draw.color}; ${blocked ? 'opacity: 0.5;' : ''}">
-                ${draw.name} ${blocked ? '(BLOKÉ)' : ''}
-            </label>
-        `;
-    }).join('');
-    
-    document.getElementById('selected-draws-count-multi').textContent = APP_STATE.selectedDraws.length;
-}
+                if (!normalMarriage) return;
 
-function toggleMultiDrawSelection(drawId) {
-    const checkbox = document.getElementById(`multi-${drawId}`);
-    if (checkbox.checked) {
-        if (!APP_STATE.selectedDraws.includes(drawId)) {
-            APP_STATE.selectedDraws.push(drawId);
-        }
-    } else {
-        APP_STATE.selectedDraws = APP_STATE.selectedDraws.filter(id => id !== drawId);
-    }
-    
-    document.getElementById('selected-draws-count-multi').textContent = APP_STATE.selectedDraws.length;
-    document.getElementById('selected-draws-count').textContent = APP_STATE.selectedDraws.length;
-}
+                const toAdd = requiredFree - existingCount;
 
-function continueToBettingWithMultiDraw() {
-    if (APP_STATE.selectedDraws.length === 0) {
-        alert("Tanpri chwazi omwen yon tiraj");
-        return;
-    }
-    
-    const draws = APP_STATE.draws || CONFIG.DRAWS;
-    for (const drawId of APP_STATE.selectedDraws) {
-        const draw = draws.find(d => d.id === drawId);
-        if (!draw.active || isDrawBlocked(draw.time)) {
-            alert(`Tiraj ${draw.name} bloke, retire li anvan ou kontinye.`);
+                for (let i = 0; i < toAdd; i++) {
+
+                    const newFree = {
+                        ...normalMarriage,
+                        id: Date.now() + Math.random() + i,
+                        amount: 0,
+                        free: true,
+                        freeType: 'special_marriage'
+                    };
+
+                    APP_STATE.currentCart.push(newFree);
+                }
+            }
+
+        });
+
+        this.renderCart();
+    },
+
+    addBet() {
+        if (APP_STATE.isDrawBlocked) {
+            alert("Tiraj sa a ap rantre nan 3 minit.");
             return;
         }
+
+        const numInput = document.getElementById('num-input');
+        const amtInput = document.getElementById('amt-input');
+        const amt = parseFloat(amtInput.value);
+
+        if (isNaN(amt) || amt <= 0) {
+            alert("Montan pa valid");
+            return;
+        }
+
+        const game = APP_STATE.selectedGame;
+
+        // --- Jeux automatiques ---
+        if (game === 'auto_marriage' || game === 'bo' || game === 'grap' || game === 'auto_lotto4' || game === 'auto_lotto5') {
+
+            let autoBets = [];
+
+            switch (game) {
+                case 'auto_marriage':
+                    autoBets = GameEngine.generateAutoMarriageBets(amt);
+                    break;
+                case 'bo':
+                    autoBets = SpecialGames.generateBOBets(amt);
+                    break;
+                case 'grap':
+                    autoBets = SpecialGames.generateGRAPBets(amt);
+                    break;
+                case 'auto_lotto4':
+                    autoBets = GameEngine.generateAutoLotto4Bets(amt);
+                    break;
+                case 'auto_lotto5':
+                    autoBets = GameEngine.generateAutoLotto5Bets(amt);
+                    break;
+            }
+
+            if (autoBets.length === 0) {
+                alert("Pa gen ase nimewo nan panye pou jenere " + game);
+                return;
+            }
+
+            const draws = APP_STATE.multiDrawMode
+                ? APP_STATE.selectedDraws
+                : [APP_STATE.selectedDraw];
+
+            draws.forEach(drawId => {
+
+                const drawName = CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId;
+
+                autoBets.forEach(bet => {
+
+                    APP_STATE.currentCart.push({
+                        ...bet,
+                        id: Date.now() + Math.random(),
+                        drawId: drawId,
+                        drawName: drawName
+                    });
+
+                });
+
+            });
+
+            this.updateFreeMarriages();
+
+            amtInput.value = '';
+            numInput.focus();
+
+            return;
+        }
+
+        // --- Jeux NX ---
+        if (/^n[0-9]$/.test(game)) {
+
+            const lastDigit = parseInt(game.substring(1), 10);
+
+            const numbers = [];
+
+            for (let tens = 0; tens <= 9; tens++) {
+                numbers.push(tens.toString() + lastDigit.toString());
+            }
+
+            const draws = APP_STATE.multiDrawMode
+                ? APP_STATE.selectedDraws
+                : [APP_STATE.selectedDraw];
+
+            for (const drawId of draws) {
+                for (const num of numbers) {
+
+                    if (isNumberBlocked(num, drawId)) {
+                        alert(`Nimewo ${num} bloke pou tiraj sa a`);
+                        return;
+                    }
+                }
+            }
+
+            draws.forEach(drawId => {
+
+                const drawName = CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId;
+
+                numbers.forEach(num => {
+
+                    APP_STATE.currentCart.push({
+                        id: Date.now() + Math.random(),
+                        game: game,
+                        number: num,
+                        cleanNumber: num,
+                        amount: amt,
+                        drawId: drawId,
+                        drawName: drawName,
+                        timestamp: new Date().toISOString()
+                    });
+
+                });
+
+            });
+
+            this.renderCart();
+
+            numInput.value = '';
+            amtInput.value = '';
+
+            numInput.focus();
+
+            return;
+        }
+
+        // --- Jeux normaux ---
+        let num = numInput.value.trim();
+
+        if (!GameEngine.validateEntry(game, num)) {
+            alert("Nimewo pa valid");
+            return;
+        }
+
+        num = GameEngine.getCleanNumber(num);
+
+        const draws = APP_STATE.multiDrawMode
+            ? APP_STATE.selectedDraws
+            : [APP_STATE.selectedDraw];
+
+        for (const drawId of draws) {
+
+            if (isNumberBlocked(num, drawId)) {
+                alert(`Nimewo ${num} bloke`);
+                return;
+            }
+        }
+
+        draws.forEach(drawId => {
+
+            if (game === 'lotto4' || game === 'lotto5') {
+
+                const optionBets = GameEngine.generateLottoBetsWithOptions(game, num, amt);
+
+                optionBets.forEach(bet => {
+
+                    APP_STATE.currentCart.push({
+                        ...bet,
+                        drawId: drawId,
+                        drawName: CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId
+                    });
+
+                });
+
+            } else {
+
+                APP_STATE.currentCart.push({
+                    id: Date.now() + Math.random(),
+                    game: game,
+                    number: num,
+                    cleanNumber: num,
+                    amount: amt,
+                    drawId: drawId,
+                    drawName: CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId,
+                    timestamp: new Date().toISOString()
+                });
+
+            }
+
+        });
+
+        this.renderCart();
+
+        numInput.value = '';
+        amtInput.value = '';
+
+        numInput.focus();
+    },
+
+    removeBet(id) {
+        APP_STATE.currentCart = APP_STATE.currentCart.filter(b => b.id != id);
+        this.updateFreeMarriages();
+    },
+
+    renderCart() {
+
+        const display = document.getElementById('cart-display');
+        const totalEl = document.getElementById('cart-total-display');
+        const itemsCount = document.getElementById('items-count');
+
+        if (!APP_STATE.currentCart.length) {
+
+            display.innerHTML = '<div class="empty-msg">Panye vid</div>';
+            totalEl.innerText = '0 Gdes';
+
+            if (itemsCount) itemsCount.innerText = '0 jwèt';
+
+            return;
+        }
+
+        let total = 0;
+        let count = 0;
+
+        display.innerHTML = APP_STATE.currentCart.map(bet => {
+
+            total += bet.amount;
+            count++;
+
+            const gameAbbr = getGameAbbreviation(bet.game, bet);
+
+            let displayNumber = bet.number;
+
+            if (bet.game === 'auto_marriage' && bet.number && bet.number.includes('&')) {
+                displayNumber = bet.number.replace('&', '*');
+            }
+
+            return `
+                <div class="cart-item">
+                    <span>${gameAbbr} ${displayNumber}</span>
+                    <span>${bet.amount} G</span>
+                    <button onclick="CartManager.removeBet('${bet.id}')">✕</button>
+                </div>
+            `;
+        }).join('');
+
+        totalEl.innerText = total.toLocaleString('fr-FR') + ' Gdes';
+
+        if (itemsCount) itemsCount.innerText = count + ' jwèt';
     }
-    
-    APP_STATE.selectedDraw = APP_STATE.selectedDraws[0];
-    const draw = draws.find(d => d.id === APP_STATE.selectedDraw);
-    document.getElementById('current-draw-title').textContent = draw.name;
-    
-    const indicator = document.getElementById('multi-draw-indicator');
-    indicator.style.display = 'block';
-    document.getElementById('selected-draws-count').textContent = APP_STATE.selectedDraws.length;
-    
-    document.getElementById('draw-selection-screen').classList.remove('active');
-    document.getElementById('betting-screen').classList.add('active');
-    document.querySelector('.back-button').style.display = 'flex';
-    
-    updateGameSelector();
-    checkSelectedDrawStatus();
-}
+};
+
+// ---------- Global ----------
+window.CartManager = CartManager;
