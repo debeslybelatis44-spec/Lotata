@@ -1,240 +1,247 @@
-// ==========================
-// cartManager.js (FIXED PRINT)
-// ==========================
+// drawManager.js complet
 
-// ---------- Utils ----------
+function isDrawBlocked(drawTime) {
+    const now = new Date();
+    const [hours, minutes] = drawTime.split(':').map(Number);
+    
+    const drawDate = new Date();
+    drawDate.setHours(hours, minutes, 0, 0);
+    
+    if (now > drawDate) {
+        return true;
+    }
+    
+    const blockedStart = new Date(drawDate.getTime() - (3 * 60 * 1000));
+    return now >= blockedStart;
+}
+
+// Fonction utilitaire pour vérifier si un numéro est bloqué
 function isNumberBlocked(number, drawId) {
     if (APP_STATE.globalBlockedNumbers.includes(number)) return true;
     const drawBlocked = APP_STATE.drawBlockedNumbers[drawId] || [];
     return drawBlocked.includes(number);
 }
 
-// ---------- Cart Manager ----------
-var CartManager = {
+function checkSelectedDrawStatus() {
+    const draws = APP_STATE.draws || CONFIG.DRAWS;
+    const selectedDraw = draws.find(d => d.id === APP_STATE.selectedDraw);
+    if (!selectedDraw) return false;
+    
+    const blocked = !selectedDraw.active || isDrawBlocked(selectedDraw.time);
+    APP_STATE.isDrawBlocked = blocked;
+    
+    const warningEl = document.getElementById('draw-blocked-warning');
+    const addBetBtn = document.getElementById('add-bet-btn');
+    
+    if (blocked) {
+        warningEl.style.display = 'flex';
+        addBetBtn.disabled = true;
+        addBetBtn.style.opacity = '0.5';
+        addBetBtn.style.cursor = 'not-allowed';
+        addBetBtn.innerHTML = '<i class="fas fa-ban"></i>';
+    } else {
+        warningEl.style.display = 'none';
+        addBetBtn.disabled = false;
+        addBetBtn.style.opacity = '1';
+        addBetBtn.style.cursor = 'pointer';
+        addBetBtn.innerHTML = '<i class="fas fa-plus"></i>';
+    }
+    
+    return blocked;
+}
 
-    addBet() {
-        if (APP_STATE.isDrawBlocked) {
-            alert("Tiraj sa a ap rantre nan 3 minit.");
-            return;
-        }
+function renderDraws() {
+    const container = document.getElementById('draws-container');
+    const draws = APP_STATE.draws || CONFIG.DRAWS;
+    container.innerHTML = draws.map(draw => {
+        const timeBlocked = isDrawBlocked(draw.time);
+        const adminBlocked = draw.active === false;
+        const blocked = timeBlocked || adminBlocked;
+        const isActive = APP_STATE.selectedDraw === draw.id && !blocked;
+        
+        let blockReason = '';
+        if (adminBlocked) blockReason = 'BLOKÉ (admin)';
+        else if (timeBlocked) blockReason = 'BLOKÉ (3 min)';
+        
+        return `
+            <div class="draw-card ${isActive ? 'active' : ''} ${blocked ? 'blocked' : ''}" 
+                 onclick="${blocked ? '' : `selectDraw('${draw.id}')`}" 
+                 style="--draw-color: ${draw.color}">
+                <span class="draw-name">${draw.name}</span>
+                <span class="draw-time"><i class="far fa-clock"></i> ${draw.time}</span>
+                ${blocked ? `<span class="blocked-badge">${blockReason}</span>` : ''}
+            </div>
+        `;
+    }).join('');
+}
 
-        const numInput = document.getElementById('num-input');
-        const amtInput = document.getElementById('amt-input');
-
-        let num = numInput.value.trim();
-        const amt = parseFloat(amtInput.value);
-
-        if (isNaN(amt) || amt <= 0) {
-            alert("Montan pa valid");
-            return;
-        }
-
-        if (!GameEngine.validateEntry(APP_STATE.selectedGame, num)) {
-            alert("Nimewo pa valid");
-            return;
-        }
-
-        num = GameEngine.getCleanNumber(num);
-
-        const draws = APP_STATE.multiDrawMode
-            ? APP_STATE.selectedDraws
-            : [APP_STATE.selectedDraw];
-
-        for (const drawId of draws) {
-            if (isNumberBlocked(num, drawId)) {
-                alert(`Nimewo ${num} bloke`);
-                return;
+function selectDraw(id) {
+    if (APP_STATE.multiDrawMode) return;
+    
+    const draws = APP_STATE.draws || CONFIG.DRAWS;
+    const draw = draws.find(d => d.id === id);
+    if (!draw.active) {
+        alert("Tiraj sa a bloke pa administratè a. Ou pa ka jwe li.");
+        return;
+    }
+    if (isDrawBlocked(draw.time)) {
+        alert("Tiraj sa a ap rantre nan 3 minit. Ou pa ka ajoute paray.");
+        return;
+    }
+    
+    APP_STATE.selectedDraw = id;
+    APP_STATE.selectedDraws = [id];
+    document.getElementById('current-draw-title').textContent = draw.name;
+    
+    // === NOUVEAU : gestion des paris en attente de rejeu ===
+    if (APP_STATE.pendingReplayBets && APP_STATE.pendingReplayBets.length > 0) {
+        let blockedFound = false;
+        for (const bet of APP_STATE.pendingReplayBets) {
+            const number = bet.cleanNumber || bet.number;
+            if (isNumberBlocked(number, id)) {
+                alert(`Nimewo ${number} bloke pou tiraj sa a. Ou pa ka rejwe li.`);
+                blockedFound = true;
+                break;
             }
         }
-
-        draws.forEach(drawId => {
-            APP_STATE.currentCart.push({
-                id: Date.now() + Math.random(),
-                game: APP_STATE.selectedGame,
-                number: num,
-                cleanNumber: num,
-                amount: amt,
-                drawId,
-                drawName: CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId,
-                timestamp: new Date().toISOString()
+        if (!blockedFound) {
+            APP_STATE.pendingReplayBets.forEach(bet => {
+                APP_STATE.currentCart.push({
+                    ...bet,
+                    id: Date.now() + Math.random(),
+                    drawId: id,
+                    drawName: draw.name,
+                    win_amount: undefined,
+                    paid: undefined,
+                    checked: undefined
+                });
             });
-        });
+            CartManager.renderCart();
+            alert(`${APP_STATE.pendingReplayBets.length} pari ajoute nan panye.`);
+        }
+        APP_STATE.pendingReplayBets = [];
+    }
+    // === FIN NOUVEAU ===
+    
+    document.getElementById('multi-draw-indicator').style.display = 'none';
+    
+    document.getElementById('draw-selection-screen').classList.remove('active');
+    document.getElementById('betting-screen').classList.add('active');
+    document.querySelector('.back-button').style.display = 'flex';
+    
+    updateGameSelector();
+    checkSelectedDrawStatus();
+}
 
-        this.renderCart();
-        numInput.value = '';
-        amtInput.value = '';
-    },
+function goBackToDraws() {
+    document.getElementById('betting-screen').classList.remove('active');
+    document.getElementById('draw-selection-screen').classList.add('active');
+    document.querySelector('.back-button').style.display = 'none';
+    
+    APP_STATE.multiDrawMode = false;
+    const btn = document.getElementById('multi-draw-btn');
+    btn.innerHTML = '<i class="fas fa-layer-group"></i> Plizyè Tiraj';
+    btn.style.background = 'rgba(0, 212, 255, 0.2)';
+    btn.style.borderColor = 'var(--secondary)';
+    btn.style.color = 'var(--secondary)';
+    
+    document.getElementById('multi-draw-container').style.display = 'none';
+    document.getElementById('multi-draw-continue').style.display = 'none';
+    document.getElementById('draws-container').style.display = 'grid';
+    
+    renderDraws();
+}
 
-    removeBet(id) {
-        APP_STATE.currentCart = APP_STATE.currentCart.filter(b => b.id != id);
-        this.renderCart();
-    },
+function toggleMultiDrawMode() {
+    APP_STATE.multiDrawMode = !APP_STATE.multiDrawMode;
+    const btn = document.getElementById('multi-draw-btn');
+    const multiContainer = document.getElementById('multi-draw-container');
+    const continueBtn = document.getElementById('multi-draw-continue');
+    const drawGrid = document.getElementById('draws-container');
+    
+    if (APP_STATE.multiDrawMode) {
+        btn.innerHTML = '<i class="fas fa-times"></i> Sispann Plizyè Tiraj';
+        btn.style.background = 'rgba(255, 77, 77, 0.2)';
+        btn.style.borderColor = 'var(--danger)';
+        btn.style.color = 'var(--danger)';
+        multiContainer.style.display = 'grid';
+        continueBtn.style.display = 'block';
+        drawGrid.style.display = 'none';
+        renderMultiDrawSelector();
+    } else {
+        btn.innerHTML = '<i class="fas fa-layer-group"></i> Plizyè Tiraj';
+        btn.style.background = 'rgba(0, 212, 255, 0.2)';
+        btn.style.borderColor = 'var(--secondary)';
+        btn.style.color = 'var(--secondary)';
+        multiContainer.style.display = 'none';
+        continueBtn.style.display = 'none';
+        drawGrid.style.display = 'grid';
+    }
+}
 
-    renderCart() {
-        const display = document.getElementById('cart-display');
-        const totalEl = document.getElementById('cart-total-display');
+function renderMultiDrawSelector() {
+    const container = document.getElementById('multi-draw-container');
+    const draws = APP_STATE.draws || CONFIG.DRAWS;
+    container.innerHTML = draws.map(draw => {
+        const timeBlocked = isDrawBlocked(draw.time);
+        const adminBlocked = draw.active === false;
+        const blocked = timeBlocked || adminBlocked;
+        const isSelected = APP_STATE.selectedDraws.includes(draw.id);
+        return `
+            <input type="checkbox" class="multi-draw-checkbox" id="multi-${draw.id}" 
+                   value="${draw.id}" ${isSelected && !blocked ? 'checked' : ''}
+                   ${blocked ? 'disabled' : ''}
+                   onchange="toggleMultiDrawSelection('${draw.id}')">
+            <label for="multi-${draw.id}" class="multi-draw-label" style="border-left: 3px solid ${draw.color}; ${blocked ? 'opacity: 0.5;' : ''}">
+                ${draw.name} ${blocked ? '(BLOKÉ)' : ''}
+            </label>
+        `;
+    }).join('');
+    
+    document.getElementById('selected-draws-count-multi').textContent = APP_STATE.selectedDraws.length;
+}
 
-        if (!APP_STATE.currentCart.length) {
-            display.innerHTML = '<div class="empty-msg">Panye vid</div>';
-            totalEl.innerText = '0 Gdes';
+function toggleMultiDrawSelection(drawId) {
+    const checkbox = document.getElementById(`multi-${drawId}`);
+    if (checkbox.checked) {
+        if (!APP_STATE.selectedDraws.includes(drawId)) {
+            APP_STATE.selectedDraws.push(drawId);
+        }
+    } else {
+        APP_STATE.selectedDraws = APP_STATE.selectedDraws.filter(id => id !== drawId);
+    }
+    
+    document.getElementById('selected-draws-count-multi').textContent = APP_STATE.selectedDraws.length;
+    document.getElementById('selected-draws-count').textContent = APP_STATE.selectedDraws.length;
+}
+
+function continueToBettingWithMultiDraw() {
+    if (APP_STATE.selectedDraws.length === 0) {
+        alert("Tanpri chwazi omwen yon tiraj");
+        return;
+    }
+    
+    const draws = APP_STATE.draws || CONFIG.DRAWS;
+    for (const drawId of APP_STATE.selectedDraws) {
+        const draw = draws.find(d => d.id === drawId);
+        if (!draw.active || isDrawBlocked(draw.time)) {
+            alert(`Tiraj ${draw.name} bloke, retire li anvan ou kontinye.`);
             return;
         }
-
-        let total = 0;
-
-        display.innerHTML = APP_STATE.currentCart.map(bet => {
-            total += bet.amount;
-            return `
-                <div class="cart-item">
-                    <span>${bet.game.toUpperCase()} ${bet.number}</span>
-                    <span>${bet.amount} G</span>
-                    <button onclick="CartManager.removeBet('${bet.id}')">✕</button>
-                </div>
-            `;
-        }).join('');
-
-        totalEl.innerText = total.toLocaleString('fr-FR') + ' Gdes';
     }
-};
-
-// ---------- Save & Print Ticket ----------
-async function processFinalTicket() {
-    if (!APP_STATE.currentCart.length) {
-        alert("Panye vid");
-        return;
-    }
-
-    const betsByDraw = {};
-    APP_STATE.currentCart.forEach(b => {
-        if (!betsByDraw[b.drawId]) betsByDraw[b.drawId] = [];
-        betsByDraw[b.drawId].push(b);
-    });
-
-    try {
-        for (const drawId in betsByDraw) {
-            const bets = betsByDraw[drawId];
-            const total = bets.reduce((s, b) => s + b.amount, 0);
-
-            const payload = {
-                agentId: APP_STATE.agentId,
-                agentName: APP_STATE.agentName,
-                drawId,
-                drawName: bets[0].drawName,
-                bets,
-                total
-            };
-
-            const res = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.SAVE_TICKET}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-                },
-                body: JSON.stringify(payload)
-            });
-
-            if (!res.ok) throw new Error("Erreur serveur");
-
-            const data = await res.json();
-            printThermalTicket(data.ticket);
-            APP_STATE.ticketsHistory.unshift(data.ticket);
-        }
-
-        APP_STATE.currentCart = [];
-        CartManager.renderCart();
-
-        alert("✅ Tikè sove & enprime");
-
-    } catch (err) {
-        console.error(err);
-        alert("❌ Erè pandan enpresyon");
-    }
+    
+    APP_STATE.selectedDraw = APP_STATE.selectedDraws[0];
+    const draw = draws.find(d => d.id === APP_STATE.selectedDraw);
+    document.getElementById('current-draw-title').textContent = draw.name;
+    
+    const indicator = document.getElementById('multi-draw-indicator');
+    indicator.style.display = 'block';
+    document.getElementById('selected-draws-count').textContent = APP_STATE.selectedDraws.length;
+    
+    document.getElementById('draw-selection-screen').classList.remove('active');
+    document.getElementById('betting-screen').classList.add('active');
+    document.querySelector('.back-button').style.display = 'flex';
+    
+    updateGameSelector();
+    checkSelectedDrawStatus();
 }
-
-// ---------- PRINT (popup fiable) ----------
-function printThermalTicket(ticket) {
-    const html = generateTicketHTML(ticket);
-    const printWindow = window.open('', '_blank', 'width=400,height=600');
-    if (!printWindow) {
-        alert('Veuillez autoriser les popups pour imprimer.');
-        return;
-    }
-    printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Ticket</title>
-            <style>
-                @page { size: 80mm auto; margin: 2mm; }
-                body {
-                    font-family: monospace;
-                    font-size: 12px;
-                    width: 76mm;
-                    margin: 0 auto;
-                    padding: 2mm;
-                }
-                .header { text-align: center; border-bottom: 1px solid #000; margin-bottom: 5px; }
-                .footer { text-align: center; margin-top: 10px; }
-                .bets div { display: flex; justify-content: space-between; }
-                .total { font-weight: bold; display: flex; justify-content: space-between; }
-            </style>
-        </head>
-        <body>
-            ${html}
-        </body>
-        </html>
-    `);
-    printWindow.document.close();
-    printWindow.focus();
-    // Délai pour assurer le rendu avant impression
-    setTimeout(() => {
-        printWindow.print();
-        printWindow.onafterprint = () => printWindow.close();
-    }, 250);
-}
-
-// ---------- Ticket HTML ----------
-function generateTicketHTML(ticket) {
-    const cfg = APP_STATE.lotteryConfig || CONFIG;
-
-    const betsHTML = (ticket.bets || []).map(b => `
-        <div style="display:flex;justify-content:space-between;">
-            <span>${b.game.toUpperCase()} ${b.number}</span>
-            <span>${b.amount} G</span>
-        </div>
-    `).join('');
-
-    return `
-        <div class="header">
-            <strong>${cfg.LOTTERY_NAME || 'LOTATO'}</strong><br>
-            <small>${cfg.slogan || ''}</small>
-        </div>
-
-        <div>
-            <p>Ticket #: ${ticket.ticket_id || ticket.id}</p>
-            <p>Tiraj: ${ticket.draw_name}</p>
-            <p>Date: ${new Date(ticket.date).toLocaleString('fr-FR')}</p>
-            <p>Ajan: ${ticket.agent_name}</p>
-        </div>
-
-        <hr>
-        <div class="bets">
-            ${betsHTML}
-        </div>
-        <hr>
-
-        <div class="total">
-            <span>TOTAL</span>
-            <span>${ticket.total_amount || ticket.total} Gdes</span>
-        </div>
-
-        <div class="footer">
-            <p>Mèsi & Bòn Chans</p>
-        </div>
-    `;
-}
-
-// Exposer globalement
-window.CartManager = CartManager;
-window.processFinalTicket = processFinalTicket;
-window.printThermalTicket = printThermalTicket;

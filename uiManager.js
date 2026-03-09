@@ -363,7 +363,7 @@ function replayTicket(ticketId) {
         return;
     }
 
-    // Nettoyer chaque pari
+    // Nettoyer chaque pari (supprimer les infos de gain)
     const cleanedBets = bets.map(bet => ({
         game: bet.game || 'borlette',
         number: bet.number || bet.numero || '',
@@ -381,15 +381,15 @@ function replayTicket(ticketId) {
 
     // Désactiver le mode multi-tirage s'il est actif
     if (APP_STATE.multiDrawMode) {
-        toggleMultiDrawMode();
+        toggleMultiDrawMode(); // fonction existante dans drawManager.js
     }
 
-    // Vider le panier actuel
+    // Vider le panier actuel (pour éviter les mélanges)
     APP_STATE.currentCart = [];
     CartManager.renderCart();
 
     // Retourner à l'écran de sélection des tirages
-    goBackToDraws();
+    goBackToDraws(); // fonction existante
 
     alert(`Pari yo pare pou rejwe. Tanpri chwazi yon tiraj.`);
 }
