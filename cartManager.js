@@ -1,5 +1,5 @@
 // ==========================
-// cartManager.js (FIXED)
+// cartManager.js (FIXED PRINT)
 // ==========================
 
 // ---------- Utils ----------
@@ -151,73 +151,32 @@ async function processFinalTicket() {
     }
 }
 
-// ---------- PRINT (NOUVELLE VERSION : fenêtre pop-up) ----------
+// ---------- PRINT (popup fiable) ----------
 function printThermalTicket(ticket) {
     const html = generateTicketHTML(ticket);
-
-    // Ouvrir une nouvelle fenêtre
     const printWindow = window.open('', '_blank', 'width=400,height=600');
     if (!printWindow) {
-        alert("Veuillez autoriser les pop-ups pour imprimer le ticket.");
+        alert('Veuillez autoriser les popups pour imprimer.');
         return;
     }
-
-    // Écrire le contenu HTML avec le style adapté
     printWindow.document.write(`
         <!DOCTYPE html>
         <html>
         <head>
             <title>Ticket</title>
             <style>
-                @page {
-                    size: 80mm auto;
-                    margin: 2mm;
-                }
+                @page { size: 80mm auto; margin: 2mm; }
                 body {
-                    font-family: 'Courier New', monospace;
-                    font-size: 11px;
+                    font-family: monospace;
+                    font-size: 12px;
                     width: 76mm;
                     margin: 0 auto;
                     padding: 2mm;
-                    background: white;
-                    color: black;
                 }
-                .header {
-                    text-align: center;
-                    border-bottom: 1px dashed #000;
-                    padding-bottom: 5px;
-                    margin-bottom: 5px;
-                }
-                .header strong {
-                    font-size: 14px;
-                }
-                .info {
-                    margin: 5px 0;
-                }
-                .info p {
-                    margin: 2px 0;
-                }
-                hr {
-                    border: none;
-                    border-top: 1px dashed #000;
-                    margin: 5px 0;
-                }
-                .bet-row {
-                    display: flex;
-                    justify-content: space-between;
-                    margin: 2px 0;
-                }
-                .total-row {
-                    display: flex;
-                    justify-content: space-between;
-                    font-weight: bold;
-                    margin-top: 5px;
-                }
-                .footer {
-                    text-align: center;
-                    margin-top: 10px;
-                    font-style: italic;
-                }
+                .header { text-align: center; border-bottom: 1px solid #000; margin-bottom: 5px; }
+                .footer { text-align: center; margin-top: 10px; }
+                .bets div { display: flex; justify-content: space-between; }
+                .total { font-weight: bold; display: flex; justify-content: space-between; }
             </style>
         </head>
         <body>
@@ -226,12 +185,12 @@ function printThermalTicket(ticket) {
         </html>
     `);
     printWindow.document.close();
-
-    // Attendre que le contenu soit chargé puis imprimer
-    printWindow.onload = function() {
-        printWindow.focus();
+    printWindow.focus();
+    // Délai pour assurer le rendu avant impression
+    setTimeout(() => {
         printWindow.print();
-    };
+        printWindow.onafterprint = () => printWindow.close();
+    }, 250);
 }
 
 // ---------- Ticket HTML ----------
@@ -239,7 +198,7 @@ function generateTicketHTML(ticket) {
     const cfg = APP_STATE.lotteryConfig || CONFIG;
 
     const betsHTML = (ticket.bets || []).map(b => `
-        <div class="bet-row">
+        <div style="display:flex;justify-content:space-between;">
             <span>${b.game.toUpperCase()} ${b.number}</span>
             <span>${b.amount} G</span>
         </div>
@@ -251,7 +210,7 @@ function generateTicketHTML(ticket) {
             <small>${cfg.slogan || ''}</small>
         </div>
 
-        <div class="info">
+        <div>
             <p>Ticket #: ${ticket.ticket_id || ticket.id}</p>
             <p>Tiraj: ${ticket.draw_name}</p>
             <p>Date: ${new Date(ticket.date).toLocaleString('fr-FR')}</p>
@@ -259,10 +218,12 @@ function generateTicketHTML(ticket) {
         </div>
 
         <hr>
-        ${betsHTML}
+        <div class="bets">
+            ${betsHTML}
+        </div>
         <hr>
 
-        <div class="total-row">
+        <div class="total">
             <span>TOTAL</span>
             <span>${ticket.total_amount || ticket.total} Gdes</span>
         </div>
@@ -273,6 +234,7 @@ function generateTicketHTML(ticket) {
     `;
 }
 
-// ---------- Global ----------
+// Exposer globalement
 window.CartManager = CartManager;
 window.processFinalTicket = processFinalTicket;
+window.printThermalTicket = printThermalTicket;
