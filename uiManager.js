@@ -86,18 +86,14 @@ function initHistorySearchBar() {
     const historyScreen = document.getElementById('history-screen');
     if (!historyScreen) return;
 
-    // Vérifier si la barre existe déjà
     if (document.getElementById('history-search')) return;
 
-    // Créer la barre de recherche
     const searchBar = document.createElement('div');
     searchBar.className = 'search-bar';
     searchBar.innerHTML = '<input type="text" id="history-search" placeholder="Rechèch tikè (nimewo, tiraj, nimewo jwe...)" />';
 
-    // Ajouter la barre en premier élément de l'écran d'historique
     historyScreen.prepend(searchBar);
 
-    // Ajouter le style CSS si nécessaire
     if (!document.getElementById('history-search-styles')) {
         const style = document.createElement('style');
         style.id = 'history-search-styles';
@@ -124,7 +120,6 @@ function initHistorySearchBar() {
         document.head.appendChild(style);
     }
 
-    // Attacher l'événement de recherche
     const searchInput = document.getElementById('history-search');
     searchInput.addEventListener('input', function(e) {
         window.historySearchTerm = e.target.value;
@@ -137,20 +132,16 @@ function filterTickets(tickets, term) {
     if (!term) return tickets;
     term = term.toLowerCase();
     return tickets.filter(ticket => {
-        // ID du ticket
         const ticketId = (ticket.ticket_id || ticket.id || '').toString().toLowerCase();
         if (ticketId.includes(term)) return true;
 
-        // Nom du tirage
         const drawName = (ticket.draw_name || ticket.drawName || '').toLowerCase();
         if (drawName.includes(term)) return true;
 
-        // Date formatée
         const date = new Date(ticket.date || ticket.created_at);
         const dateStr = date.toLocaleDateString('fr-FR').toLowerCase();
         if (dateStr.includes(term)) return true;
 
-        // Numéros joués (dans les paris)
         const bets = ticket.bets || [];
         let numbers = '';
         if (Array.isArray(bets)) {
@@ -172,10 +163,7 @@ async function loadHistory() {
         const tickets = await fetchTickets();
         APP_STATE.ticketsHistory = tickets;
 
-        // Initialiser la barre de recherche (une seule fois)
         initHistorySearchBar();
-
-        // Lancer l'affichage
         renderHistory();
     } catch (error) {
         console.error('Erreur chargement historique:', error);
@@ -192,7 +180,6 @@ function renderHistory() {
         return;
     }
 
-    // Appliquer le filtre
     const filteredTickets = filterTickets(APP_STATE.ticketsHistory, window.historySearchTerm);
 
     if (filteredTickets.length === 0) {
@@ -282,7 +269,6 @@ function renderHistory() {
                         <button class="btn-small print-btn" onclick="reprintTicket('${displayId}')">
                             <i class="fas fa-print"></i> Enprime
                         </button>
-                        <!-- Nouveau bouton Rejwe -->
                         <button class="btn-small replay-btn" onclick="replayTicket('${displayId}')">
                             <i class="fas fa-redo"></i> Rejwe
                         </button>
@@ -379,7 +365,6 @@ function replayTicket(ticketId) {
         return;
     }
 
-    // Récupérer les tirages sélectionnés (mode simple ou multiple)
     const draws = APP_STATE.multiDrawMode
         ? APP_STATE.selectedDraws
         : [APP_STATE.selectedDraw];
@@ -389,17 +374,16 @@ function replayTicket(ticketId) {
         return;
     }
 
-    // Extraire les paris du ticket (uniquement ceux avec montant > 0, pas les gratuits)
+    // Extraire les paris payants uniquement
     let bets = [];
     if (Array.isArray(ticket.bets)) {
-        bets = ticket.bets.filter(b => b.amount > 0); // Garder seulement les payants
+        bets = ticket.bets.filter(b => b.amount > 0);
     } else if (typeof ticket.bets === 'string') {
         try {
             const parsed = JSON.parse(ticket.bets);
             if (Array.isArray(parsed)) {
                 bets = parsed.filter(b => b.amount > 0);
             } else if (typeof parsed === 'object') {
-                // Si c'est un objet { num: montant }, on le convertit
                 bets = Object.entries(parsed)
                     .filter(([_, amt]) => amt > 0)
                     .map(([num, amt]) => ({ number: num, amount: amt }));
@@ -418,7 +402,6 @@ function replayTicket(ticketId) {
         return;
     }
 
-    // Pour chaque tirage sélectionné, ajouter une copie de chaque pari
     draws.forEach(drawId => {
         const drawName = CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId;
         bets.forEach(bet => {
@@ -427,7 +410,6 @@ function replayTicket(ticketId) {
                 id: Date.now() + Math.random(),
                 drawId: drawId,
                 drawName: drawName,
-                // Supprimer les éventuelles informations de gain
                 win_amount: undefined,
                 paid: undefined,
                 checked: undefined
@@ -436,12 +418,8 @@ function replayTicket(ticketId) {
         });
     });
 
-    // Mettre à jour les mariages gratuits en fonction du nouveau total payant
     CartManager.updateFreeMarriages();
-
-    // Basculer vers l'écran d'accueil pour visualiser/modifier
     switchTab('home');
-
     alert(`Tikè #${ticket.ticket_id || ticket.id} rejwete nan panye. Ou kapab modifye l.`);
 }
 

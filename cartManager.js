@@ -26,10 +26,10 @@ var CartManager = {
 
     // Met à jour les mariages gratuits : supprime tous les anciens et recrée selon le total payant
     updateFreeMarriages() {
-        // Supprimer tous les gratuits existants
+        // 1. Supprimer tous les gratuits existants
         APP_STATE.currentCart = APP_STATE.currentCart.filter(b => !(b.free && b.freeType === 'special_marriage'));
 
-        // Regrouper les paris payants par drawId
+        // 2. Regrouper les paris payants par tirage
         const payantsByDraw = {};
         APP_STATE.currentCart.forEach(bet => {
             if (bet.amount > 0) {
@@ -38,7 +38,7 @@ var CartManager = {
             }
         });
 
-        // Pour chaque tirage, calculer le nombre de gratuits nécessaires
+        // 3. Pour chaque tirage, calculer le nombre de gratuits requis
         Object.keys(payantsByDraw).forEach(drawId => {
             const payants = payantsByDraw[drawId];
             const totalPayant = payants.reduce((sum, b) => sum + b.amount, 0);
@@ -47,8 +47,9 @@ var CartManager = {
             if (totalPayant >= 100 && totalPayant <= 200) requiredFree = 1;
             else if (totalPayant >= 201 && totalPayant <= 500) requiredFree = 2;
             else if (totalPayant >= 501) requiredFree = 3;
+            // Si totalPayant < 100, requiredFree = 0 → pas de gratuit
 
-            // Ajouter les gratuits nécessaires
+            // 4. Ajouter les gratuits avec des numéros aléatoires
             for (let i = 0; i < requiredFree; i++) {
                 const freeBet = generateRandomMarriageBet(0);
                 const newFree = {
