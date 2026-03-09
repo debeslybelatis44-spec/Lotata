@@ -44,10 +44,11 @@ var CartManager = {
             const totalPayant = payants.reduce((sum, b) => sum + b.amount, 0);
 
             let requiredFree = 0;
-            if (totalPayant >= 100 && totalPayant <= 200) requiredFree = 1;
-            else if (totalPayant >= 201 && totalPayant <= 500) requiredFree = 2;
-            else if (totalPayant >= 501) requiredFree = 3;
-            // Si totalPayant < 100, requiredFree = 0 → pas de gratuit
+            // Seuils modifiés selon la demande :
+            if (totalPayant >= 1 && totalPayant <= 50) requiredFree = 1;
+            else if (totalPayant >= 51 && totalPayant <= 150) requiredFree = 2;
+            else if (totalPayant >= 151) requiredFree = 3;
+            // Si totalPayant < 1, requiredFree = 0 → pas de gratuit
 
             // 4. Ajouter les gratuits avec des numéros aléatoires
             for (let i = 0; i < requiredFree; i++) {

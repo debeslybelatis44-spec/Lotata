@@ -306,15 +306,14 @@ app.post('/api/tickets/save', async (req, res) => {
     }
     // ===== FIN AJOUT =====
 
-    // ===== NOUVELLE LOGIQUE DES MARIAGES GRATUITS =====
-// // ===== NOUVELLE LOGIQUE DES MARIAGES GRATUITS =====
+// ===== NOUVELLE LOGIQUE DES MARIAGES GRATUITS =====
 const totalAmount = parseFloat(total) || 0;
 let freeCount = 0;
 if (totalAmount >= 1 && totalAmount <= 50) {
     freeCount = 1;
-} else if (totalAmount >= 51 && totalAmount <= 250) {
+} else if (totalAmount >= 51 && totalAmount <= 150) {
     freeCount = 2;
-} else if (totalAmount >= 251) {
+} else if (totalAmount >= 151) {
     freeCount = 3;
 }
 // Maximum 3 gratuits, même pour les montants élevés
