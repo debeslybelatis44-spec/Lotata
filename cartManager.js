@@ -1,5 +1,5 @@
 // ==========================
-// cartManager.js (FINAL - ajustements supplémentaires)
+// cartManager.js (FIXED)
 // ==========================
 
 // ---------- Utils ----------
@@ -151,16 +151,18 @@ async function processFinalTicket() {
     }
 }
 
-// ---------- PRINT (fenêtre pop-up) ----------
+// ---------- PRINT (NOUVELLE VERSION : fenêtre pop-up) ----------
 function printThermalTicket(ticket) {
     const html = generateTicketHTML(ticket);
 
-    const printWindow = window.open('', '_blank', 'width=500,height=700');
+    // Ouvrir une nouvelle fenêtre
+    const printWindow = window.open('', '_blank', 'width=400,height=600');
     if (!printWindow) {
         alert("Veuillez autoriser les pop-ups pour imprimer le ticket.");
         return;
     }
 
+    // Écrire le contenu HTML avec le style adapté
     printWindow.document.write(`
         <!DOCTYPE html>
         <html>
@@ -173,62 +175,48 @@ function printThermalTicket(ticket) {
                 }
                 body {
                     font-family: 'Courier New', monospace;
-                    font-size: 30px; /* Texte général */
+                    font-size: 11px;
                     width: 76mm;
                     margin: 0 auto;
-                    padding: 4mm;
+                    padding: 2mm;
                     background: white;
                     color: black;
                 }
                 .header {
-                    text-align: center !important;
-                    border-bottom: 2px dashed #000;
-                    padding-bottom: 12px;
-                    margin-bottom: 12px;
-                }
-                .header img {
-                    display: block !important;
-                    margin: 0 auto 10px auto !important;
-                    max-height: 250px; /* Logo agrandi */
-                    max-width: 100%;
+                    text-align: center;
+                    border-bottom: 1px dashed #000;
+                    padding-bottom: 5px;
+                    margin-bottom: 5px;
                 }
                 .header strong {
-                    display: block;
-                    font-size: 34px;
-                }
-                .header small {
-                    display: block;
-                    font-size: 22px;
-                    color: #555;
+                    font-size: 14px;
                 }
                 .info {
-                    margin: 10px 0;
+                    margin: 5px 0;
                 }
                 .info p {
-                    margin: 5px 0;
+                    margin: 2px 0;
                 }
                 hr {
                     border: none;
-                    border-top: 2px dashed #000;
-                    margin: 10px 0;
+                    border-top: 1px dashed #000;
+                    margin: 5px 0;
                 }
                 .bet-row {
                     display: flex;
                     justify-content: space-between;
-                    margin: 5px 0;
+                    margin: 2px 0;
                 }
                 .total-row {
                     display: flex;
                     justify-content: space-between;
                     font-weight: bold;
-                    margin-top: 10px;
-                    font-size: 34px; /* Total */
+                    margin-top: 5px;
                 }
                 .footer {
                     text-align: center;
-                    margin-top: 20px;
+                    margin-top: 10px;
                     font-style: italic;
-                    font-size: 26px; /* Footer */
                 }
             </style>
         </head>
@@ -239,6 +227,7 @@ function printThermalTicket(ticket) {
     `);
     printWindow.document.close();
 
+    // Attendre que le contenu soit chargé puis imprimer
     printWindow.onload = function() {
         printWindow.focus();
         printWindow.print();
@@ -249,29 +238,24 @@ function printThermalTicket(ticket) {
 function generateTicketHTML(ticket) {
     const cfg = APP_STATE.lotteryConfig || CONFIG;
 
-    const lotteryName = cfg.LOTTERY_NAME || cfg.name || 'LOTATO';
-    const slogan = cfg.slogan || '';
-    const logoUrl = cfg.LOTTERY_LOGO || cfg.logo || cfg.logoUrl || '';
-
     const betsHTML = (ticket.bets || []).map(b => `
         <div class="bet-row">
-            <span>${b.game?.toUpperCase() || ''} ${b.number || ''}</span>
-            <span>${b.amount || 0} G</span>
+            <span>${b.game.toUpperCase()} ${b.number}</span>
+            <span>${b.amount} G</span>
         </div>
     `).join('');
 
     return `
         <div class="header">
-            ${logoUrl ? `<img src="${logoUrl}" alt="Logo">` : ''}
-            <strong>${lotteryName}</strong>
-            ${slogan ? `<small>${slogan}</small>` : ''}
+            <strong>${cfg.LOTTERY_NAME || 'LOTATO'}</strong><br>
+            <small>${cfg.slogan || ''}</small>
         </div>
 
         <div class="info">
             <p>Ticket #: ${ticket.ticket_id || ticket.id}</p>
-            <p>Tiraj: ${ticket.draw_name || ticket.drawName || ''}</p>
+            <p>Tiraj: ${ticket.draw_name}</p>
             <p>Date: ${new Date(ticket.date).toLocaleString('fr-FR')}</p>
-            <p>Ajan: ${ticket.agent_name || ticket.agentName || ''}</p>
+            <p>Ajan: ${ticket.agent_name}</p>
         </div>
 
         <hr>
@@ -280,11 +264,11 @@ function generateTicketHTML(ticket) {
 
         <div class="total-row">
             <span>TOTAL</span>
-            <span>${ticket.total_amount || ticket.total || 0} Gdes</span>
+            <span>${ticket.total_amount || ticket.total} Gdes</span>
         </div>
 
         <div class="footer">
-            <p>tickets valable jusqu'à 90 jours</p>
+            <p>Mèsi & Bòn Chans</p>
         </div>
     `;
 }
