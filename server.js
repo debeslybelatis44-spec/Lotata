@@ -307,36 +307,41 @@ app.post('/api/tickets/save', async (req, res) => {
     // ===== FIN AJOUT =====
 
     // ===== NOUVELLE LOGIQUE DES MARIAGES GRATUITS =====
-// Calculer le nombre de mariages gratuits en fonction du montant total
+// // ===== NOUVELLE LOGIQUE DES MARIAGES GRATUITS =====
 const totalAmount = parseFloat(total) || 0;
 let freeCount = 0;
-if (totalAmount >= 1 && totalAmount <= 50) freeCount = 1;
-else if (totalAmount >= 51 && totalAmount <= 250) freeCount = 2;
-else if (totalAmount >= 251) freeCount = 3;
+if (totalAmount >= 1 && totalAmount <= 50) {
+    freeCount = 1;
+} else if (totalAmount >= 51 && totalAmount <= 250) {
+    freeCount = 2;
+} else if (totalAmount >= 251) {
+    freeCount = 3;
+}
+// Maximum 3 gratuits, même pour les montants élevés
 
-const allBets = [...bets]; // on part des paris envoyés
+const allBets = [...bets];
 
 if (freeCount > 0) {
-  for (let i = 0; i < freeCount; i++) {
-    // Générer deux nombres aléatoires à deux chiffres
-    const num1 = Math.floor(Math.random() * 100).toString().padStart(2, '0');
-    const num2 = Math.floor(Math.random() * 100).toString().padStart(2, '0');
-    const number = `${num1}&${num2}`;
-    const cleanNumber = num1 + num2;
+    for (let i = 0; i < freeCount; i++) {
+        const num1 = Math.floor(Math.random() * 100).toString().padStart(2, '0');
+        const num2 = Math.floor(Math.random() * 100).toString().padStart(2, '0');
+        const number = `${num1}&${num2}`;
+        const cleanNumber = num1 + num2;
 
-    allBets.push({
-      game: 'auto_marriage',
-      number: number,
-      cleanNumber: cleanNumber,
-      amount: 0,
-      free: true,
-      freeType: 'special_marriage',
-      freeWin: 1000
-    });
-  }
+        allBets.push({
+            game: 'auto_marriage',
+            number: number,
+            cleanNumber: cleanNumber,
+            amount: 0,
+            free: true,
+            freeType: 'special_marriage',
+            freeWin: 1000
+        });
+    }
 }
 
 const betsJson = JSON.stringify(allBets);
+// ===== FIN NOUVELLE LOGIQUE =====
     // ===== FIN NOUVELLE LOGIQUE =====
 
     const ticketId = `T${Date.now()}${Math.floor(Math.random() * 1000)}`;
