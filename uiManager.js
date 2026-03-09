@@ -1,17 +1,13 @@
-// uiManager.js
+// uiManager.js complet
 
-// Variable globale pour le terme de recherche
 window.historySearchTerm = '';
 
-// Fonction utilitaire pour récupérer les tickets depuis l'API
 async function fetchTickets() {
     const token = localStorage.getItem('auth_token');
     if (!token) throw new Error('Non authentifié');
 
     const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.GET_TICKETS}`, {
-        headers: {
-            'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` }
     });
     if (!response.ok) throw new Error('Erreur réseau');
     const data = await response.json();
@@ -58,7 +54,6 @@ function switchTab(tabName) {
     }
 }
 
-// Fonction pour ajuster l'affichage des tirages sur l'écran d'accueil
 function fixHomeScreenDisplay() {
     setTimeout(() => {
         const drawNames = document.querySelectorAll('.draw-card .draw-name, .draw-item .draw-title, .draw-selection .draw-name');
@@ -77,27 +72,20 @@ function fixHomeScreenDisplay() {
             container.style.flex = '1 1 auto';
         });
         
-        console.log('Affichage des tirages corrigé (notamment pour Texas)');
+        console.log('Affichage des tirages corrigé');
     }, 100);
 }
 
-// Initialisation de la barre de recherche dans l'historique (corrigée avec prepend)
 function initHistorySearchBar() {
     const historyScreen = document.getElementById('history-screen');
     if (!historyScreen) return;
-
-    // Vérifier si la barre existe déjà
     if (document.getElementById('history-search')) return;
 
-    // Créer la barre de recherche
     const searchBar = document.createElement('div');
     searchBar.className = 'search-bar';
     searchBar.innerHTML = '<input type="text" id="history-search" placeholder="Rechèch tikè (nimewo, tiraj, nimewo jwe...)" />';
-
-    // Ajouter la barre en premier élément de l'écran d'historique
     historyScreen.prepend(searchBar);
 
-    // Ajouter le style CSS si nécessaire
     if (!document.getElementById('history-search-styles')) {
         const style = document.createElement('style');
         style.id = 'history-search-styles';
@@ -124,7 +112,6 @@ function initHistorySearchBar() {
         document.head.appendChild(style);
     }
 
-    // Attacher l'événement de recherche
     const searchInput = document.getElementById('history-search');
     searchInput.addEventListener('input', function(e) {
         window.historySearchTerm = e.target.value;
@@ -132,25 +119,17 @@ function initHistorySearchBar() {
     });
 }
 
-// Fonction de filtrage des tickets
 function filterTickets(tickets, term) {
     if (!term) return tickets;
     term = term.toLowerCase();
     return tickets.filter(ticket => {
-        // ID du ticket
         const ticketId = (ticket.ticket_id || ticket.id || '').toString().toLowerCase();
         if (ticketId.includes(term)) return true;
-
-        // Nom du tirage
         const drawName = (ticket.draw_name || ticket.drawName || '').toLowerCase();
         if (drawName.includes(term)) return true;
-
-        // Date formatée
         const date = new Date(ticket.date || ticket.created_at);
         const dateStr = date.toLocaleDateString('fr-FR').toLowerCase();
         if (dateStr.includes(term)) return true;
-
-        // Numéros joués (dans les paris)
         const bets = ticket.bets || [];
         let numbers = '';
         if (Array.isArray(bets)) {
@@ -159,7 +138,6 @@ function filterTickets(tickets, term) {
             numbers = bets.toLowerCase();
         }
         if (numbers.includes(term)) return true;
-
         return false;
     });
 }
@@ -171,11 +149,7 @@ async function loadHistory() {
         
         const tickets = await fetchTickets();
         APP_STATE.ticketsHistory = tickets;
-
-        // Initialiser la barre de recherche (une seule fois)
         initHistorySearchBar();
-
-        // Lancer l'affichage
         renderHistory();
     } catch (error) {
         console.error('Erreur chargement historique:', error);
@@ -192,7 +166,6 @@ function renderHistory() {
         return;
     }
 
-    // Appliquer le filtre
     const filteredTickets = filterTickets(APP_STATE.ticketsHistory, window.historySearchTerm);
 
     if (filteredTickets.length === 0) {
@@ -224,9 +197,7 @@ function renderHistory() {
             }
         }
         
-        let status = '';
-        let statusClass = '';
-        
+        let status = '', statusClass = '';
         if (checked) {
             if (winAmount > 0) {
                 status = 'GeNYEN';
@@ -246,15 +217,12 @@ function renderHistory() {
         const canDelete = minutesDiff <= 3 && numericId != null;
         const canEdit = minutesDiff <= 3;
         
-        let formattedDate = 'Date inkonu';
-        let formattedTime = '';
-        
+        let formattedDate = 'Date inkonu', formattedTime = '';
         try {
             formattedDate = ticketDate.toLocaleDateString('fr-FR');
             formattedTime = ticketDate.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
         } catch (e) {
             formattedDate = 'N/A';
-            formattedTime = '';
         }
         
         return `
@@ -282,7 +250,6 @@ function renderHistory() {
                         <button class="btn-small print-btn" onclick="reprintTicket('${displayId}')">
                             <i class="fas fa-print"></i> Enprime
                         </button>
-                        <!-- Nouveau bouton Rejwe -->
                         <button class="btn-small replay-btn" onclick="replayTicket('${displayId}')">
                             <i class="fas fa-redo"></i> Rejwe
                         </button>
@@ -309,10 +276,8 @@ function deleteTicketFromCard(button) {
 
 async function deleteTicket(ticketId) {
     if (!confirm('Èske ou sèten ou vle efase tikè sa a?')) return;
-
     try {
         const response = await APIService.deleteTicket(ticketId);
-        
         if (response && (response.success === true || response.status === 'ok' || response.message)) {
             APP_STATE.ticketsHistory = APP_STATE.ticketsHistory.filter(t => 
                 (t.id !== ticketId && t.ticket_id !== ticketId)
@@ -371,40 +336,13 @@ function editTicket(ticketId) {
     alert(`Tikè #${ticket.ticket_id || ticket.id} charge nan panye. Ou kapab modifye l.`);
 }
 
-// ==================== FONCTION REPLAY CORRIGÉE ====================
+// ==================== NOUVELLE FONCTION REPLAY ====================
 function replayTicket(ticketId) {
     const ticket = APP_STATE.ticketsHistory.find(t => t.id === ticketId || t.ticket_id === ticketId);
     if (!ticket) {
         alert("Tikè pa jwenn!");
         return;
     }
-
-    // Récupérer l'ID du tirage original
-    const drawId = ticket.draw_id || ticket.drawId;
-    if (!drawId) {
-        alert("Tikè pa gen tiraj asosye.");
-        return;
-    }
-
-    // Vérifier que le tirage est toujours actif et non bloqué
-    const draws = APP_STATE.draws || CONFIG.DRAWS;
-    const draw = draws.find(d => d.id === drawId);
-    if (!draw) {
-        alert("Tiraj pa jwenn.");
-        return;
-    }
-    if (!draw.active || isDrawBlocked(draw.time)) {
-        alert("Tiraj sa a bloke, ou pa ka rejwe tikè sa a kounye a.");
-        return;
-    }
-
-    // Désactiver le mode multi-tirage s'il est actif
-    if (APP_STATE.multiDrawMode) {
-        toggleMultiDrawMode(); // éteint le mode multi-tirage
-    }
-
-    // Vider le panier
-    APP_STATE.currentCart = [];
 
     // Extraire les paris du ticket
     let bets = [];
@@ -420,32 +358,43 @@ function replayTicket(ticketId) {
         bets = Object.entries(ticket.bets).map(([num, amt]) => ({ number: num, amount: amt }));
     }
 
-    // Ajouter chaque pari au panier (avec le drawId original)
-    bets.forEach(bet => {
-        const newBet = {
-            ...bet,
-            id: Date.now() + Math.random(),
-            drawId: drawId,
-            drawName: draw.name || drawId,
-            // Supprimer les infos de gain
-            win_amount: undefined,
-            paid: undefined,
-            checked: undefined
-        };
-        APP_STATE.currentCart.push(newBet);
-    });
+    if (bets.length === 0) {
+        alert("Pa gen pari nan tikè sa a.");
+        return;
+    }
 
-    // Mettre à jour l'affichage du panier
+    // Nettoyer chaque pari
+    const cleanedBets = bets.map(bet => ({
+        game: bet.game || 'borlette',
+        number: bet.number || bet.numero || '',
+        cleanNumber: bet.cleanNumber || bet.number || '',
+        amount: bet.amount || bet.montant || 0,
+        specialType: bet.specialType,
+        option: bet.option,
+        isAutoGenerated: bet.isAutoGenerated,
+        free: bet.free,
+        freeType: bet.freeType
+    })).filter(bet => bet.amount > 0 && bet.number);
+
+    // Stocker dans pendingReplayBets
+    APP_STATE.pendingReplayBets = cleanedBets;
+
+    // Désactiver le mode multi-tirage s'il est actif
+    if (APP_STATE.multiDrawMode) {
+        toggleMultiDrawMode();
+    }
+
+    // Vider le panier actuel
+    APP_STATE.currentCart = [];
     CartManager.renderCart();
 
-    // Aller directement à l'écran de mise pour ce tirage
-    selectDraw(drawId);
+    // Retourner à l'écran de sélection des tirages
+    goBackToDraws();
 
-    alert(`Tikè #${ticket.ticket_id || ticket.id} rejwete nan panye.`);
+    alert(`Pari yo pare pou rejwe. Tanpri chwazi yon tiraj.`);
 }
-// ==================== FIN CORRECTION ====================
+// ==================== FIN REPLAY ====================
 
-// Réimpression d'un ticket depuis l'historique
 function reprintTicket(ticketId) {
     const ticket = APP_STATE.ticketsHistory.find(t => t.id === ticketId || t.ticket_id === ticketId);
     if (!ticket) {
@@ -472,10 +421,7 @@ async function loadReports() {
         
         const reports = await APIService.getReports();
         
-        let totalTickets = 0;
-        let totalBets = 0;
-        let totalWins = 0;
-        let totalLoss = 0;
+        let totalTickets = 0, totalBets = 0, totalWins = 0, totalLoss = 0;
         
         if (reports && reports.total_tickets !== undefined) {
             totalTickets = reports.total_tickets || 0;
@@ -484,11 +430,9 @@ async function loadReports() {
             totalLoss = reports.total_loss || 0;
         } else {
             totalTickets = APP_STATE.ticketsHistory.length;
-            
             APP_STATE.ticketsHistory.forEach(ticket => {
                 const ticketAmount = parseFloat(ticket.total_amount || ticket.totalAmount || ticket.amount || 0);
                 totalBets += ticketAmount;
-                
                 if (ticket.checked || ticket.verified) {
                     const winAmount = parseFloat(ticket.win_amount || ticket.winAmount || ticket.prize_amount || 0);
                     if (winAmount > 0) {
@@ -511,7 +455,6 @@ async function loadReports() {
         
         const drawSelector = document.getElementById('draw-report-selector');
         drawSelector.innerHTML = '<option value="all">Tout Tiraj</option>';
-        
         CONFIG.DRAWS.forEach(draw => {
             const option = document.createElement('option');
             option.value = draw.id;
@@ -565,14 +508,11 @@ async function loadDrawReport(drawId = null) {
             );
             
             let drawTotalTickets = drawTickets.length;
-            let drawTotalBets = 0;
-            let drawTotalWins = 0;
-            let drawTotalLoss = 0;
+            let drawTotalBets = 0, drawTotalWins = 0, drawTotalLoss = 0;
             
             drawTickets.forEach(ticket => {
                 const ticketAmount = parseFloat(ticket.total_amount || ticket.totalAmount || ticket.amount || 0);
                 drawTotalBets += ticketAmount;
-                
                 if (ticket.checked || ticket.verified) {
                     const winAmount = parseFloat(ticket.win_amount || ticket.winAmount || ticket.prize_amount || 0);
                     if (winAmount > 0) {
@@ -606,7 +546,6 @@ async function loadDrawReport(drawId = null) {
     }
 }
 
-// Impression des rapports
 function printReport() {
     const drawSelector = document.getElementById('draw-report-selector');
     const selectedDraw = drawSelector.options[drawSelector.selectedIndex].text;
@@ -646,10 +585,7 @@ function printReport() {
         <head>
             <title>Rapò ${selectedDraw}</title>
             <style>
-                @page {
-                    size: 80mm auto;
-                    margin: 2mm;
-                }
+                @page { size: 80mm auto; margin: 2mm; }
                 body {
                     font-family: 'Courier New', monospace;
                     font-size: 28px;
@@ -667,27 +603,11 @@ function printReport() {
                     margin: 0 0 10px 0;
                     line-height: 1.2;
                 }
-                .header img {
-                    max-height: 180px;
-                    max-width: 100%;
-                    margin-bottom: 5px;
-                }
-                .header h1 {
-                    font-size: 40px;
-                    margin: 5px 0;
-                }
-                .header h2 {
-                    font-size: 32px;
-                    margin: 5px 0;
-                    font-weight: normal;
-                }
-                .header p {
-                    margin: 2px 0;
-                    font-size: 24px;
-                }
-                .section {
-                    margin: 15px 0;
-                }
+                .header img { max-height: 180px; max-width: 100%; margin-bottom: 5px; }
+                .header h1 { font-size: 40px; margin: 5px 0; }
+                .header h2 { font-size: 32px; margin: 5px 0; font-weight: normal; }
+                .header p { margin: 2px 0; font-size: 24px; }
+                .section { margin: 15px 0; }
                 .section-title {
                     font-size: 32px;
                     font-weight: bold;
@@ -843,9 +763,7 @@ async function markAsPaid(ticketId) {
                 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
             }
         });
-        
         if (!response.ok) throw new Error('Erreur réseau');
-        
         const data = await response.json();
         if (data.success) {
             alert('Tikè make kòm peye!');
@@ -863,7 +781,7 @@ function viewTicketDetails(ticketId) {
     );
     
     if (!ticket) {
-        alert(`Tikè pa jwenn! ID: ${ticketId}\nTotal tickets disponibles: ${APP_STATE.ticketsHistory.length}`);
+        alert(`Tikè pa jwenn! ID: ${ticketId}`);
         return;
     }
     
@@ -888,7 +806,6 @@ function viewTicketDetails(ticketId) {
     `;
     
     let bets = [];
-    
     if (Array.isArray(ticket.bets)) {
         bets = ticket.bets;
     } else if (Array.isArray(ticket.numbers)) {
@@ -900,9 +817,7 @@ function viewTicketDetails(ticketId) {
             bets = [{ number: ticket.bets, amount: totalAmount }];
         }
     } else if (ticket.bets && typeof ticket.bets === 'object') {
-        bets = Object.entries(ticket.bets).map(([key, value]) => {
-            return { number: key, amount: value };
-        });
+        bets = Object.entries(ticket.bets).map(([key, value]) => ({ number: key, amount: value }));
     } else {
         bets = [{ number: 'N/A', amount: totalAmount }];
     }
@@ -983,7 +898,6 @@ function viewTicketDetails(ticketId) {
 function updateClock() {
     const now = new Date();
     document.getElementById('live-clock').innerText = now.toLocaleTimeString('fr-FR');
-    
     if (APP_STATE.currentTab === 'home' || APP_STATE.currentTab === 'betting') {
         checkSelectedDrawStatus();
     }
@@ -992,13 +906,11 @@ function updateClock() {
 function updateSyncStatus() {
     const syncBar = document.getElementById('sync-status-bar');
     const syncText = document.getElementById('sync-text');
-    
     const statuses = [
         { text: "Sistem OK", class: "sync-idle" },
         { text: "Synchro...", class: "sync-syncing" },
         { text: "Konekte", class: "sync-connected" }
     ];
-    
     const status = statuses[Math.floor(Math.random() * statuses.length)];
     syncText.textContent = status.text;
     syncBar.className = "sync-status-bar " + status.class;
@@ -1009,17 +921,14 @@ async function loadLotteryConfig() {
         const config = await APIService.getLotteryConfig();
         if (config) {
             APP_STATE.lotteryConfig = config;
-
             CONFIG.LOTTERY_NAME = config.name || 'LOTATO';
             CONFIG.LOTTERY_LOGO = config.logo || config.logoUrl || '';
             CONFIG.slogan = config.slogan || '';
             CONFIG.LOTTERY_ADDRESS = config.address || '';
             CONFIG.LOTTERY_PHONE = config.phone || '';
-
             document.getElementById('lottery-name').innerHTML = `${config.name} <span class="pro-badge">version 6</span>`;
             const sloganEl = document.getElementById('lottery-slogan');
             if (sloganEl) sloganEl.textContent = config.slogan || '';
-
             console.log('✅ Configuration chargée :', config);
         } else {
             console.warn('⚠️ Aucune configuration reçue, utilisation des valeurs par défaut.');
@@ -1036,9 +945,7 @@ function logout() {
     
     fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.LOGOUT}`, {
         method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` }
     })
     .catch(err => console.error('Erreur lors de la déconnexion côté serveur:', err))
     .finally(() => {
@@ -1046,12 +953,10 @@ function logout() {
         localStorage.removeItem('agent_id');
         localStorage.removeItem('agent_name');
         localStorage.removeItem('user_role');
-        
         window.location.href = 'index.html';
     });
 }
 
-// Exposer les fonctions globales
 window.editTicket = editTicket;
 window.deleteTicket = deleteTicket;
 window.deleteTicketFromCard = deleteTicketFromCard;
