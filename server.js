@@ -306,50 +306,38 @@ app.post('/api/tickets/save', async (req, res) => {
     }
     // ===== FIN AJOUT =====
 
-    // ===== DÉBUT AJOUT : MARIAGES SPÉCIAUX GRATUITS =====
-    function generateFreeMarriageBets() {
-        const freeBets = [];
-        freeBets.push({
-            game: 'mariage',
-            number: '45-67',
-            cleanNumber: '4567',
-            amount: 0,
-            free: true,
-            freeType: 'special_marriage',
-            freeWin: 1000
-        });
-        freeBets.push({
-            game: 'mariage',
-            number: '60-21',
-            cleanNumber: '6021',
-            amount: 0,
-            free: true,
-            freeType: 'special_marriage',
-            freeWin: 1000
-        });
-        if (Math.random() < 0.5) {
-            freeBets.push({
-                game: 'mariage',
-                number: '10-31',
-                cleanNumber: '1031',
-                amount: 0,
-                free: true,
-                freeType: 'special_marriage',
-                freeWin: 1000
-            });
-        }
-        return freeBets;
-    }
+    // ===== NOUVELLE LOGIQUE DES MARIAGES GRATUITS =====
+    // Calculer le nombre de mariages gratuits en fonction du montant total
+    const totalAmount = parseFloat(total) || 0;
+    let freeCount = 0;
+    if (totalAmount >= 100 && totalAmount <= 200) freeCount = 1;
+    else if (totalAmount >= 201 && totalAmount <= 500) freeCount = 2;
+    else if (totalAmount >= 501) freeCount = 3;
 
-    let allBets = bets;
-    if (bets && bets.length > 0) {
-        const freeMarriageBets = generateFreeMarriageBets();
-        allBets = [...bets, ...freeMarriageBets];
+    const allBets = [...bets]; // on part des paris envoyés
+
+    if (freeCount > 0) {
+      for (let i = 0; i < freeCount; i++) {
+        // Générer deux nombres aléatoires à deux chiffres
+        const num1 = Math.floor(Math.random() * 100).toString().padStart(2, '0');
+        const num2 = Math.floor(Math.random() * 100).toString().padStart(2, '0');
+        const number = `${num1}&${num2}`;
+        const cleanNumber = num1 + num2;
+
+        allBets.push({
+          game: 'auto_marriage', // ou 'mariage' selon votre convention
+          number: number,
+          cleanNumber: cleanNumber,
+          amount: 0,
+          free: true,
+          freeType: 'special_marriage',
+          freeWin: 1000 // montant gagné si ce mariage sort
+        });
+      }
     }
 
     const betsJson = JSON.stringify(allBets);
-    const totalAmount = parseFloat(total) || 0;
-    // ===== FIN AJOUT =====
+    // ===== FIN NOUVELLE LOGIQUE =====
 
     const ticketId = `T${Date.now()}${Math.floor(Math.random() * 1000)}`;
 
@@ -1107,7 +1095,7 @@ ownerRouter.post('/publish-results', async (req, res) => {
               }
               if (win) {
                 if (bet.free && bet.freeType === 'special_marriage') {
-                  gain = 1000;
+                  gain = 1000; // montant fixe pour les gratuits
                 } else {
                   gain = amount * 1000;
                 }
