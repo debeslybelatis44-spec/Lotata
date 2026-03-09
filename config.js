@@ -31,7 +31,7 @@ const CONFIG = {
     },
     DRAWS: [
         { id: 'tn_matin', name: 'Tunisia Matin', time: '10:28', color: 'var(--tunisia)' },
-        { id: 'tn_soir', name: 'Tunisia Soir', time: '23:28', color: 'var(--tunisia)' },
+        { id: 'tn_soir', name: 'Tunisia Soir', time: '23:58', color: 'var(--tunisia)' },
         { id: 'fl_matin', name: 'Florida Matin', time: '13:30', color: 'var(--florida)' },
         { id: 'fl_soir', name: 'Florida Soir', time: '21:50', color: 'var(--florida)' },
         { id: 'ny_matin', name: 'New York Matin', time: '14:28', color: 'var(--newyork)' },
