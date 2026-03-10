@@ -306,28 +306,26 @@ app.post('/api/tickets/save', async (req, res) => {
     }
     // ===== FIN AJOUT =====
 
-// ===== NOUVELLE LOGIQUE DES MARIAGES GRATUITS =====
-const totalAmount = parseFloat(total) || 0;
-let freeCount = 0;
-if (totalAmount >= 1 && totalAmount <= 50) {
-    freeCount = 1;
-} else if (totalAmount >= 51 && totalAmount <= 150) {
-    freeCount = 2;
-} else if (totalAmount >= 151) {
-    freeCount = 3;
-}
-// Maximum 3 gratuits, même pour les montants élevés
+    // ===== GESTION CORRECTE DES MARIAGES GRATUITS =====
+    // 1. Séparer les paris payants des éventuels gratuits déjà envoyés
+    const paidBets = bets.filter(b => !b.free);
+    // 2. Calculer le total des mises payantes
+    const totalPaid = paidBets.reduce((sum, b) => sum + (parseFloat(b.amount) || 0), 0);
 
-const allBets = [...bets];
+    // 3. Déterminer le nombre de gratuits requis
+    let requiredFree = 0;
+    if (totalPaid >= 1 && totalPaid <= 50) requiredFree = 1;
+    else if (totalPaid >= 51 && totalPaid <= 150) requiredFree = 2;
+    else if (totalPaid >= 151) requiredFree = 3;
 
-if (freeCount > 0) {
-    for (let i = 0; i < freeCount; i++) {
+    // 4. Générer les nouveaux gratuits (on écrase les anciens pour éviter les doublons)
+    const newFreeBets = [];
+    for (let i = 0; i < requiredFree; i++) {
         const num1 = Math.floor(Math.random() * 100).toString().padStart(2, '0');
         const num2 = Math.floor(Math.random() * 100).toString().padStart(2, '0');
         const number = `${num1}&${num2}`;
         const cleanNumber = num1 + num2;
-
-        allBets.push({
+        newFreeBets.push({
             game: 'auto_marriage',
             number: number,
             cleanNumber: cleanNumber,
@@ -337,11 +335,12 @@ if (freeCount > 0) {
             freeWin: 1000
         });
     }
-}
 
-const betsJson = JSON.stringify(allBets);
-// ===== FIN NOUVELLE LOGIQUE =====
-    // ===== FIN NOUVELLE LOGIQUE =====
+    // 5. Reconstituer la liste finale des paris (payants + nouveaux gratuits)
+    const finalBets = [...paidBets, ...newFreeBets];
+    const betsJson = JSON.stringify(finalBets);
+    const finalTotal = finalBets.reduce((sum, b) => sum + (parseFloat(b.amount) || 0), 0);
+    // ===== FIN GESTION DES MARIAGES GRATUITS =====
 
     const ticketId = `T${Date.now()}${Math.floor(Math.random() * 1000)}`;
 
@@ -349,7 +348,7 @@ const betsJson = JSON.stringify(allBets);
       `INSERT INTO tickets (ticket_id, agent_id, agent_name, draw_id, draw_name, bets, total_amount, date)
        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
        RETURNING *`,
-      [ticketId, agentId, agentName, drawId, drawName, betsJson, totalAmount]
+      [ticketId, agentId, agentName, drawId, drawName, betsJson, finalTotal]
     );
 
     res.json({ success: true, ticket: result.rows[0] });
