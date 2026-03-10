@@ -1,5 +1,5 @@
 // ==========================
-// cartManager.js (corrigé - gestion dynamique des gratuits avec seuils modifiés)
+// cartManager.js (corrigé - stable)
 // ==========================
 
 // ---------- Utils ----------
@@ -7,6 +7,25 @@ function isNumberBlocked(number, drawId) {
     if (APP_STATE.globalBlockedNumbers.includes(number)) return true;
     const drawBlocked = APP_STATE.drawBlockedNumbers[drawId] || [];
     return drawBlocked.includes(number);
+}
+
+// Vérifie si le montant dépasse la limite pour ce numéro et ce tirage
+function checkNumberLimit(number, drawId, amountToAdd) {
+    const key = `${drawId}_${number}`;
+    const limit = APP_STATE.numberLimits[key];
+    if (!limit) return true; // pas de limite
+
+    // Calculer le total déjà misé pour ce numéro dans le panier actuel (même tirage)
+    const currentTotal = APP_STATE.currentCart
+        .filter(bet => bet.drawId === drawId && bet.cleanNumber === number)
+        .reduce((sum, bet) => sum + bet.amount, 0);
+
+    const newTotal = currentTotal + amountToAdd;
+    if (newTotal > limit) {
+        alert(`Limite atteinte pour le numéro ${number} (${drawId}). Maximum: ${limit} G, déjà misé: ${currentTotal} G, tentative: ${amountToAdd} G.`);
+        return false;
+    }
+    return true;
 }
 
 // ---------- Génération aléatoire d'un mariage ----------
@@ -21,13 +40,44 @@ function generateRandomMarriageBet(amount) {
     };
 }
 
+// ---------- Vérifie et supprime les mariages gratuits en trop (max 3 par tirage) ----------
+function ensureMaxThreeFreeMarriages() {
+    // Ne rien faire si le panier n'existe pas
+    if (!APP_STATE.currentCart) return;
+
+    // 1. Compter les gratuits par tirage
+    const freeByDraw = {};
+    APP_STATE.currentCart.forEach(bet => {
+        if (bet.free && bet.freeType === 'special_marriage') {
+            if (!freeByDraw[bet.drawId]) freeByDraw[bet.drawId] = [];
+            freeByDraw[bet.drawId].push(bet);
+        }
+    });
+
+    // 2. Construire la liste des IDs à supprimer (les excédents)
+    const idsToRemove = new Set();
+    Object.keys(freeByDraw).forEach(drawId => {
+        const freeList = freeByDraw[drawId];
+        if (freeList.length > 3) {
+            // Trier par ancienneté (supposer que les premiers dans le tableau sont plus anciens)
+            // On garde les 3 premiers, on supprime les suivants
+            freeList.slice(3).forEach(bet => idsToRemove.add(bet.id));
+        }
+    });
+
+    // 3. Filtrer le panier en supprimant les IDs en trop
+    if (idsToRemove.size > 0) {
+        APP_STATE.currentCart = APP_STATE.currentCart.filter(bet => !idsToRemove.has(bet.id));
+    }
+}
+
 // ---------- Cart Manager ----------
 var CartManager = {
 
-    // Met à jour les mariages gratuits : supprime tous les anciens et recrée selon le total payant
+    // Met à jour les mariages gratuits
     updateFreeMarriages() {
-        // 1. Supprimer tous les gratuits existants
-        APP_STATE.currentCart = APP_STATE.currentCart.filter(b => !(b.free && b.freeType === 'special_marriage'));
+        // 1. Supprimer tous les gratuits existants (quel que soit leur type)
+        APP_STATE.currentCart = APP_STATE.currentCart.filter(b => !b.free);
 
         // 2. Regrouper les paris payants par tirage
         const payantsByDraw = {};
@@ -44,18 +94,16 @@ var CartManager = {
             const totalPayant = payants.reduce((sum, b) => sum + b.amount, 0);
 
             let requiredFree = 0;
-            // Seuils modifiés selon la demande :
             if (totalPayant >= 1 && totalPayant <= 50) requiredFree = 1;
             else if (totalPayant >= 51 && totalPayant <= 150) requiredFree = 2;
             else if (totalPayant >= 151) requiredFree = 3;
-            // Si totalPayant < 1, requiredFree = 0 → pas de gratuit
 
-            // 4. Ajouter les gratuits avec des numéros aléatoires
+            // 4. Ajouter les gratuits
             for (let i = 0; i < requiredFree; i++) {
                 const freeBet = generateRandomMarriageBet(0);
                 const newFree = {
                     ...freeBet,
-                    id: Date.now() + Math.random() + i,
+                    id: 'free_' + Date.now() + '_' + Math.random() + '_' + i,
                     drawId: drawId,
                     drawName: payants[0]?.drawName || 'Tiraj',
                     free: true,
@@ -65,6 +113,10 @@ var CartManager = {
             }
         });
 
+        // 5. Sécurité : garantir qu'on ne dépasse pas 3 gratuits par tirage
+        ensureMaxThreeFreeMarriages();
+
+        // 6. Mettre à jour l'affichage
         this.renderCart();
     },
 
@@ -115,6 +167,16 @@ var CartManager = {
                 ? APP_STATE.selectedDraws
                 : [APP_STATE.selectedDraw];
 
+            // Vérification des limites pour chaque pari auto-généré
+            for (const drawId of draws) {
+                for (const bet of autoBets) {
+                    const number = bet.cleanNumber || bet.number;
+                    if (!checkNumberLimit(number, drawId, amt)) {
+                        return;
+                    }
+                }
+            }
+
             draws.forEach(drawId => {
                 const drawName = CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId;
                 autoBets.forEach(bet => {
@@ -145,10 +207,14 @@ var CartManager = {
                 ? APP_STATE.selectedDraws
                 : [APP_STATE.selectedDraw];
 
+            // Vérification blocage et limites pour chaque numéro
             for (const drawId of draws) {
                 for (const num of numbers) {
                     if (isNumberBlocked(num, drawId)) {
                         alert(`Nimewo ${num} bloke pou tiraj sa a`);
+                        return;
+                    }
+                    if (!checkNumberLimit(num, drawId, amt)) {
                         return;
                     }
                 }
@@ -191,9 +257,13 @@ var CartManager = {
             ? APP_STATE.selectedDraws
             : [APP_STATE.selectedDraw];
 
+        // Vérification blocage et limites pour chaque tirage
         for (const drawId of draws) {
             if (isNumberBlocked(num, drawId)) {
                 alert(`Nimewo ${num} bloke`);
+                return;
+            }
+            if (!checkNumberLimit(num, drawId, amt)) {
                 return;
             }
         }
