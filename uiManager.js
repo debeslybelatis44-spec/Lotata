@@ -532,25 +532,22 @@ function editTicket(ticketId) {
     alert(`Tikè #${ticket.ticket_id || ticket.id} charge nan panye. Ou kapab modifye l.`);
 }
 
-// NOUVELLE FONCTION POUR REJOUER UN TICKET (FUSIONNE LES PARIS)
-function replayTicket(ticketId) {
+// NOUVELLE FONCTION POUR REJOUER UN TICKET (AVEC SÉLECTION LIBRE DES TIRAGES)
+async function replayTicket(ticketId) {
     const ticket = APP_STATE.ticketsHistory.find(t => t.id === ticketId || t.ticket_id === ticketId);
     if (!ticket) {
         alert("Tikè pa jwenn!");
         return;
     }
 
-    // Récupérer les tirages sélectionnés
-    const draws = APP_STATE.multiDrawMode
-        ? APP_STATE.selectedDraws
-        : [APP_STATE.selectedDraw];
-
-    if (!draws || draws.length === 0) {
-        alert("Chwazi yon tiraj anvan!");
+    // 1. Demander à l'utilisateur de choisir le(s) tirage(s) de destination
+    const selectedDraws = await showDrawSelectionModal();
+    if (!selectedDraws || selectedDraws.length === 0) {
+        alert("Ou pa chwazi okenn tiraj. Rejwe annile.");
         return;
     }
 
-    // Extraire les paris payants du ticket (montant > 0)
+    // 2. Extraire les paris payants du ticket (montant > 0)
     let bets = [];
     if (Array.isArray(ticket.bets)) {
         bets = ticket.bets.filter(b => parseFloat(b.amount) > 0);
@@ -578,20 +575,18 @@ function replayTicket(ticketId) {
         return;
     }
 
-    // Fonction pour générer une clé unique d'un pari (type + numéro + option)
+    // 3. Fonction pour générer une clé unique d'un pari (type + numéro + option)
     function getBetKey(bet) {
         const game = bet.game || bet.specialType || 'borlette';
-        // Utiliser cleanNumber si disponible, sinon number
         const number = bet.cleanNumber || bet.number || '';
         const option = bet.option || '';
         return `${game}_${number}_${option}`;
     }
 
-    // Pour chaque tirage sélectionné
-    draws.forEach(drawId => {
+    // 4. Pour chaque tirage sélectionné, fusionner ou ajouter les paris
+    selectedDraws.forEach(drawId => {
         const drawName = CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId;
 
-        // Pour chaque pari du ticket rejoué
         bets.forEach(bet => {
             const betKey = getBetKey(bet);
 
@@ -622,15 +617,90 @@ function replayTicket(ticketId) {
         });
     });
 
-    // Mettre à jour les mariages gratuits si nécessaire
+    // 5. Mettre à jour les mariages gratuits si nécessaire
     if (typeof CartManager.updateFreeMarriages === 'function') {
         CartManager.updateFreeMarriages();
     }
 
-    // Aller à l'écran d'accueil
+    // 6. Aller à l'écran d'accueil
     switchTab('home');
-
     alert(`Tikè #${ticket.ticket_id || ticket.id} rejwete nan panye. Ou kapab modifye l.`);
+}
+
+// Fonction auxiliaire pour afficher une modale de sélection des tirages
+function showDrawSelectionModal() {
+    return new Promise((resolve) => {
+        // Créer l'overlay de la modale
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        `;
+
+        // Contenu de la modale
+        modal.innerHTML = `
+            <div class="modal-content" style="
+                background: var(--bg);
+                padding: 20px;
+                border-radius: 20px;
+                max-width: 90%;
+                max-height: 80%;
+                overflow-y: auto;
+                border: 2px solid var(--primary);
+            ">
+                <h3 style="margin-top:0; text-align:center;">Chwazi tiraj(yo) pou rejwete</h3>
+                <div class="draws-list" style="margin: 15px 0;">
+                    ${CONFIG.DRAWS.map(draw => `
+                        <label style="display:block; padding:8px; border-bottom:1px solid var(--glass-border);">
+                            <input type="checkbox" value="${draw.id}" style="margin-right:10px;"> 
+                            ${draw.name}
+                        </label>
+                    `).join('')}
+                </div>
+                <div class="modal-actions" style="display:flex; gap:10px; justify-content:flex-end;">
+                    <button id="cancel-replay" style="
+                        background: var(--text-dim);
+                        border: none;
+                        color: white;
+                        padding: 10px 20px;
+                        border-radius: 10px;
+                        cursor: pointer;
+                    ">Anile</button>
+                    <button id="confirm-replay" style="
+                        background: var(--primary);
+                        border: none;
+                        color: white;
+                        padding: 10px 20px;
+                        border-radius: 10px;
+                        cursor: pointer;
+                    ">Konfime</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Gestionnaires d'événements
+        document.getElementById('cancel-replay').onclick = () => {
+            document.body.removeChild(modal);
+            resolve([]);
+        };
+        document.getElementById('confirm-replay').onclick = () => {
+            const checkboxes = modal.querySelectorAll('input[type=checkbox]:checked');
+            const selected = Array.from(checkboxes).map(cb => cb.value);
+            document.body.removeChild(modal);
+            resolve(selected);
+        };
+    });
 }
 
 // Réimpression d'un ticket depuis l'historique
