@@ -3,16 +3,16 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const cors = require('cors');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs'); // CORRIGÉ : bcryptjs au lieu de bcrypt
 const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
-const compression = require('compression'); // Ajout de la compression
+const compression = require('compression');
 
 const app = express();
 const port = process.env.PORT || 3000;
 
 // Middleware
-app.use(compression({ // Activation de la compression
+app.use(compression({
     level: 6,
     threshold: 1024,
     filter: (req, res) => {
@@ -25,7 +25,7 @@ app.use(compression({ // Activation de la compression
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname), { // Cache pour les fichiers statiques
+app.use(express.static(path.join(__dirname), {
     maxAge: '7d',
     etag: true
 }));
