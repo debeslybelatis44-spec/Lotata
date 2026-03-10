@@ -1,5 +1,5 @@
 // ==========================
-// cartManager.js (corrigé - gestion dynamique des gratuits + vérification limites)
+// cartManager.js (corrigé - gestion dynamique des gratuits avec seuils modifiés)
 // ==========================
 
 // ---------- Utils ----------
@@ -7,25 +7,6 @@ function isNumberBlocked(number, drawId) {
     if (APP_STATE.globalBlockedNumbers.includes(number)) return true;
     const drawBlocked = APP_STATE.drawBlockedNumbers[drawId] || [];
     return drawBlocked.includes(number);
-}
-
-// Vérifie si le montant dépasse la limite pour ce numéro et ce tirage
-function checkNumberLimit(number, drawId, amountToAdd) {
-    const key = `${drawId}_${number}`;
-    const limit = APP_STATE.numberLimits[key];
-    if (!limit) return true; // pas de limite
-
-    // Calculer le total déjà misé pour ce numéro dans le panier actuel (même tirage)
-    const currentTotal = APP_STATE.currentCart
-        .filter(bet => bet.drawId === drawId && bet.cleanNumber === number)
-        .reduce((sum, bet) => sum + bet.amount, 0);
-
-    const newTotal = currentTotal + amountToAdd;
-    if (newTotal > limit) {
-        alert(`Limite atteinte pour le numéro ${number} (${drawId}). Maximum: ${limit} G, déjà misé: ${currentTotal} G, tentative: ${amountToAdd} G.`);
-        return false;
-    }
-    return true;
 }
 
 // ---------- Génération aléatoire d'un mariage ----------
@@ -40,41 +21,13 @@ function generateRandomMarriageBet(amount) {
     };
 }
 
-// ---------- Vérifie et supprime les mariages gratuits en trop (max 3 par tirage) ----------
-function ensureMaxThreeFreeMarriages() {
-    // Regrouper les gratuits par tirage
-    const freeByDraw = {};
-    APP_STATE.currentCart.forEach((bet, index) => {
-        if (bet.free && bet.freeType === 'special_marriage') {
-            if (!freeByDraw[bet.drawId]) freeByDraw[bet.drawId] = [];
-            freeByDraw[bet.drawId].push({ bet, index });
-        }
-    });
-
-    // Pour chaque tirage, ne garder que les 3 premiers (ou moins)
-    Object.keys(freeByDraw).forEach(drawId => {
-        const freeList = freeByDraw[drawId];
-        if (freeList.length > 3) {
-            // Trier par ordre d'ajout (index croissant = plus ancien)
-            freeList.sort((a, b) => a.index - b.index);
-            // Supprimer les excédents (à partir du 4e)
-            const toRemove = freeList.slice(3).map(item => item.index);
-            // Filtrer le panier en excluant ces indices
-            APP_STATE.currentCart = APP_STATE.currentCart.filter((_, idx) => !toRemove.includes(idx));
-        }
-    });
-
-    // Re-rendre le panier si nécessaire
-    CartManager.renderCart();
-}
-
 // ---------- Cart Manager ----------
 var CartManager = {
 
-    // Met à jour les mariages gratuits
+    // Met à jour les mariages gratuits : supprime tous les anciens et recrée selon le total payant
     updateFreeMarriages() {
         // 1. Supprimer tous les gratuits existants
-        APP_STATE.currentCart = APP_STATE.currentCart.filter(b => !b.free);
+        APP_STATE.currentCart = APP_STATE.currentCart.filter(b => !(b.free && b.freeType === 'special_marriage'));
 
         // 2. Regrouper les paris payants par tirage
         const payantsByDraw = {};
@@ -91,11 +44,13 @@ var CartManager = {
             const totalPayant = payants.reduce((sum, b) => sum + b.amount, 0);
 
             let requiredFree = 0;
+            // Seuils modifiés selon la demande :
             if (totalPayant >= 1 && totalPayant <= 50) requiredFree = 1;
             else if (totalPayant >= 51 && totalPayant <= 150) requiredFree = 2;
             else if (totalPayant >= 151) requiredFree = 3;
+            // Si totalPayant < 1, requiredFree = 0 → pas de gratuit
 
-            // 4. Ajouter les gratuits
+            // 4. Ajouter les gratuits avec des numéros aléatoires
             for (let i = 0; i < requiredFree; i++) {
                 const freeBet = generateRandomMarriageBet(0);
                 const newFree = {
@@ -109,9 +64,6 @@ var CartManager = {
                 APP_STATE.currentCart.push(newFree);
             }
         });
-
-        // 5. Nettoyage final : garantir qu'on ne dépasse pas 3 gratuits par tirage
-        ensureMaxThreeFreeMarriages();
 
         this.renderCart();
     },
@@ -163,16 +115,6 @@ var CartManager = {
                 ? APP_STATE.selectedDraws
                 : [APP_STATE.selectedDraw];
 
-            // Vérification des limites pour chaque pari auto-généré
-            for (const drawId of draws) {
-                for (const bet of autoBets) {
-                    const number = bet.cleanNumber || bet.number;
-                    if (!checkNumberLimit(number, drawId, amt)) {
-                        return;
-                    }
-                }
-            }
-
             draws.forEach(drawId => {
                 const drawName = CONFIG.DRAWS.find(d => d.id === drawId)?.name || drawId;
                 autoBets.forEach(bet => {
@@ -203,14 +145,10 @@ var CartManager = {
                 ? APP_STATE.selectedDraws
                 : [APP_STATE.selectedDraw];
 
-            // Vérification blocage et limites pour chaque numéro
             for (const drawId of draws) {
                 for (const num of numbers) {
                     if (isNumberBlocked(num, drawId)) {
                         alert(`Nimewo ${num} bloke pou tiraj sa a`);
-                        return;
-                    }
-                    if (!checkNumberLimit(num, drawId, amt)) {
                         return;
                     }
                 }
@@ -253,13 +191,9 @@ var CartManager = {
             ? APP_STATE.selectedDraws
             : [APP_STATE.selectedDraw];
 
-        // Vérification blocage et limites pour chaque tirage
         for (const drawId of draws) {
             if (isNumberBlocked(num, drawId)) {
                 alert(`Nimewo ${num} bloke`);
-                return;
-            }
-            if (!checkNumberLimit(num, drawId, amt)) {
                 return;
             }
         }
