@@ -63,19 +63,8 @@ async function initializeDatabase() {
     await addColumnIfNotExists('lottery_config', 'slogan', 'TEXT');
     await addColumnIfNotExists('lottery_config', 'multipliers', 'JSONB');
     await addColumnIfNotExists('lottery_config', 'game_limits', 'JSONB');
+    // Ajout de la colonne lotto3 dans draw_results si elle n'existe pas
     await addColumnIfNotExists('draw_results', 'lotto3', 'VARCHAR(3)');
-    await addColumnIfNotExists('supervisors', 'is_super_admin', 'BOOLEAN DEFAULT FALSE');
-    
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS owner_messages (
-        id SERIAL PRIMARY KEY,
-        owner_id INTEGER NOT NULL REFERENCES supervisors(id) ON DELETE CASCADE,
-        message TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT NOW(),
-        expires_at TIMESTAMP DEFAULT (NOW() + INTERVAL '10 minutes')
-      )
-    `);
-    
     console.log('✅ Base de données prête');
   } catch (error) {
     console.error('❌ Erreur initialisation:', error);
@@ -117,6 +106,7 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
+// Login
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password, role } = req.body;
@@ -188,32 +178,7 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-app.post('/api/auth/superadmin-login', async (req, res) => {
-  try {
-    const { username, password } = req.body;
-    const result = await pool.query(
-      'SELECT id, name, email, password FROM supervisors WHERE email = $1 AND is_super_admin = true',
-      [username]
-    );
-    if (result.rows.length === 0) {
-      return res.status(401).json({ error: 'Identifiants incorrects' });
-    }
-    const user = result.rows[0];
-    const valid = await bcrypt.compare(password, user.password);
-    if (!valid) return res.status(401).json({ error: 'Identifiants incorrects' });
-
-    const token = jwt.sign(
-      { id: user.id, name: user.name, email: user.email, role: 'superadmin' },
-      JWT_SECRET,
-      { expiresIn: '24h' }
-    );
-    res.json({ success: true, token, name: user.name });
-  } catch (error) {
-    console.error('❌ Erreur superadmin login:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
+// Rafraîchir le token
 app.post('/api/auth/refresh', authenticateToken, (req, res) => {
   const user = req.user;
   const newToken = jwt.sign(
@@ -232,6 +197,7 @@ app.post('/api/auth/refresh', authenticateToken, (req, res) => {
   res.json({ success: true, token: newToken });
 });
 
+// Logout
 app.post('/api/auth/logout', authenticateToken, async (req, res) => {
   await pool.query(
     'INSERT INTO activity_log (user_id, user_role, action, ip_address) VALUES ($1, $2, $3, $4)',
@@ -240,6 +206,7 @@ app.post('/api/auth/logout', authenticateToken, async (req, res) => {
   res.json({ success: true });
 });
 
+// Vérifier le token
 app.get('/api/auth/verify', authenticateToken, (req, res) => {
   res.json({ valid: true, user: req.user });
 });
@@ -259,32 +226,41 @@ app.post('/api/tickets/save', async (req, res) => {
       return res.status(403).json({ error: 'Vous ne pouvez enregistrer que vos propres tickets' });
     }
 
+    // Vérifier que le tirage est actif
     const drawCheck = await pool.query('SELECT active FROM draws WHERE id = $1', [drawId]);
     if (drawCheck.rows.length === 0 || !drawCheck.rows[0].active) {
       return res.status(403).json({ error: 'Tirage bloqué ou inexistant' });
     }
 
+    // Récupérer les blocages globaux
     const globalBlocked = await pool.query('SELECT number FROM blocked_numbers');
     const globalBlockedSet = new Set(globalBlocked.rows.map(r => r.number));
 
+    // Récupérer les blocages par tirage
     const drawBlocked = await pool.query('SELECT number FROM draw_blocked_numbers WHERE draw_id = $1', [drawId]);
     const drawBlockedSet = new Set(drawBlocked.rows.map(r => r.number));
 
+    // Récupérer les limites
     const limits = await pool.query('SELECT number, limit_amount FROM draw_number_limits WHERE draw_id = $1', [drawId]);
     const limitsMap = new Map(limits.rows.map(r => [r.number, parseFloat(r.limit_amount)]));
 
+    // Vérifier chaque pari
     for (const bet of bets) {
       const cleanNumber = bet.cleanNumber || (bet.number ? bet.number.replace(/[^0-9]/g, '') : '');
       if (!cleanNumber) continue;
 
+      // Blocage global
       if (globalBlockedSet.has(cleanNumber)) {
         return res.status(403).json({ error: `Numéro ${cleanNumber} est bloqué globalement` });
       }
+      // Blocage par tirage
       if (drawBlockedSet.has(cleanNumber)) {
         return res.status(403).json({ error: `Numéro ${cleanNumber} est bloqué pour ce tirage` });
       }
+      // Limite de mise
       if (limitsMap.has(cleanNumber)) {
         const limit = limitsMap.get(cleanNumber);
+        // Calculer le total déjà mis aujourd'hui sur ce numéro
         const todayBetsResult = await pool.query(
           `SELECT SUM((bets->>'amount')::numeric) as total
            FROM tickets, jsonb_array_elements(bets::jsonb) as bet
@@ -298,7 +274,7 @@ app.post('/api/tickets/save', async (req, res) => {
         }
       }
     }
-
+    // ===== AJOUT : Vérification des limites par type de jeu =====
     const configResult = await pool.query('SELECT game_limits FROM lottery_config LIMIT 1');
     let gameLimits = {};
     if (configResult.rows.length > 0 && configResult.rows[0].game_limits) {
@@ -306,6 +282,7 @@ app.post('/api/tickets/save', async (req, res) => {
         gameLimits = typeof raw === 'string' ? JSON.parse(raw) : raw;
     }
 
+    // Calculer les totaux par type de jeu
     const totalsByGame = {};
     for (const bet of bets) {
         const game = bet.game || bet.specialType;
@@ -327,15 +304,21 @@ app.post('/api/tickets/save', async (req, res) => {
             });
         }
     }
+    // ===== FIN AJOUT =====
 
+    // ===== GESTION CORRECTE DES MARIAGES GRATUITS =====
+    // 1. Séparer les paris payants des éventuels gratuits déjà envoyés
     const paidBets = bets.filter(b => !b.free);
+    // 2. Calculer le total des mises payantes
     const totalPaid = paidBets.reduce((sum, b) => sum + (parseFloat(b.amount) || 0), 0);
 
+    // 3. Déterminer le nombre de gratuits requis
     let requiredFree = 0;
     if (totalPaid >= 1 && totalPaid <= 50) requiredFree = 1;
     else if (totalPaid >= 51 && totalPaid <= 150) requiredFree = 2;
     else if (totalPaid >= 151) requiredFree = 3;
 
+    // 4. Générer les nouveaux gratuits (on écrase les anciens pour éviter les doublons)
     const newFreeBets = [];
     for (let i = 0; i < requiredFree; i++) {
         const num1 = Math.floor(Math.random() * 100).toString().padStart(2, '0');
@@ -353,9 +336,11 @@ app.post('/api/tickets/save', async (req, res) => {
         });
     }
 
+    // 5. Reconstituer la liste finale des paris (payants + nouveaux gratuits)
     const finalBets = [...paidBets, ...newFreeBets];
     const betsJson = JSON.stringify(finalBets);
     const finalTotal = finalBets.reduce((sum, b) => sum + (parseFloat(b.amount) || 0), 0);
+    // ===== FIN GESTION DES MARIAGES GRATUITS =====
 
     const ticketId = `T${Date.now()}${Math.floor(Math.random() * 1000)}`;
 
@@ -572,7 +557,7 @@ app.post('/api/lottery-config', authenticateToken, authorize('owner'), async (re
   }
 });
 
-// --- Numéros bloqués ---
+// --- Numéros bloqués (globaux) ---
 app.get('/api/blocked-numbers/global', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query('SELECT number FROM blocked_numbers');
@@ -583,6 +568,7 @@ app.get('/api/blocked-numbers/global', authenticateToken, async (req, res) => {
   }
 });
 
+// --- Numéros bloqués par tirage ---
 app.get('/api/blocked-numbers/draw/:drawId', authenticateToken, async (req, res) => {
   try {
     const { drawId } = req.params;
@@ -594,6 +580,7 @@ app.get('/api/blocked-numbers/draw/:drawId', authenticateToken, async (req, res)
   }
 });
 
+// --- Limites de mise par tirage ---
 app.get('/api/number-limits/draw/:drawId', authenticateToken, async (req, res) => {
   try {
     const { drawId } = req.params;
@@ -763,6 +750,7 @@ supervisorRouter.get('/tickets/recent', async (req, res) => {
   }
 });
 
+// NOUVELLES ROUTES SUPERVISEUR
 supervisorRouter.get('/tickets', async (req, res) => {
   try {
     const supervisorId = req.user.id;
@@ -880,8 +868,6 @@ ownerRouter.use(authorize('owner'));
 // Tableau de bord
 ownerRouter.get('/dashboard', async (req, res) => {
   try {
-    const ownerId = req.user.id;
-
     const connectedSupervisors = await pool.query(
       `SELECT id, name, email FROM supervisors WHERE active = true LIMIT 5`
     );
@@ -911,43 +897,10 @@ ownerRouter.get('/dashboard', async (req, res) => {
               COALESCE(SUM(t.win_amount) - SUM(t.total_amount), 0) as net_result
        FROM agents a
        LEFT JOIN tickets t ON a.id = t.agent_id AND DATE(t.date) = CURRENT_DATE
-       WHERE a.supervisor_id = $1
        GROUP BY a.id, a.name
        HAVING COALESCE(SUM(t.total_amount), 0) > 0 OR COALESCE(SUM(t.win_amount), 0) > 0
-       ORDER BY net_result DESC`,
-      [ownerId]
+       ORDER BY net_result DESC`
     );
-
-    // Statistiques globales du jour pour ce propriétaire
-    const totalTicketsToday = await pool.query(
-      `SELECT COUNT(*) as count
-       FROM tickets t
-       JOIN agents a ON t.agent_id = a.id
-       WHERE a.supervisor_id = $1 AND DATE(t.date) = CURRENT_DATE`,
-      [ownerId]
-    );
-
-    const totalWinningTicketsToday = await pool.query(
-      `SELECT COUNT(*) as count
-       FROM tickets t
-       JOIN agents a ON t.agent_id = a.id
-       WHERE a.supervisor_id = $1 AND DATE(t.date) = CURRENT_DATE AND t.win_amount > 0`,
-      [ownerId]
-    );
-
-    const totalsToday = await pool.query(
-      `SELECT 
-         COALESCE(SUM(t.total_amount), 0) as total_bets,
-         COALESCE(SUM(t.win_amount), 0) as total_wins
-       FROM tickets t
-       JOIN agents a ON t.agent_id = a.id
-       WHERE a.supervisor_id = $1 AND DATE(t.date) = CURRENT_DATE`,
-      [ownerId]
-    );
-
-    const totalBetsToday = parseFloat(totalsToday.rows[0].total_bets);
-    const totalWinsToday = parseFloat(totalsToday.rows[0].total_wins);
-    const balanceToday = totalBetsToday - totalWinsToday;
 
     res.json({
       connected: {
@@ -958,14 +911,7 @@ ownerRouter.get('/dashboard', async (req, res) => {
       },
       sales_today: parseFloat(salesToday.rows[0].total),
       limits_progress: limitsProgress.rows,
-      agents_gain_loss: agentsGainLoss.rows,
-      global_stats: {
-        total_tickets_all: parseInt(totalTicketsToday.rows[0].count),
-        total_winning_tickets_all: parseInt(totalWinningTicketsToday.rows[0].count),
-        total_bets_all: totalBetsToday,
-        total_wins_all: totalWinsToday,
-        balance_all: balanceToday
-      }
+      agents_gain_loss: agentsGainLoss.rows
     });
   } catch (error) {
     console.error('❌ Erreur dashboard owner:', error);
@@ -973,6 +919,7 @@ ownerRouter.get('/dashboard', async (req, res) => {
   }
 });
 
+// Liste des superviseurs
 ownerRouter.get('/supervisors', async (req, res) => {
   try {
     const result = await pool.query(
@@ -985,6 +932,7 @@ ownerRouter.get('/supervisors', async (req, res) => {
   }
 });
 
+// Liste des agents
 ownerRouter.get('/agents', async (req, res) => {
   try {
     const result = await pool.query(
@@ -1001,6 +949,7 @@ ownerRouter.get('/agents', async (req, res) => {
   }
 });
 
+// Créer un utilisateur
 ownerRouter.post('/create-user', async (req, res) => {
   try {
     const { name, cin, username, password, role, supervisorId, zone } = req.body;
@@ -1036,6 +985,7 @@ ownerRouter.post('/create-user', async (req, res) => {
   }
 });
 
+// Bloquer / débloquer un utilisateur
 ownerRouter.post('/block-user', async (req, res) => {
   try {
     const { userId, type } = req.body;
@@ -1052,6 +1002,7 @@ ownerRouter.post('/block-user', async (req, res) => {
   }
 });
 
+// Changer le superviseur d'un agent
 ownerRouter.put('/change-supervisor', async (req, res) => {
   try {
     const { agentId, supervisorId } = req.body;
@@ -1067,6 +1018,7 @@ ownerRouter.put('/change-supervisor', async (req, res) => {
   }
 });
 
+// Liste des tirages
 ownerRouter.get('/draws', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM draws ORDER BY name');
@@ -1077,9 +1029,10 @@ ownerRouter.get('/draws', async (req, res) => {
   }
 });
 
+// Publier les résultats (MODIFIÉ pour inclure lotto3 et calcul correct)
 ownerRouter.post('/publish-results', async (req, res) => {
   try {
-    const { drawId, numbers, lotto3 } = req.body;
+    const { drawId, numbers, lotto3 } = req.body;   // ← ajout de lotto3
     if (!drawId || !numbers || !Array.isArray(numbers) || numbers.length !== 3) {
       return res.status(400).json({ error: 'Données invalides' });
     }
@@ -1094,9 +1047,10 @@ ownerRouter.post('/publish-results', async (req, res) => {
 
     await pool.query('UPDATE draws SET last_draw = NOW() WHERE id = $1', [drawId]);
 
-    const lot1 = numbers[0];
-    const lot2 = numbers[1];
-    const lot3 = numbers[2];
+    // Calcul automatique des gagnants
+    const lot1 = numbers[0]; // 2 chiffres (premier lot)
+    const lot2 = numbers[1]; // 2 chiffres
+    const lot3 = numbers[2]; // 2 chiffres
 
     const ticketsRes = await pool.query(
       'SELECT id, bets FROM tickets WHERE draw_id = $1 AND checked = false',
@@ -1122,8 +1076,9 @@ ownerRouter.post('/publish-results', async (req, res) => {
             }
           }
           else if (game === 'lotto3') {
+            // Utilisation de lotto3 (3 chiffres)
             if (cleanNumber.length === 3 && cleanNumber === lotto3) {
-              gain = amount * 500;
+              gain = amount * 500; // ou multiplicateur configuré
             }
           }
           else if (game === 'mariage' || game === 'auto_marriage') {
@@ -1143,7 +1098,7 @@ ownerRouter.post('/publish-results', async (req, res) => {
               }
               if (win) {
                 if (bet.free && bet.freeType === 'special_marriage') {
-                  gain = 1000;
+                  gain = 1000; // montant fixe pour les gratuits
                 } else {
                   gain = amount * 1000;
                 }
@@ -1164,8 +1119,8 @@ ownerRouter.post('/publish-results', async (req, res) => {
             if (cleanNumber.length === 5 && bet.option) {
               const option = bet.option;
               let expected = '';
-              if (option == 1) expected = lotto3 + lot2;
-              else if (option == 2) expected = lotto3 + lot3;
+              if (option == 1) expected = lotto3 + lot2;      // lotto3 (3 chiffres) + lot2 (2 chiffres)
+              else if (option == 2) expected = lotto3 + lot3; // lotto3 (3 chiffres) + lot3 (2 chiffres)
               if (cleanNumber === expected) gain = amount * 5000;
             }
           }
@@ -1187,6 +1142,7 @@ ownerRouter.post('/publish-results', async (req, res) => {
   }
 });
 
+// Bloquer / débloquer un tirage
 ownerRouter.post('/block-draw', async (req, res) => {
   try {
     const { drawId, block } = req.body;
@@ -1199,6 +1155,7 @@ ownerRouter.post('/block-draw', async (req, res) => {
   }
 });
 
+// Bloquer un numéro globalement
 ownerRouter.post('/block-number', async (req, res) => {
   try {
     const { number } = req.body;
@@ -1225,6 +1182,7 @@ ownerRouter.post('/unblock-number', async (req, res) => {
   }
 });
 
+// Bloquer un numéro pour un tirage spécifique
 ownerRouter.post('/block-number-draw', async (req, res) => {
   try {
     const { drawId, number } = req.body;
@@ -1254,6 +1212,7 @@ ownerRouter.post('/unblock-number-draw', async (req, res) => {
   }
 });
 
+// Définir une limite pour un numéro sur un tirage
 ownerRouter.post('/number-limit', async (req, res) => {
   try {
     const { drawId, number, limitAmount } = req.body;
@@ -1273,6 +1232,7 @@ ownerRouter.post('/number-limit', async (req, res) => {
   }
 });
 
+// Liste des numéros globalement bloqués (GET)
 ownerRouter.get('/blocked-numbers', async (req, res) => {
   try {
     const result = await pool.query('SELECT number FROM blocked_numbers ORDER BY number');
@@ -1283,6 +1243,7 @@ ownerRouter.get('/blocked-numbers', async (req, res) => {
   }
 });
 
+// Liste des numéros bloqués par tirage
 ownerRouter.get('/blocked-numbers-per-draw', async (req, res) => {
   try {
     const result = await pool.query(
@@ -1298,6 +1259,7 @@ ownerRouter.get('/blocked-numbers-per-draw', async (req, res) => {
   }
 });
 
+// Liste des limites de numéros
 ownerRouter.get('/number-limits', async (req, res) => {
   try {
     const result = await pool.query(
@@ -1313,6 +1275,7 @@ ownerRouter.get('/number-limits', async (req, res) => {
   }
 });
 
+// Supprimer une limite de numéro
 ownerRouter.post('/remove-number-limit', async (req, res) => {
   try {
     const { drawId, number } = req.body;
@@ -1330,6 +1293,7 @@ ownerRouter.post('/remove-number-limit', async (req, res) => {
   }
 });
 
+// Liste des tirages bloqués (inactifs)
 ownerRouter.get('/blocked-draws', async (req, res) => {
   try {
     const result = await pool.query(
@@ -1342,6 +1306,7 @@ ownerRouter.get('/blocked-draws', async (req, res) => {
   }
 });
 
+// Rapports avec filtres
 ownerRouter.get('/reports', async (req, res) => {
   try {
     const { supervisorId, agentId, drawId, period, fromDate, toDate, gainLoss } = req.query;
@@ -1444,24 +1409,7 @@ ownerRouter.get('/reports', async (req, res) => {
   }
 });
 
-ownerRouter.get('/messages', async (req, res) => {
-  try {
-    const ownerId = req.user.id;
-    const result = await pool.query(
-      'SELECT message FROM owner_messages WHERE owner_id = $1 AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1',
-      [ownerId]
-    );
-    if (result.rows.length > 0) {
-      res.json({ message: result.rows[0].message });
-    } else {
-      res.json({ message: null });
-    }
-  } catch (error) {
-    console.error('❌ Erreur récupération message owner:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
+// ========== NOUVELLES ROUTES POUR LA CONFIGURATION PROPRIÉTAIRE ==========
 ownerRouter.get('/settings', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM lottery_config LIMIT 1');
@@ -1574,6 +1522,7 @@ ownerRouter.post('/settings', upload.single('logo'), async (req, res) => {
   }
 });
 
+// ========== NOUVELLES ROUTES POUR LA GESTION DES TICKETS (PROPRIÉTAIRE) ==========
 ownerRouter.get('/tickets', async (req, res) => {
   try {
     const { supervisorId, agentId, drawId, period, fromDate, toDate, gain, paid, page = 0, limit = 20 } = req.query;
@@ -1705,138 +1654,6 @@ ownerRouter.delete('/tickets/:ticketId', async (req, res) => {
 
 app.use('/api/owner', ownerRouter);
 
-// ==================== Routes superadmin ====================
-const superadminRouter = express.Router();
-superadminRouter.use(authenticateToken, (req, res, next) => {
-  if (req.user.role !== 'superadmin') {
-    return res.status(403).json({ error: 'Accès réservé au super-administrateur' });
-  }
-  next();
-});
-
-superadminRouter.get('/owners', async (req, res) => {
-  try {
-    const result = await pool.query(
-      'SELECT id, name, email, phone, active FROM supervisors WHERE is_super_admin = false ORDER BY name'
-    );
-    res.json(result.rows);
-  } catch (error) {
-    console.error('❌ Erreur liste owners:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-superadminRouter.post('/owners', async (req, res) => {
-  try {
-    const { name, email, password, phone } = req.body;
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: 'Champs requis manquants' });
-    }
-    const hashed = await bcrypt.hash(password, 10);
-    const result = await pool.query(
-      'INSERT INTO supervisors (name, email, password, phone, active, is_super_admin) VALUES ($1, $2, $3, $4, true, false) RETURNING id',
-      [name, email, hashed, phone || '']
-    );
-    res.json({ success: true, id: result.rows[0].id });
-  } catch (error) {
-    console.error('❌ Erreur création owner:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-superadminRouter.put('/owners/:id/block', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { block } = req.body;
-    await pool.query('UPDATE supervisors SET active = $1 WHERE id = $2 AND is_super_admin = false', [!block, id]);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('❌ Erreur blocage owner:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-superadminRouter.delete('/owners/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    await pool.query('DELETE FROM supervisors WHERE id = $1 AND is_super_admin = false', [id]);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('❌ Erreur suppression owner:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-superadminRouter.delete('/agents/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    await pool.query('DELETE FROM agents WHERE id = $1', [id]);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('❌ Erreur suppression agent:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-superadminRouter.delete('/supervisors/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const check = await pool.query('SELECT is_super_admin FROM supervisors WHERE id = $1', [id]);
-    if (check.rows.length === 0) return res.status(404).json({ error: 'Superviseur non trouvé' });
-    if (check.rows[0].is_super_admin) {
-      return res.status(403).json({ error: 'Impossible de supprimer un propriétaire via cette route' });
-    }
-    await pool.query('DELETE FROM supervisors WHERE id = $1', [id]);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('❌ Erreur suppression superviseur:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-superadminRouter.post('/messages', async (req, res) => {
-  try {
-    const { ownerId, message } = req.body;
-    if (!ownerId || !message) {
-      return res.status(400).json({ error: 'ownerId et message requis' });
-    }
-    await pool.query(
-      'INSERT INTO owner_messages (owner_id, message) VALUES ($1, $2)',
-      [ownerId, message]
-    );
-    res.json({ success: true });
-  } catch (error) {
-    console.error('❌ Erreur envoi message:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-superadminRouter.get('/reports/owners', async (req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT 
-        s.id, s.name, s.email,
-        COUNT(DISTINCT a.id) as agent_count,
-        COUNT(DISTINCT t.id) as ticket_count,
-        COALESCE(SUM(t.total_amount), 0) as total_bets,
-        COALESCE(SUM(t.win_amount), 0) as total_wins,
-        COALESCE(SUM(t.win_amount) - SUM(t.total_amount), 0) as net_result
-      FROM supervisors s
-      LEFT JOIN agents a ON a.supervisor_id = s.id
-      LEFT JOIN tickets t ON t.agent_id = a.id AND DATE(t.date) = CURRENT_DATE
-      WHERE s.is_super_admin = false
-      GROUP BY s.id, s.name, s.email
-      ORDER BY s.name
-    `);
-    res.json(result.rows);
-  } catch (error) {
-    console.error('❌ Erreur rapports owners:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-app.use('/api/superadmin', superadminRouter);
-
 // ==================== Routes statiques ====================
 app.use(express.static(__dirname));
 
@@ -1844,22 +1661,24 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/agent1.html', (req, res) => res.sendFile(path.join(__dirname, 'agent1.html')));
 app.get('/responsable.html', (req, res) => res.sendFile(path.join(__dirname, 'responsable.html')));
 app.get('/owner.html', (req, res) => res.sendFile(path.join(__dirname, 'owner.html')));
-app.get('/superadmin.html', (req, res) => res.sendFile(path.join(__dirname, 'superadmin.html')));
 
 // 404 API
 app.use('/api/*', (req, res) => {
   res.status(404).json({ error: 'Route API non trouvée' });
 });
 
+// 404 général
 app.use('*', (req, res) => {
   res.status(404).send('Page non trouvée');
 });
 
+// Gestion des erreurs
 app.use((err, req, res, next) => {
   console.error('🔥 Erreur serveur:', err.stack);
   res.status(500).json({ error: 'Erreur serveur interne', message: err.message });
 });
 
+// Démarrage
 initializeDatabase().then(() => {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Serveur LOTATO démarré sur http://0.0.0.0:${PORT}`);
