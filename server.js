@@ -65,6 +65,20 @@ async function initializeDatabase() {
     await addColumnIfNotExists('lottery_config', 'game_limits', 'JSONB');
     // Ajout de la colonne lotto3 dans draw_results si elle n'existe pas
     await addColumnIfNotExists('draw_results', 'lotto3', 'VARCHAR(3)');
+    // Pour superadmin
+    await addColumnIfNotExists('supervisors', 'is_super_admin', 'BOOLEAN DEFAULT FALSE');
+    
+    // Table des messages aux propriétaires
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS owner_messages (
+        id SERIAL PRIMARY KEY,
+        owner_id INTEGER NOT NULL REFERENCES supervisors(id) ON DELETE CASCADE,
+        message TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        expires_at TIMESTAMP DEFAULT (NOW() + INTERVAL '10 minutes')
+      )
+    `);
+    
     console.log('✅ Base de données prête');
   } catch (error) {
     console.error('❌ Erreur initialisation:', error);
@@ -174,6 +188,33 @@ app.post('/api/auth/login', async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Erreur login:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Login superadmin
+app.post('/api/auth/superadmin-login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    const result = await pool.query(
+      'SELECT id, name, email, password FROM supervisors WHERE email = $1 AND is_super_admin = true',
+      [username]
+    );
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'Identifiants incorrects' });
+    }
+    const user = result.rows[0];
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) return res.status(401).json({ error: 'Identifiants incorrects' });
+
+    const token = jwt.sign(
+      { id: user.id, name: user.name, email: user.email, role: 'superadmin' },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+    res.json({ success: true, token, name: user.name });
+  } catch (error) {
+    console.error('❌ Erreur superadmin login:', error);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -750,7 +791,6 @@ supervisorRouter.get('/tickets/recent', async (req, res) => {
   }
 });
 
-// NOUVELLES ROUTES SUPERVISEUR
 supervisorRouter.get('/tickets', async (req, res) => {
   try {
     const supervisorId = req.user.id;
@@ -868,6 +908,9 @@ ownerRouter.use(authorize('owner'));
 // Tableau de bord
 ownerRouter.get('/dashboard', async (req, res) => {
   try {
+    const ownerId = req.user.id; // l'ID du propriétaire connecté
+
+    // Superviseurs et agents connectés (inchangé)
     const connectedSupervisors = await pool.query(
       `SELECT id, name, email FROM supervisors WHERE active = true LIMIT 5`
     );
@@ -875,10 +918,12 @@ ownerRouter.get('/dashboard', async (req, res) => {
       `SELECT id, name, email FROM agents WHERE active = true LIMIT 5`
     );
 
+    // Ventes du jour (inchangé)
     const salesToday = await pool.query(
       `SELECT COALESCE(SUM(total_amount), 0) as total FROM tickets WHERE DATE(date) = CURRENT_DATE`
     );
 
+    // Progression des limites (inchangé)
     const limitsProgress = await pool.query(
       `SELECT d.name as draw_name, l.number, l.limit_amount,
               COALESCE(SUM(t.total_amount), 0) as current_bets,
@@ -890,6 +935,7 @@ ownerRouter.get('/dashboard', async (req, res) => {
        ORDER BY progress_percent DESC`
     );
 
+    // Gains/pertes des agents aujourd'hui (inchangé)
     const agentsGainLoss = await pool.query(
       `SELECT a.id, a.name,
               COALESCE(SUM(t.total_amount), 0) as total_bets,
@@ -902,6 +948,41 @@ ownerRouter.get('/dashboard', async (req, res) => {
        ORDER BY net_result DESC`
     );
 
+    // ===== NOUVELLES STATISTIQUES GLOBALES =====
+    // Total tickets (tous tirages, tous agents du propriétaire)
+    const totalTicketsAll = await pool.query(
+      `SELECT COUNT(*) as count
+       FROM tickets t
+       JOIN agents a ON t.agent_id = a.id
+       WHERE a.supervisor_id IN (SELECT id FROM supervisors WHERE id = $1 OR $1 IS NULL)`,
+      [ownerId]
+    );
+
+    // Total tickets gagnants (win_amount > 0)
+    const totalWinningTicketsAll = await pool.query(
+      `SELECT COUNT(*) as count
+       FROM tickets t
+       JOIN agents a ON t.agent_id = a.id
+       WHERE a.supervisor_id IN (SELECT id FROM supervisors WHERE id = $1 OR $1 IS NULL)
+         AND t.win_amount > 0`,
+      [ownerId]
+    );
+
+    // Somme totale misée et gains (tous tirages)
+    const totalsAll = await pool.query(
+      `SELECT 
+         COALESCE(SUM(t.total_amount), 0) as total_bets,
+         COALESCE(SUM(t.win_amount), 0) as total_wins
+       FROM tickets t
+       JOIN agents a ON t.agent_id = a.id
+       WHERE a.supervisor_id IN (SELECT id FROM supervisors WHERE id = $1 OR $1 IS NULL)`,
+      [ownerId]
+    );
+
+    const totalBetsAll = parseFloat(totalsAll.rows[0].total_bets);
+    const totalWinsAll = parseFloat(totalsAll.rows[0].total_wins);
+    const balanceAll = totalBetsAll - totalWinsAll;
+
     res.json({
       connected: {
         supervisors_count: connectedSupervisors.rows.length,
@@ -911,7 +992,15 @@ ownerRouter.get('/dashboard', async (req, res) => {
       },
       sales_today: parseFloat(salesToday.rows[0].total),
       limits_progress: limitsProgress.rows,
-      agents_gain_loss: agentsGainLoss.rows
+      agents_gain_loss: agentsGainLoss.rows,
+      // Nouvelles données globales
+      global_stats: {
+        total_tickets_all: parseInt(totalTicketsAll.rows[0].count),
+        total_winning_tickets_all: parseInt(totalWinningTicketsAll.rows[0].count),
+        total_bets_all: totalBetsAll,
+        total_wins_all: totalWinsAll,
+        balance_all: balanceAll
+      }
     });
   } catch (error) {
     console.error('❌ Erreur dashboard owner:', error);
@@ -1029,10 +1118,10 @@ ownerRouter.get('/draws', async (req, res) => {
   }
 });
 
-// Publier les résultats (MODIFIÉ pour inclure lotto3 et calcul correct)
+// Publier les résultats
 ownerRouter.post('/publish-results', async (req, res) => {
   try {
-    const { drawId, numbers, lotto3 } = req.body;   // ← ajout de lotto3
+    const { drawId, numbers, lotto3 } = req.body;
     if (!drawId || !numbers || !Array.isArray(numbers) || numbers.length !== 3) {
       return res.status(400).json({ error: 'Données invalides' });
     }
@@ -1048,9 +1137,9 @@ ownerRouter.post('/publish-results', async (req, res) => {
     await pool.query('UPDATE draws SET last_draw = NOW() WHERE id = $1', [drawId]);
 
     // Calcul automatique des gagnants
-    const lot1 = numbers[0]; // 2 chiffres (premier lot)
-    const lot2 = numbers[1]; // 2 chiffres
-    const lot3 = numbers[2]; // 2 chiffres
+    const lot1 = numbers[0];
+    const lot2 = numbers[1];
+    const lot3 = numbers[2];
 
     const ticketsRes = await pool.query(
       'SELECT id, bets FROM tickets WHERE draw_id = $1 AND checked = false',
@@ -1076,9 +1165,8 @@ ownerRouter.post('/publish-results', async (req, res) => {
             }
           }
           else if (game === 'lotto3') {
-            // Utilisation de lotto3 (3 chiffres)
             if (cleanNumber.length === 3 && cleanNumber === lotto3) {
-              gain = amount * 500; // ou multiplicateur configuré
+              gain = amount * 500;
             }
           }
           else if (game === 'mariage' || game === 'auto_marriage') {
@@ -1098,7 +1186,7 @@ ownerRouter.post('/publish-results', async (req, res) => {
               }
               if (win) {
                 if (bet.free && bet.freeType === 'special_marriage') {
-                  gain = 1000; // montant fixe pour les gratuits
+                  gain = 1000;
                 } else {
                   gain = amount * 1000;
                 }
@@ -1119,8 +1207,8 @@ ownerRouter.post('/publish-results', async (req, res) => {
             if (cleanNumber.length === 5 && bet.option) {
               const option = bet.option;
               let expected = '';
-              if (option == 1) expected = lotto3 + lot2;      // lotto3 (3 chiffres) + lot2 (2 chiffres)
-              else if (option == 2) expected = lotto3 + lot3; // lotto3 (3 chiffres) + lot3 (2 chiffres)
+              if (option == 1) expected = lotto3 + lot2;
+              else if (option == 2) expected = lotto3 + lot3;
               if (cleanNumber === expected) gain = amount * 5000;
             }
           }
@@ -1409,6 +1497,25 @@ ownerRouter.get('/reports', async (req, res) => {
   }
 });
 
+// Récupérer le message destiné au propriétaire (s'il existe et non expiré)
+ownerRouter.get('/messages', async (req, res) => {
+  try {
+    const ownerId = req.user.id;
+    const result = await pool.query(
+      'SELECT message FROM owner_messages WHERE owner_id = $1 AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1',
+      [ownerId]
+    );
+    if (result.rows.length > 0) {
+      res.json({ message: result.rows[0].message });
+    } else {
+      res.json({ message: null });
+    }
+  } catch (error) {
+    console.error('❌ Erreur récupération message owner:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 // ========== NOUVELLES ROUTES POUR LA CONFIGURATION PROPRIÉTAIRE ==========
 ownerRouter.get('/settings', async (req, res) => {
   try {
@@ -1522,7 +1629,7 @@ ownerRouter.post('/settings', upload.single('logo'), async (req, res) => {
   }
 });
 
-// ========== NOUVELLES ROUTES POUR LA GESTION DES TICKETS (PROPRIÉTAIRE) ==========
+// ========== ROUTES POUR LA GESTION DES TICKETS (PROPRIÉTAIRE) ==========
 ownerRouter.get('/tickets', async (req, res) => {
   try {
     const { supervisorId, agentId, drawId, period, fromDate, toDate, gain, paid, page = 0, limit = 20 } = req.query;
@@ -1654,6 +1761,146 @@ ownerRouter.delete('/tickets/:ticketId', async (req, res) => {
 
 app.use('/api/owner', ownerRouter);
 
+// ==================== Routes superadmin ====================
+const superadminRouter = express.Router();
+superadminRouter.use(authenticateToken, (req, res, next) => {
+  if (req.user.role !== 'superadmin') {
+    return res.status(403).json({ error: 'Accès réservé au super-administrateur' });
+  }
+  next();
+});
+
+// Liste des propriétaires
+superadminRouter.get('/owners', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, name, email, phone, active FROM supervisors WHERE is_super_admin = false ORDER BY name'
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('❌ Erreur liste owners:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Créer un propriétaire
+superadminRouter.post('/owners', async (req, res) => {
+  try {
+    const { name, email, password, phone } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: 'Champs requis manquants' });
+    }
+    const hashed = await bcrypt.hash(password, 10);
+    const result = await pool.query(
+      'INSERT INTO supervisors (name, email, password, phone, active, is_super_admin) VALUES ($1, $2, $3, $4, true, false) RETURNING id',
+      [name, email, hashed, phone || '']
+    );
+    res.json({ success: true, id: result.rows[0].id });
+  } catch (error) {
+    console.error('❌ Erreur création owner:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Bloquer / débloquer un propriétaire
+superadminRouter.put('/owners/:id/block', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { block } = req.body;
+    await pool.query('UPDATE supervisors SET active = $1 WHERE id = $2 AND is_super_admin = false', [!block, id]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Erreur blocage owner:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Supprimer un propriétaire
+superadminRouter.delete('/owners/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM supervisors WHERE id = $1 AND is_super_admin = false', [id]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Erreur suppression owner:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Supprimer un agent
+superadminRouter.delete('/agents/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM agents WHERE id = $1', [id]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Erreur suppression agent:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Supprimer un superviseur (non propriétaire)
+superadminRouter.delete('/supervisors/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const check = await pool.query('SELECT is_super_admin FROM supervisors WHERE id = $1', [id]);
+    if (check.rows.length === 0) return res.status(404).json({ error: 'Superviseur non trouvé' });
+    if (check.rows[0].is_super_admin) {
+      return res.status(403).json({ error: 'Impossible de supprimer un propriétaire via cette route' });
+    }
+    await pool.query('DELETE FROM supervisors WHERE id = $1', [id]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Erreur suppression superviseur:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Envoyer un message à un propriétaire
+superadminRouter.post('/messages', async (req, res) => {
+  try {
+    const { ownerId, message } = req.body;
+    if (!ownerId || !message) {
+      return res.status(400).json({ error: 'ownerId et message requis' });
+    }
+    await pool.query(
+      'INSERT INTO owner_messages (owner_id, message) VALUES ($1, $2)',
+      [ownerId, message]
+    );
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Erreur envoi message:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Rapports consolidés par propriétaire (tous temps, aujourd'hui)
+superadminRouter.get('/reports/owners', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        s.id, s.name, s.email,
+        COUNT(DISTINCT a.id) as agent_count,
+        COUNT(DISTINCT t.id) as ticket_count,
+        COALESCE(SUM(t.total_amount), 0) as total_bets,
+        COALESCE(SUM(t.win_amount), 0) as total_wins,
+        COALESCE(SUM(t.win_amount) - SUM(t.total_amount), 0) as net_result
+      FROM supervisors s
+      LEFT JOIN agents a ON a.supervisor_id = s.id
+      LEFT JOIN tickets t ON t.agent_id = a.id AND DATE(t.date) = CURRENT_DATE
+      WHERE s.is_super_admin = false
+      GROUP BY s.id, s.name, s.email
+      ORDER BY s.name
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('❌ Erreur rapports owners:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+app.use('/api/superadmin', superadminRouter);
+
 // ==================== Routes statiques ====================
 app.use(express.static(__dirname));
 
@@ -1661,6 +1908,7 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/agent1.html', (req, res) => res.sendFile(path.join(__dirname, 'agent1.html')));
 app.get('/responsable.html', (req, res) => res.sendFile(path.join(__dirname, 'responsable.html')));
 app.get('/owner.html', (req, res) => res.sendFile(path.join(__dirname, 'owner.html')));
+app.get('/superadmin.html', (req, res) => res.sendFile(path.join(__dirname, 'superadmin.html')));
 
 // 404 API
 app.use('/api/*', (req, res) => {
