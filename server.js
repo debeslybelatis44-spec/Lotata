@@ -54,7 +54,6 @@ async function addColumnIfNotExists(table, column, definition) {
   }
 }
 
-// Initialisation des tables (ajout des colonnes manquantes)
 async function initializeDatabase() {
   try {
     console.log('🔄 Vérification de la base de données...');
@@ -188,7 +187,6 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Login spécifique pour le superadmin
 app.post('/api/auth/superadmin-login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -905,6 +903,7 @@ ownerRouter.get('/dashboard', async (req, res) => {
        ORDER BY progress_percent DESC`
     );
 
+    // Gains/pertes des agents du propriétaire (aujourd'hui)
     const agentsGainLoss = await pool.query(
       `SELECT a.id, a.name,
               COALESCE(SUM(t.total_amount), 0) as total_bets,
@@ -919,36 +918,27 @@ ownerRouter.get('/dashboard', async (req, res) => {
       [ownerId]
     );
 
-    // Statistiques globales du jour pour ce propriétaire
-    const totalTicketsToday = await pool.query(
-      `SELECT COUNT(*) as count
-       FROM tickets t
-       JOIN agents a ON t.agent_id = a.id
-       WHERE a.supervisor_id = $1 AND DATE(t.date) = CURRENT_DATE`,
-      [ownerId]
-    );
-
-    const totalWinningTicketsToday = await pool.query(
-      `SELECT COUNT(*) as count
-       FROM tickets t
-       JOIN agents a ON t.agent_id = a.id
-       WHERE a.supervisor_id = $1 AND DATE(t.date) = CURRENT_DATE AND t.win_amount > 0`,
-      [ownerId]
-    );
-
-    const totalsToday = await pool.query(
+    // Statistiques globales pour ce propriétaire (aujourd'hui)
+    const globalStats = await pool.query(
       `SELECT 
+         COUNT(DISTINCT t.id) as total_tickets,
+         COUNT(DISTINCT CASE WHEN t.win_amount > 0 THEN t.id END) as total_winning_tickets,
          COALESCE(SUM(t.total_amount), 0) as total_bets,
-         COALESCE(SUM(t.win_amount), 0) as total_wins
+         COALESCE(SUM(t.win_amount), 0) as total_wins,
+         COALESCE(SUM(t.total_amount) - SUM(t.win_amount), 0) as balance
        FROM tickets t
        JOIN agents a ON t.agent_id = a.id
        WHERE a.supervisor_id = $1 AND DATE(t.date) = CURRENT_DATE`,
       [ownerId]
     );
 
-    const totalBetsToday = parseFloat(totalsToday.rows[0].total_bets);
-    const totalWinsToday = parseFloat(totalsToday.rows[0].total_wins);
-    const balanceToday = totalBetsToday - totalWinsToday;
+    const stats = globalStats.rows[0] || {
+      total_tickets: 0,
+      total_winning_tickets: 0,
+      total_bets: 0,
+      total_wins: 0,
+      balance: 0
+    };
 
     res.json({
       connected: {
@@ -961,11 +951,11 @@ ownerRouter.get('/dashboard', async (req, res) => {
       limits_progress: limitsProgress.rows,
       agents_gain_loss: agentsGainLoss.rows,
       global_stats: {
-        total_tickets_all: parseInt(totalTicketsToday.rows[0].count),
-        total_winning_tickets_all: parseInt(totalWinningTicketsToday.rows[0].count),
-        total_bets_all: totalBetsToday,
-        total_wins_all: totalWinsToday,
-        balance_all: balanceToday
+        total_tickets_all: parseInt(stats.total_tickets),
+        total_winning_tickets_all: parseInt(stats.total_winning_tickets),
+        total_bets_all: parseFloat(stats.total_bets),
+        total_wins_all: parseFloat(stats.total_wins),
+        balance_all: parseFloat(stats.balance)
       }
     });
   } catch (error) {
