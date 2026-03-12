@@ -908,7 +908,7 @@ ownerRouter.use(authorize('owner'));
 // Tableau de bord
 ownerRouter.get('/dashboard', async (req, res) => {
   try {
-    const ownerId = req.user.id; // l'ID du propriétaire connecté
+    const ownerId = req.user.id; // ID du propriétaire dans la table supervisors
 
     // Superviseurs et agents connectés (inchangé)
     const connectedSupervisors = await pool.query(
@@ -943,45 +943,46 @@ ownerRouter.get('/dashboard', async (req, res) => {
               COALESCE(SUM(t.win_amount) - SUM(t.total_amount), 0) as net_result
        FROM agents a
        LEFT JOIN tickets t ON a.id = t.agent_id AND DATE(t.date) = CURRENT_DATE
+       WHERE a.supervisor_id = $1
        GROUP BY a.id, a.name
        HAVING COALESCE(SUM(t.total_amount), 0) > 0 OR COALESCE(SUM(t.win_amount), 0) > 0
-       ORDER BY net_result DESC`
-    );
-
-    // ===== NOUVELLES STATISTIQUES GLOBALES =====
-    // Total tickets (tous tirages, tous agents du propriétaire)
-    const totalTicketsAll = await pool.query(
-      `SELECT COUNT(*) as count
-       FROM tickets t
-       JOIN agents a ON t.agent_id = a.id
-       WHERE a.supervisor_id IN (SELECT id FROM supervisors WHERE id = $1 OR $1 IS NULL)`,
+       ORDER BY net_result DESC`,
       [ownerId]
     );
 
-    // Total tickets gagnants (win_amount > 0)
-    const totalWinningTicketsAll = await pool.query(
+    // ===== STATISTIQUES GLOBALES DU JOUR pour ce propriétaire =====
+    // Total tickets du jour (tous agents du propriétaire)
+    const totalTicketsToday = await pool.query(
       `SELECT COUNT(*) as count
        FROM tickets t
        JOIN agents a ON t.agent_id = a.id
-       WHERE a.supervisor_id IN (SELECT id FROM supervisors WHERE id = $1 OR $1 IS NULL)
-         AND t.win_amount > 0`,
+       WHERE a.supervisor_id = $1 AND DATE(t.date) = CURRENT_DATE`,
       [ownerId]
     );
 
-    // Somme totale misée et gains (tous tirages)
-    const totalsAll = await pool.query(
+    // Total tickets gagnants du jour
+    const totalWinningTicketsToday = await pool.query(
+      `SELECT COUNT(*) as count
+       FROM tickets t
+       JOIN agents a ON t.agent_id = a.id
+       WHERE a.supervisor_id = $1 AND DATE(t.date) = CURRENT_DATE AND t.win_amount > 0`,
+      [ownerId]
+    );
+
+    // Somme des mises et gains du jour
+    const totalsToday = await pool.query(
       `SELECT 
          COALESCE(SUM(t.total_amount), 0) as total_bets,
          COALESCE(SUM(t.win_amount), 0) as total_wins
        FROM tickets t
        JOIN agents a ON t.agent_id = a.id
-       WHERE a.supervisor_id IN (SELECT id FROM supervisors WHERE id = $1 OR $1 IS NULL)`,
+       WHERE a.supervisor_id = $1 AND DATE(t.date) = CURRENT_DATE`,
       [ownerId]
     );
 
-    const totalBetsAll = parseFloat(totalsAll.rows[0].total_bets);
-    const totalWinsAll = parseFloat(totalsAll.rows[0].total_wins);
-    const balanceAll = totalBetsAll - totalWinsAll;
+    const totalBetsToday = parseFloat(totalsToday.rows[0].total_bets);
+    const totalWinsToday = parseFloat(totalsToday.rows[0].total_wins);
+    const balanceToday = totalBetsToday - totalWinsToday;
 
     res.json({
       connected: {
@@ -993,13 +994,13 @@ ownerRouter.get('/dashboard', async (req, res) => {
       sales_today: parseFloat(salesToday.rows[0].total),
       limits_progress: limitsProgress.rows,
       agents_gain_loss: agentsGainLoss.rows,
-      // Nouvelles données globales
+      // Statistiques globales du jour
       global_stats: {
-        total_tickets_all: parseInt(totalTicketsAll.rows[0].count),
-        total_winning_tickets_all: parseInt(totalWinningTicketsAll.rows[0].count),
-        total_bets_all: totalBetsAll,
-        total_wins_all: totalWinsAll,
-        balance_all: balanceAll
+        total_tickets_all: parseInt(totalTicketsToday.rows[0].count),
+        total_winning_tickets_all: parseInt(totalWinningTicketsToday.rows[0].count),
+        total_bets_all: totalBetsToday,
+        total_wins_all: totalWinsToday,
+        balance_all: balanceToday
       }
     });
   } catch (error) {
