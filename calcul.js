@@ -1,14 +1,26 @@
-// calcul.js (version client‑side uniquement)
+// calcul.js - Version robuste, ne bloque pas l'affichage
 (function() {
+    // Attendre que le DOM soit chargé, mais sans bloquer
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
+        document.addEventListener('DOMContentLoaded', safeInit);
     } else {
-        init();
+        safeInit();
+    }
+
+    function safeInit() {
+        try {
+            init();
+        } catch (e) {
+            console.error('Erreur dans calcul.js (initialisation) :', e);
+            // On ne relance pas l'erreur pour ne pas bloquer la page
+        }
     }
 
     async function init() {
+        // Vérifier si les cartes existent déjà (pour éviter les doublons)
         if (document.getElementById('sales-period')) return;
 
+        // Créer le conteneur des nouvelles cartes
         const container = document.createElement('div');
         container.className = 'stats-grid';
         container.style.marginTop = '20px';
@@ -27,26 +39,36 @@
             </div>
         `;
 
+        // Trouver un endroit pour insérer les cartes
         const firstStatsGrid = document.querySelector('.stats-grid');
         if (firstStatsGrid) {
             firstStatsGrid.parentNode.insertBefore(container, firstStatsGrid.nextSibling);
         } else {
+            // Si on ne trouve pas la grille, on ajoute dans l'onglet dashboard
             const dashboardTab = document.getElementById('tab-dashboard');
-            if (dashboardTab) dashboardTab.appendChild(container);
-            else return;
+            if (dashboardTab) {
+                dashboardTab.appendChild(container);
+            } else {
+                console.warn("Impossible de trouver l'emplacement pour les cartes. Annulation.");
+                return;
+            }
         }
 
+        // Charger les données
         await loadTicketsAndCompute();
     }
 
     async function loadTicketsAndCompute() {
         const token = localStorage.getItem('auth_token');
-        if (!token) return;
+        if (!token) {
+            console.warn('Aucun token, impossible de charger les données');
+            return;
+        }
 
         try {
             let allTickets = [];
             let page = 0;
-            const limit = 100;
+            const limit = 100; // Vous pouvez ajuster
             let hasMore = true;
 
             while (hasMore) {
@@ -54,38 +76,55 @@
                 const res = await fetch(url, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                if (!res.ok) throw new Error('Erreur réseau');
+                if (!res.ok) {
+                    throw new Error(`Erreur HTTP ${res.status}`);
+                }
                 const data = await res.json();
-                allTickets = allTickets.concat(data.tickets);
+                allTickets = allTickets.concat(data.tickets || []);
                 hasMore = data.hasMore;
                 page++;
             }
 
-            const startHour = 7, endHour = 21, endMinute = 30;
-            let sales = 0, wins = 0;
+            // Filtrer les tickets entre 7h et 21h30 (heure locale du navigateur)
+            const startHour = 7;
+            const endHour = 21;
+            const endMinute = 30;
 
-            allTickets.forEach(t => {
-                const date = new Date(t.date);
+            let sales = 0;
+            let wins = 0;
+
+            allTickets.forEach(ticket => {
+                const date = new Date(ticket.date);
                 const hour = date.getHours();
                 const minute = date.getMinutes();
+
                 if (hour < startHour || hour > endHour) return;
                 if (hour === endHour && minute > endMinute) return;
 
-                sales += parseFloat(t.total_amount) || 0;
-                wins += parseFloat(t.win_amount) || 0;
+                sales += parseFloat(ticket.total_amount) || 0;
+                wins += parseFloat(ticket.win_amount) || 0;
             });
 
             const balance = sales - wins;
 
-            document.getElementById('sales-period').innerText = `${sales.toLocaleString()} G`;
-            document.getElementById('wins-period').innerText = `${wins.toLocaleString()} G`;
-            document.getElementById('balance-period').innerText = `${balance.toLocaleString()} G`;
+            // Mettre à jour l'affichage
+            const salesEl = document.getElementById('sales-period');
+            const winsEl = document.getElementById('wins-period');
+            const balanceEl = document.getElementById('balance-period');
+
+            if (salesEl) salesEl.innerText = `${sales.toLocaleString()} G`;
+            if (winsEl) winsEl.innerText = `${wins.toLocaleString()} G`;
+            if (balanceEl) balanceEl.innerText = `${balance.toLocaleString()} G`;
 
         } catch (error) {
-            console.error('Erreur calcul période :', error);
-            document.getElementById('sales-period').innerText = 'Erreur';
-            document.getElementById('wins-period').innerText = 'Erreur';
-            document.getElementById('balance-period').innerText = 'Erreur';
+            console.error('Erreur lors du calcul des indicateurs période :', error);
+            // Afficher un message d'erreur dans les cartes
+            const salesEl = document.getElementById('sales-period');
+            const winsEl = document.getElementById('wins-period');
+            const balanceEl = document.getElementById('balance-period');
+            if (salesEl) salesEl.innerText = 'Erreur';
+            if (winsEl) winsEl.innerText = 'Erreur';
+            if (balanceEl) balanceEl.innerText = 'Erreur';
         }
     }
 })();
