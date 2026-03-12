@@ -594,15 +594,19 @@
                 }
             }
 
-            // ---------- TABLEAU DE BORD ----------
+            // ---------- TABLEAU DE BORD (corrigé) ----------
             async function loadDashboard() {
                 const token = localStorage.getItem('auth_token');
                 try {
                     const res = await fetch(`${API_URL}/api/owner/dashboard`, {
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
-                    if (!res.ok) throw new Error('Erreur chargement dashboard');
+                    if (!res.ok) {
+                        const errorText = await res.text();
+                        throw new Error(`Erreur ${res.status}: ${errorText}`);
+                    }
                     const data = await res.json();
+                    console.log('Dashboard data:', data);
 
                     document.getElementById('connected-sup-count').innerText = data.connected.supervisors_count;
                     document.getElementById('connected-agent-count').innerText = data.connected.agents_count;
@@ -617,6 +621,7 @@
 
                     document.getElementById('sales-today').innerHTML = `${data.sales_today.toLocaleString()} G`;
 
+                    // Nouvelles stats globales
                     if (data.global_stats) {
                         document.getElementById('total-tickets-all').innerHTML = data.global_stats.total_tickets_all.toLocaleString();
                         document.getElementById('total-winning-tickets-all').innerHTML = data.global_stats.total_winning_tickets_all.toLocaleString();
@@ -624,6 +629,11 @@
                         const balanceEl = document.getElementById('balance-all');
                         balanceEl.innerHTML = `${balanceAll.toLocaleString()} G`;
                         balanceEl.style.color = balanceAll >= 0 ? '#00f190' : '#ff4d4d';
+                    } else {
+                        console.warn('global_stats manquant dans la réponse');
+                        document.getElementById('total-tickets-all').innerHTML = '0';
+                        document.getElementById('total-winning-tickets-all').innerHTML = '0';
+                        document.getElementById('balance-all').innerHTML = '0 G';
                     }
 
                     let limitsHtml = '';
@@ -669,7 +679,7 @@
 
                 } catch (e) {
                     console.error('Dashboard error:', e);
-                    showMessage('', 'Erreur chargement dashboard', false);
+                    showMessage('', 'Erreur chargement dashboard: ' + e.message, false);
                 }
             }
 

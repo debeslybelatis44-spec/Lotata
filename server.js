@@ -63,12 +63,9 @@ async function initializeDatabase() {
     await addColumnIfNotExists('lottery_config', 'slogan', 'TEXT');
     await addColumnIfNotExists('lottery_config', 'multipliers', 'JSONB');
     await addColumnIfNotExists('lottery_config', 'game_limits', 'JSONB');
-    // Ajout de la colonne lotto3 dans draw_results si elle n'existe pas
     await addColumnIfNotExists('draw_results', 'lotto3', 'VARCHAR(3)');
-    // Pour superadmin
     await addColumnIfNotExists('supervisors', 'is_super_admin', 'BOOLEAN DEFAULT FALSE');
     
-    // Table des messages aux propriétaires
     await pool.query(`
       CREATE TABLE IF NOT EXISTS owner_messages (
         id SERIAL PRIMARY KEY,
@@ -120,7 +117,6 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-// Login
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password, role } = req.body;
@@ -192,7 +188,6 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Login superadmin
 app.post('/api/auth/superadmin-login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -219,7 +214,6 @@ app.post('/api/auth/superadmin-login', async (req, res) => {
   }
 });
 
-// Rafraîchir le token
 app.post('/api/auth/refresh', authenticateToken, (req, res) => {
   const user = req.user;
   const newToken = jwt.sign(
@@ -238,7 +232,6 @@ app.post('/api/auth/refresh', authenticateToken, (req, res) => {
   res.json({ success: true, token: newToken });
 });
 
-// Logout
 app.post('/api/auth/logout', authenticateToken, async (req, res) => {
   await pool.query(
     'INSERT INTO activity_log (user_id, user_role, action, ip_address) VALUES ($1, $2, $3, $4)',
@@ -247,7 +240,6 @@ app.post('/api/auth/logout', authenticateToken, async (req, res) => {
   res.json({ success: true });
 });
 
-// Vérifier le token
 app.get('/api/auth/verify', authenticateToken, (req, res) => {
   res.json({ valid: true, user: req.user });
 });
@@ -267,41 +259,32 @@ app.post('/api/tickets/save', async (req, res) => {
       return res.status(403).json({ error: 'Vous ne pouvez enregistrer que vos propres tickets' });
     }
 
-    // Vérifier que le tirage est actif
     const drawCheck = await pool.query('SELECT active FROM draws WHERE id = $1', [drawId]);
     if (drawCheck.rows.length === 0 || !drawCheck.rows[0].active) {
       return res.status(403).json({ error: 'Tirage bloqué ou inexistant' });
     }
 
-    // Récupérer les blocages globaux
     const globalBlocked = await pool.query('SELECT number FROM blocked_numbers');
     const globalBlockedSet = new Set(globalBlocked.rows.map(r => r.number));
 
-    // Récupérer les blocages par tirage
     const drawBlocked = await pool.query('SELECT number FROM draw_blocked_numbers WHERE draw_id = $1', [drawId]);
     const drawBlockedSet = new Set(drawBlocked.rows.map(r => r.number));
 
-    // Récupérer les limites
     const limits = await pool.query('SELECT number, limit_amount FROM draw_number_limits WHERE draw_id = $1', [drawId]);
     const limitsMap = new Map(limits.rows.map(r => [r.number, parseFloat(r.limit_amount)]));
 
-    // Vérifier chaque pari
     for (const bet of bets) {
       const cleanNumber = bet.cleanNumber || (bet.number ? bet.number.replace(/[^0-9]/g, '') : '');
       if (!cleanNumber) continue;
 
-      // Blocage global
       if (globalBlockedSet.has(cleanNumber)) {
         return res.status(403).json({ error: `Numéro ${cleanNumber} est bloqué globalement` });
       }
-      // Blocage par tirage
       if (drawBlockedSet.has(cleanNumber)) {
         return res.status(403).json({ error: `Numéro ${cleanNumber} est bloqué pour ce tirage` });
       }
-      // Limite de mise
       if (limitsMap.has(cleanNumber)) {
         const limit = limitsMap.get(cleanNumber);
-        // Calculer le total déjà mis aujourd'hui sur ce numéro
         const todayBetsResult = await pool.query(
           `SELECT SUM((bets->>'amount')::numeric) as total
            FROM tickets, jsonb_array_elements(bets::jsonb) as bet
@@ -315,7 +298,7 @@ app.post('/api/tickets/save', async (req, res) => {
         }
       }
     }
-    // ===== AJOUT : Vérification des limites par type de jeu =====
+
     const configResult = await pool.query('SELECT game_limits FROM lottery_config LIMIT 1');
     let gameLimits = {};
     if (configResult.rows.length > 0 && configResult.rows[0].game_limits) {
@@ -323,7 +306,6 @@ app.post('/api/tickets/save', async (req, res) => {
         gameLimits = typeof raw === 'string' ? JSON.parse(raw) : raw;
     }
 
-    // Calculer les totaux par type de jeu
     const totalsByGame = {};
     for (const bet of bets) {
         const game = bet.game || bet.specialType;
@@ -345,21 +327,15 @@ app.post('/api/tickets/save', async (req, res) => {
             });
         }
     }
-    // ===== FIN AJOUT =====
 
-    // ===== GESTION CORRECTE DES MARIAGES GRATUITS =====
-    // 1. Séparer les paris payants des éventuels gratuits déjà envoyés
     const paidBets = bets.filter(b => !b.free);
-    // 2. Calculer le total des mises payantes
     const totalPaid = paidBets.reduce((sum, b) => sum + (parseFloat(b.amount) || 0), 0);
 
-    // 3. Déterminer le nombre de gratuits requis
     let requiredFree = 0;
     if (totalPaid >= 1 && totalPaid <= 50) requiredFree = 1;
     else if (totalPaid >= 51 && totalPaid <= 150) requiredFree = 2;
     else if (totalPaid >= 151) requiredFree = 3;
 
-    // 4. Générer les nouveaux gratuits (on écrase les anciens pour éviter les doublons)
     const newFreeBets = [];
     for (let i = 0; i < requiredFree; i++) {
         const num1 = Math.floor(Math.random() * 100).toString().padStart(2, '0');
@@ -377,11 +353,9 @@ app.post('/api/tickets/save', async (req, res) => {
         });
     }
 
-    // 5. Reconstituer la liste finale des paris (payants + nouveaux gratuits)
     const finalBets = [...paidBets, ...newFreeBets];
     const betsJson = JSON.stringify(finalBets);
     const finalTotal = finalBets.reduce((sum, b) => sum + (parseFloat(b.amount) || 0), 0);
-    // ===== FIN GESTION DES MARIAGES GRATUITS =====
 
     const ticketId = `T${Date.now()}${Math.floor(Math.random() * 1000)}`;
 
@@ -598,7 +572,7 @@ app.post('/api/lottery-config', authenticateToken, authorize('owner'), async (re
   }
 });
 
-// --- Numéros bloqués (globaux) ---
+// --- Numéros bloqués ---
 app.get('/api/blocked-numbers/global', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query('SELECT number FROM blocked_numbers');
@@ -609,7 +583,6 @@ app.get('/api/blocked-numbers/global', authenticateToken, async (req, res) => {
   }
 });
 
-// --- Numéros bloqués par tirage ---
 app.get('/api/blocked-numbers/draw/:drawId', authenticateToken, async (req, res) => {
   try {
     const { drawId } = req.params;
@@ -621,7 +594,6 @@ app.get('/api/blocked-numbers/draw/:drawId', authenticateToken, async (req, res)
   }
 });
 
-// --- Limites de mise par tirage ---
 app.get('/api/number-limits/draw/:drawId', authenticateToken, async (req, res) => {
   try {
     const { drawId } = req.params;
@@ -908,9 +880,8 @@ ownerRouter.use(authorize('owner'));
 // Tableau de bord
 ownerRouter.get('/dashboard', async (req, res) => {
   try {
-    const ownerId = req.user.id; // ID du propriétaire dans la table supervisors
+    const ownerId = req.user.id;
 
-    // Superviseurs et agents connectés (inchangé)
     const connectedSupervisors = await pool.query(
       `SELECT id, name, email FROM supervisors WHERE active = true LIMIT 5`
     );
@@ -918,12 +889,10 @@ ownerRouter.get('/dashboard', async (req, res) => {
       `SELECT id, name, email FROM agents WHERE active = true LIMIT 5`
     );
 
-    // Ventes du jour (inchangé)
     const salesToday = await pool.query(
       `SELECT COALESCE(SUM(total_amount), 0) as total FROM tickets WHERE DATE(date) = CURRENT_DATE`
     );
 
-    // Progression des limites (inchangé)
     const limitsProgress = await pool.query(
       `SELECT d.name as draw_name, l.number, l.limit_amount,
               COALESCE(SUM(t.total_amount), 0) as current_bets,
@@ -935,7 +904,6 @@ ownerRouter.get('/dashboard', async (req, res) => {
        ORDER BY progress_percent DESC`
     );
 
-    // Gains/pertes des agents aujourd'hui (inchangé)
     const agentsGainLoss = await pool.query(
       `SELECT a.id, a.name,
               COALESCE(SUM(t.total_amount), 0) as total_bets,
@@ -950,8 +918,7 @@ ownerRouter.get('/dashboard', async (req, res) => {
       [ownerId]
     );
 
-    // ===== STATISTIQUES GLOBALES DU JOUR pour ce propriétaire =====
-    // Total tickets du jour (tous agents du propriétaire)
+    // Statistiques globales du jour pour ce propriétaire
     const totalTicketsToday = await pool.query(
       `SELECT COUNT(*) as count
        FROM tickets t
@@ -960,7 +927,6 @@ ownerRouter.get('/dashboard', async (req, res) => {
       [ownerId]
     );
 
-    // Total tickets gagnants du jour
     const totalWinningTicketsToday = await pool.query(
       `SELECT COUNT(*) as count
        FROM tickets t
@@ -969,7 +935,6 @@ ownerRouter.get('/dashboard', async (req, res) => {
       [ownerId]
     );
 
-    // Somme des mises et gains du jour
     const totalsToday = await pool.query(
       `SELECT 
          COALESCE(SUM(t.total_amount), 0) as total_bets,
@@ -994,7 +959,6 @@ ownerRouter.get('/dashboard', async (req, res) => {
       sales_today: parseFloat(salesToday.rows[0].total),
       limits_progress: limitsProgress.rows,
       agents_gain_loss: agentsGainLoss.rows,
-      // Statistiques globales du jour
       global_stats: {
         total_tickets_all: parseInt(totalTicketsToday.rows[0].count),
         total_winning_tickets_all: parseInt(totalWinningTicketsToday.rows[0].count),
@@ -1009,7 +973,6 @@ ownerRouter.get('/dashboard', async (req, res) => {
   }
 });
 
-// Liste des superviseurs
 ownerRouter.get('/supervisors', async (req, res) => {
   try {
     const result = await pool.query(
@@ -1022,7 +985,6 @@ ownerRouter.get('/supervisors', async (req, res) => {
   }
 });
 
-// Liste des agents
 ownerRouter.get('/agents', async (req, res) => {
   try {
     const result = await pool.query(
@@ -1039,7 +1001,6 @@ ownerRouter.get('/agents', async (req, res) => {
   }
 });
 
-// Créer un utilisateur
 ownerRouter.post('/create-user', async (req, res) => {
   try {
     const { name, cin, username, password, role, supervisorId, zone } = req.body;
@@ -1075,7 +1036,6 @@ ownerRouter.post('/create-user', async (req, res) => {
   }
 });
 
-// Bloquer / débloquer un utilisateur
 ownerRouter.post('/block-user', async (req, res) => {
   try {
     const { userId, type } = req.body;
@@ -1092,7 +1052,6 @@ ownerRouter.post('/block-user', async (req, res) => {
   }
 });
 
-// Changer le superviseur d'un agent
 ownerRouter.put('/change-supervisor', async (req, res) => {
   try {
     const { agentId, supervisorId } = req.body;
@@ -1108,7 +1067,6 @@ ownerRouter.put('/change-supervisor', async (req, res) => {
   }
 });
 
-// Liste des tirages
 ownerRouter.get('/draws', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM draws ORDER BY name');
@@ -1119,7 +1077,6 @@ ownerRouter.get('/draws', async (req, res) => {
   }
 });
 
-// Publier les résultats
 ownerRouter.post('/publish-results', async (req, res) => {
   try {
     const { drawId, numbers, lotto3 } = req.body;
@@ -1137,7 +1094,6 @@ ownerRouter.post('/publish-results', async (req, res) => {
 
     await pool.query('UPDATE draws SET last_draw = NOW() WHERE id = $1', [drawId]);
 
-    // Calcul automatique des gagnants
     const lot1 = numbers[0];
     const lot2 = numbers[1];
     const lot3 = numbers[2];
@@ -1231,7 +1187,6 @@ ownerRouter.post('/publish-results', async (req, res) => {
   }
 });
 
-// Bloquer / débloquer un tirage
 ownerRouter.post('/block-draw', async (req, res) => {
   try {
     const { drawId, block } = req.body;
@@ -1244,7 +1199,6 @@ ownerRouter.post('/block-draw', async (req, res) => {
   }
 });
 
-// Bloquer un numéro globalement
 ownerRouter.post('/block-number', async (req, res) => {
   try {
     const { number } = req.body;
@@ -1271,7 +1225,6 @@ ownerRouter.post('/unblock-number', async (req, res) => {
   }
 });
 
-// Bloquer un numéro pour un tirage spécifique
 ownerRouter.post('/block-number-draw', async (req, res) => {
   try {
     const { drawId, number } = req.body;
@@ -1301,7 +1254,6 @@ ownerRouter.post('/unblock-number-draw', async (req, res) => {
   }
 });
 
-// Définir une limite pour un numéro sur un tirage
 ownerRouter.post('/number-limit', async (req, res) => {
   try {
     const { drawId, number, limitAmount } = req.body;
@@ -1321,7 +1273,6 @@ ownerRouter.post('/number-limit', async (req, res) => {
   }
 });
 
-// Liste des numéros globalement bloqués (GET)
 ownerRouter.get('/blocked-numbers', async (req, res) => {
   try {
     const result = await pool.query('SELECT number FROM blocked_numbers ORDER BY number');
@@ -1332,7 +1283,6 @@ ownerRouter.get('/blocked-numbers', async (req, res) => {
   }
 });
 
-// Liste des numéros bloqués par tirage
 ownerRouter.get('/blocked-numbers-per-draw', async (req, res) => {
   try {
     const result = await pool.query(
@@ -1348,7 +1298,6 @@ ownerRouter.get('/blocked-numbers-per-draw', async (req, res) => {
   }
 });
 
-// Liste des limites de numéros
 ownerRouter.get('/number-limits', async (req, res) => {
   try {
     const result = await pool.query(
@@ -1364,7 +1313,6 @@ ownerRouter.get('/number-limits', async (req, res) => {
   }
 });
 
-// Supprimer une limite de numéro
 ownerRouter.post('/remove-number-limit', async (req, res) => {
   try {
     const { drawId, number } = req.body;
@@ -1382,7 +1330,6 @@ ownerRouter.post('/remove-number-limit', async (req, res) => {
   }
 });
 
-// Liste des tirages bloqués (inactifs)
 ownerRouter.get('/blocked-draws', async (req, res) => {
   try {
     const result = await pool.query(
@@ -1395,7 +1342,6 @@ ownerRouter.get('/blocked-draws', async (req, res) => {
   }
 });
 
-// Rapports avec filtres
 ownerRouter.get('/reports', async (req, res) => {
   try {
     const { supervisorId, agentId, drawId, period, fromDate, toDate, gainLoss } = req.query;
@@ -1498,7 +1444,6 @@ ownerRouter.get('/reports', async (req, res) => {
   }
 });
 
-// Récupérer le message destiné au propriétaire (s'il existe et non expiré)
 ownerRouter.get('/messages', async (req, res) => {
   try {
     const ownerId = req.user.id;
@@ -1517,7 +1462,6 @@ ownerRouter.get('/messages', async (req, res) => {
   }
 });
 
-// ========== NOUVELLES ROUTES POUR LA CONFIGURATION PROPRIÉTAIRE ==========
 ownerRouter.get('/settings', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM lottery_config LIMIT 1');
@@ -1630,7 +1574,6 @@ ownerRouter.post('/settings', upload.single('logo'), async (req, res) => {
   }
 });
 
-// ========== ROUTES POUR LA GESTION DES TICKETS (PROPRIÉTAIRE) ==========
 ownerRouter.get('/tickets', async (req, res) => {
   try {
     const { supervisorId, agentId, drawId, period, fromDate, toDate, gain, paid, page = 0, limit = 20 } = req.query;
@@ -1771,7 +1714,6 @@ superadminRouter.use(authenticateToken, (req, res, next) => {
   next();
 });
 
-// Liste des propriétaires
 superadminRouter.get('/owners', async (req, res) => {
   try {
     const result = await pool.query(
@@ -1784,7 +1726,6 @@ superadminRouter.get('/owners', async (req, res) => {
   }
 });
 
-// Créer un propriétaire
 superadminRouter.post('/owners', async (req, res) => {
   try {
     const { name, email, password, phone } = req.body;
@@ -1803,7 +1744,6 @@ superadminRouter.post('/owners', async (req, res) => {
   }
 });
 
-// Bloquer / débloquer un propriétaire
 superadminRouter.put('/owners/:id/block', async (req, res) => {
   try {
     const { id } = req.params;
@@ -1816,7 +1756,6 @@ superadminRouter.put('/owners/:id/block', async (req, res) => {
   }
 });
 
-// Supprimer un propriétaire
 superadminRouter.delete('/owners/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -1828,7 +1767,6 @@ superadminRouter.delete('/owners/:id', async (req, res) => {
   }
 });
 
-// Supprimer un agent
 superadminRouter.delete('/agents/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -1840,7 +1778,6 @@ superadminRouter.delete('/agents/:id', async (req, res) => {
   }
 });
 
-// Supprimer un superviseur (non propriétaire)
 superadminRouter.delete('/supervisors/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -1857,7 +1794,6 @@ superadminRouter.delete('/supervisors/:id', async (req, res) => {
   }
 });
 
-// Envoyer un message à un propriétaire
 superadminRouter.post('/messages', async (req, res) => {
   try {
     const { ownerId, message } = req.body;
@@ -1875,7 +1811,6 @@ superadminRouter.post('/messages', async (req, res) => {
   }
 });
 
-// Rapports consolidés par propriétaire (tous temps, aujourd'hui)
 superadminRouter.get('/reports/owners', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -1916,18 +1851,15 @@ app.use('/api/*', (req, res) => {
   res.status(404).json({ error: 'Route API non trouvée' });
 });
 
-// 404 général
 app.use('*', (req, res) => {
   res.status(404).send('Page non trouvée');
 });
 
-// Gestion des erreurs
 app.use((err, req, res, next) => {
   console.error('🔥 Erreur serveur:', err.stack);
   res.status(500).json({ error: 'Erreur serveur interne', message: err.message });
 });
 
-// Démarrage
 initializeDatabase().then(() => {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Serveur LOTATO démarré sur http://0.0.0.0:${PORT}`);
