@@ -188,6 +188,7 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+// Login spécifique pour le superadmin
 app.post('/api/auth/superadmin-login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -877,7 +878,7 @@ app.use('/api/supervisor', supervisorRouter);
 const ownerRouter = express.Router();
 ownerRouter.use(authorize('owner'));
 
-// Tableau de bord
+// Tableau de bord enrichi avec global_stats
 ownerRouter.get('/dashboard', async (req, res) => {
   try {
     const ownerId = req.user.id;
