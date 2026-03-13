@@ -133,11 +133,21 @@
     </div>
 
     <script>
-        const API_BASE = ''; // Laisser vide si même origine, sinon mettre l'URL de Render
+        const API_BASE = ''; // Laissez vide si même origine
+        let token = localStorage.getItem('superadmin_token');
+        let adminName = localStorage.getItem('superadmin_name') || '';
 
-        let token = null;
+        // Vérifier si déjà connecté
+        if (token) {
+            document.getElementById('login-section').style.display = 'none';
+            document.getElementById('main-section').style.display = 'block';
+            document.getElementById('admin-name').innerText = adminName;
+            loadOwners();
+            loadOwnerSelect();
+            loadReports();
+        }
 
-        // Connexion super-admin
+        // Connexion super-admin (sans rechargement)
         async function superAdminLogin() {
             const username = document.getElementById('login-username').value;
             const password = document.getElementById('login-password').value;
@@ -154,11 +164,13 @@
                 const data = await res.json();
                 if (data.success) {
                     token = data.token;
+                    adminName = data.name;
                     localStorage.setItem('superadmin_token', token);
-                    localStorage.setItem('superadmin_name', data.name);
+                    localStorage.setItem('superadmin_name', adminName);
+                    // Afficher la section principale sans recharger
                     document.getElementById('login-section').style.display = 'none';
                     document.getElementById('main-section').style.display = 'block';
-                    document.getElementById('admin-name').innerText = data.name;
+                    document.getElementById('admin-name').innerText = adminName;
                     loadOwners();
                     loadOwnerSelect();
                     loadReports();
@@ -175,20 +187,6 @@
             el.style.display = 'block';
             el.innerText = msg;
         }
-
-        // Vérifier session existante
-        (function() {
-            const savedToken = localStorage.getItem('superadmin_token');
-            if (savedToken) {
-                token = savedToken;
-                document.getElementById('login-section').style.display = 'none';
-                document.getElementById('main-section').style.display = 'block';
-                document.getElementById('admin-name').innerText = localStorage.getItem('superadmin_name') || 'Admin';
-                loadOwners();
-                loadOwnerSelect();
-                loadReports();
-            }
-        })();
 
         function logout() {
             localStorage.removeItem('superadmin_token');
@@ -207,11 +205,26 @@
             if (tabId === 'reports') loadReports();
         }
 
+        // Fonction utilitaire pour les requêtes avec token
+        async function fetchWithToken(url, options = {}) {
+            const headers = {
+                'Authorization': `Bearer ${token}`,
+                ...options.headers
+            };
+            const res = await fetch(url, { ...options, headers });
+            if (res.status === 401) {
+                // Token invalide ou expiré
+                alert('Session expirée, veuillez vous reconnecter');
+                logout();
+                return null;
+            }
+            return res;
+        }
+
         // ========== GESTION PROPRIÉTAIRES ==========
         async function loadOwners() {
-            const res = await fetch(`${API_BASE}/api/superadmin/owners`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const res = await fetchWithToken(`${API_BASE}/api/superadmin/owners`);
+            if (!res) return;
             const owners = await res.json();
             let html = '';
             owners.forEach(o => {
@@ -240,11 +253,12 @@
                 showMessage('owner-create-message', 'Veuillez remplir tous les champs', false);
                 return;
             }
-            const res = await fetch(`${API_BASE}/api/superadmin/owners`, {
+            const res = await fetchWithToken(`${API_BASE}/api/superadmin/owners`, {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, email, password, phone })
             });
+            if (!res) return;
             const data = await res.json();
             if (data.success) {
                 showMessage('owner-create-message', '✅ Propriétaire créé', true);
@@ -260,21 +274,20 @@
 
         async function toggleBlockOwner(id, currentActive) {
             const block = currentActive; // si actif, on bloque (true)
-            const res = await fetch(`${API_BASE}/api/superadmin/owners/${id}/block`, {
+            const res = await fetchWithToken(`${API_BASE}/api/superadmin/owners/${id}/block`, {
                 method: 'PUT',
-                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ block })
             });
-            if (res.ok) loadOwners();
+            if (res && res.ok) loadOwners();
         }
 
         async function deleteOwner(id) {
             if (!confirm('Supprimer définitivement ce propriétaire ?')) return;
-            const res = await fetch(`${API_BASE}/api/superadmin/owners/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
+            const res = await fetchWithToken(`${API_BASE}/api/superadmin/owners/${id}`, {
+                method: 'DELETE'
             });
-            if (res.ok) loadOwners();
+            if (res && res.ok) loadOwners();
         }
 
         // ========== SUPPRESSION AGENT / SUPERVISEUR ==========
@@ -283,10 +296,10 @@
             const id = document.getElementById('delete-id').value;
             if (!id) return;
             if (!confirm(`Supprimer définitivement ${type} ID ${id} ?`)) return;
-            const res = await fetch(`${API_BASE}/api/superadmin/${type}s/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
+            const res = await fetchWithToken(`${API_BASE}/api/superadmin/${type}s/${id}`, {
+                method: 'DELETE'
             });
+            if (!res) return;
             const data = await res.json();
             if (res.ok) {
                 showMessage('delete-message', '✅ Supprimé avec succès', true);
@@ -298,9 +311,8 @@
 
         // ========== MESSAGES ==========
         async function loadOwnerSelect() {
-            const res = await fetch(`${API_BASE}/api/superadmin/owners`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const res = await fetchWithToken(`${API_BASE}/api/superadmin/owners`);
+            if (!res) return;
             const owners = await res.json();
             let opts = '<option value="">Choisir un propriétaire</option>';
             owners.forEach(o => opts += `<option value="${o.id}">${o.name}</option>`);
@@ -314,11 +326,12 @@
                 showMessage('message-result', 'Veuillez sélectionner un propriétaire et saisir un message', false);
                 return;
             }
-            const res = await fetch(`${API_BASE}/api/superadmin/messages`, {
+            const res = await fetchWithToken(`${API_BASE}/api/superadmin/messages`, {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ownerId, message })
             });
+            if (!res) return;
             if (res.ok) {
                 showMessage('message-result', '✅ Message envoyé (visible 10 min)', true);
                 document.getElementById('message-text').value = '';
@@ -329,9 +342,8 @@
 
         // ========== RAPPORTS ==========
         async function loadReports() {
-            const res = await fetch(`${API_BASE}/api/superadmin/reports/owners`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const res = await fetchWithToken(`${API_BASE}/api/superadmin/reports/owners`);
+            if (!res) return;
             const reports = await res.json();
             let html = '<table><thead><tr><th>Propriétaire</th><th>Agents</th><th>Tickets</th><th>Mises (G)</th><th>Gains (G)</th><th>Résultat net</th></tr></thead><tbody>';
             reports.forEach(r => {
@@ -358,6 +370,7 @@
             setTimeout(() => el.style.display = 'none', 4000);
         }
 
+        // Exposer les fonctions globalement
         window.switchTab = switchTab;
         window.superAdminLogin = superAdminLogin;
         window.logout = logout;
