@@ -902,6 +902,15 @@ ownerRouter.get('/dashboard', async (req, res) => {
        ORDER BY net_result DESC`
     );
 
+    // <-- AJOUT : statistiques globales (tous temps) -->
+    const globalStats = await pool.query(`
+      SELECT
+        COUNT(*)::integer AS total_tickets_all,
+        COUNT(CASE WHEN win_amount > 0 THEN 1 END)::integer AS total_winning_tickets_all,
+        COALESCE(SUM(total_amount - win_amount), 0)::float AS balance_all
+      FROM tickets
+    `);
+
     res.json({
       connected: {
         supervisors_count: connectedSupervisors.rows.length,
@@ -911,10 +920,26 @@ ownerRouter.get('/dashboard', async (req, res) => {
       },
       sales_today: parseFloat(salesToday.rows[0].total),
       limits_progress: limitsProgress.rows,
-      agents_gain_loss: agentsGainLoss.rows
+      agents_gain_loss: agentsGainLoss.rows,
+      global_stats: globalStats.rows[0]   // <-- AJOUT
     });
   } catch (error) {
     console.error('❌ Erreur dashboard owner:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// <-- AJOUT : route pour les messages propriétaire -->
+ownerRouter.get('/messages', async (req, res) => {
+  try {
+    // Si vous avez une table owner_messages, décommentez les lignes ci-dessous
+    // const result = await pool.query('SELECT message FROM owner_messages ORDER BY created_at DESC LIMIT 1');
+    // const message = result.rows.length > 0 ? result.rows[0].message : '';
+    // Sinon, renvoyez un message vide ou un message par défaut
+    const message = process.env.OWNER_MESSAGE || '';
+    res.json({ message });
+  } catch (error) {
+    console.error('❌ Erreur récupération message propriétaire:', error);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
