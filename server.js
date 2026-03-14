@@ -35,6 +35,13 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
+// Configurer le fuseau horaire sur chaque nouvelle connexion
+pool.on('connect', (client) => {
+  client.query("SET TIME ZONE 'America/Port-au-Prince'", (err) => {
+    if (err) console.error('❌ Erreur réglage fuseau:', err);
+  });
+});
+
 pool.on('connect', () => console.log('✅ Connecté à PostgreSQL'));
 pool.on('error', (err) => console.error('❌ Erreur PostgreSQL:', err));
 
