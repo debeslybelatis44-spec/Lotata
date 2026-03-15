@@ -35,6 +35,9 @@
         .alert { padding:15px; border-radius:12px; margin-bottom:20px; display:none; }
         .alert-success { background:rgba(0,241,144,0.2); border:1px solid #00f190; color:#00f190; }
         .alert-danger { background:rgba(255,77,77,0.2); border:1px solid #ff4d4d; color:#ff4d4d; }
+        table { width:100%; border-collapse:collapse; }
+        th, td { padding:10px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.1); }
+        th { color:#a0a0b8; font-weight:normal; }
     </style>
 </head>
 <body>
@@ -94,16 +97,18 @@
             <div class="form-grid">
                 <div class="form-group">
                     <label>Type</label>
-                    <select id="delete-type">
+                    <select id="delete-type" onchange="loadUsersForType()">
                         <option value="agent">Agent</option>
                         <option value="supervisor">Superviseur</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>ID de l'utilisateur</label>
-                    <input type="number" id="delete-id" placeholder="123">
+                    <label>Utilisateur</label>
+                    <select id="delete-user-select">
+                        <option value="">Chargement...</option>
+                    </select>
                 </div>
-                <div><button class="btn-danger" onclick="deleteUser()">Supprimer définitivement</button></div>
+                <div><button class="btn-danger" onclick="deleteSelectedUser()">Supprimer définitivement</button></div>
             </div>
             <div id="delete-message" class="alert"></div>
         </div>
@@ -145,9 +150,10 @@
             loadOwners();
             loadOwnerSelect();
             loadReports();
+            loadUsersForType(); // précharger la liste des agents/superviseurs
         }
 
-        // Connexion super-admin (sans rechargement)
+        // Connexion super-admin
         async function superAdminLogin() {
             const username = document.getElementById('login-username').value;
             const password = document.getElementById('login-password').value;
@@ -174,6 +180,7 @@
                     loadOwners();
                     loadOwnerSelect();
                     loadReports();
+                    loadUsersForType();
                 } else {
                     showLoginError(data.error || 'Identifiants incorrects');
                 }
@@ -201,6 +208,7 @@
             document.querySelector(`.tab[onclick*="${tabId}"]`).classList.add('active');
             document.getElementById(`tab-${tabId}`).classList.add('active');
             if (tabId === 'owners') loadOwners();
+            if (tabId === 'agents') loadUsersForType();
             if (tabId === 'messages') loadOwnerSelect();
             if (tabId === 'reports') loadReports();
         }
@@ -291,20 +299,48 @@
         }
 
         // ========== SUPPRESSION AGENT / SUPERVISEUR ==========
-        async function deleteUser() {
+        async function loadUsersForType() {
             const type = document.getElementById('delete-type').value;
-            const id = document.getElementById('delete-id').value;
-            if (!id) return;
-            if (!confirm(`Supprimer définitivement ${type} ID ${id} ?`)) return;
-            const res = await fetchWithToken(`${API_BASE}/api/superadmin/${type}s/${id}`, {
+            const select = document.getElementById('delete-user-select');
+            select.innerHTML = '<option value="">Chargement...</option>';
+
+            const endpoint = type === 'agent' ? '/api/superadmin/agents' : '/api/superadmin/supervisors';
+            const res = await fetchWithToken(`${API_BASE}${endpoint}`);
+            if (!res) return;
+            const users = await res.json();
+
+            if (users.length === 0) {
+                select.innerHTML = '<option value="">Aucun utilisateur trouvé</option>';
+                return;
+            }
+
+            let options = '<option value="">Sélectionnez un utilisateur</option>';
+            users.forEach(u => {
+                options += `<option value="${u.id}">${u.name} (${u.email})</option>`;
+            });
+            select.innerHTML = options;
+        }
+
+        async function deleteSelectedUser() {
+            const type = document.getElementById('delete-type').value;
+            const select = document.getElementById('delete-user-select');
+            const userId = select.value;
+            if (!userId) {
+                showMessage('delete-message', 'Veuillez sélectionner un utilisateur', false);
+                return;
+            }
+            if (!confirm(`Supprimer définitivement ${type} sélectionné ?`)) return;
+
+            const endpoint = type === 'agent' ? `/api/superadmin/agents/${userId}` : `/api/superadmin/supervisors/${userId}`;
+            const res = await fetchWithToken(`${API_BASE}${endpoint}`, {
                 method: 'DELETE'
             });
             if (!res) return;
-            const data = await res.json();
             if (res.ok) {
                 showMessage('delete-message', '✅ Supprimé avec succès', true);
-                document.getElementById('delete-id').value = '';
+                loadUsersForType(); // recharger la liste
             } else {
+                const data = await res.json();
                 showMessage('delete-message', '❌ ' + (data.error || 'Erreur'), false);
             }
         }
@@ -377,7 +413,8 @@
         window.createOwner = createOwner;
         window.toggleBlockOwner = toggleBlockOwner;
         window.deleteOwner = deleteOwner;
-        window.deleteUser = deleteUser;
+        window.loadUsersForType = loadUsersForType;
+        window.deleteSelectedUser = deleteSelectedUser;
         window.sendMessage = sendMessage;
         window.loadReports = loadReports;
     </script>
