@@ -128,7 +128,7 @@ app.post('/api/auth/login', async (req, res) => {
     } else if (role === 'agent') {
       table = 'agents';
     } else if (role === 'owner') {
-      table = 'supervisors'; // propriétaires aussi dans supervisors (avec un champ owner flag ?)
+      table = 'supervisors';
     } else {
       return res.status(400).json({ error: 'Rôle invalide' });
     }
@@ -181,55 +181,6 @@ app.post('/api/auth/login', async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Erreur login:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-// Login superadmin (spécifique)
-app.post('/api/auth/superadmin-login', async (req, res) => {
-  try {
-    const { username, password } = req.body;
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Champs requis manquants' });
-    }
-
-    const result = await pool.query(
-      'SELECT id, name, email, password FROM superadmins WHERE email = $1 OR name = $1',
-      [username]
-    );
-    if (result.rows.length === 0) {
-      return res.status(401).json({ error: 'Identifiants incorrects' });
-    }
-    const user = result.rows[0];
-
-    const validPassword = await bcrypt.compare(password, user.password);
-    if (!validPassword) {
-      return res.status(401).json({ error: 'Identifiants incorrects' });
-    }
-
-    const token = jwt.sign(
-      {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: 'superadmin'
-      },
-      JWT_SECRET,
-      { expiresIn: '24h' }
-    );
-
-    await pool.query(
-      'INSERT INTO activity_log (user_id, user_role, action, ip_address, user_agent) VALUES ($1, $2, $3, $4, $5)',
-      [user.id, 'superadmin', 'login', req.ip, req.headers['user-agent']]
-    );
-
-    res.json({
-      success: true,
-      token,
-      name: user.name
-    });
-  } catch (error) {
-    console.error('❌ Erreur superadmin login:', error);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -1735,163 +1686,6 @@ ownerRouter.delete('/tickets/:ticketId', async (req, res) => {
 
 app.use('/api/owner', ownerRouter);
 
-// ==================== Routes superadmin ====================
-const superadminRouter = express.Router();
-superadminRouter.use(authorize('superadmin'));
-
-// Liste des propriétaires (superviseurs avec le rôle owner implicite)
-superadminRouter.get('/owners', async (req, res) => {
-  try {
-    const result = await pool.query(
-      `SELECT id, name, email, phone, active FROM supervisors WHERE role = 'owner' OR (role IS NULL AND active = true) ORDER BY name`
-    );
-    res.json(result.rows);
-  } catch (error) {
-    console.error('❌ Erreur récupération propriétaires:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-// Créer un propriétaire
-superadminRouter.post('/owners', async (req, res) => {
-  try {
-    const { name, email, password, phone } = req.body;
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: 'Nom, email et mot de passe requis' });
-    }
-    const hashedPassword = await bcrypt.hash(password, 10);
-    await pool.query(
-      `INSERT INTO supervisors (name, email, password, phone, active, role) VALUES ($1, $2, $3, $4, true, 'owner')`,
-      [name, email, hashedPassword, phone || '']
-    );
-    res.json({ success: true });
-  } catch (error) {
-    console.error('❌ Erreur création propriétaire:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-// Bloquer/débloquer un propriétaire
-superadminRouter.put('/owners/:id/block', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { block } = req.body; // block = true pour bloquer, false pour débloquer
-    await pool.query('UPDATE supervisors SET active = $1 WHERE id = $2', [!block, id]);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('❌ Erreur blocage propriétaire:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-// Supprimer un propriétaire
-superadminRouter.delete('/owners/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    await pool.query('DELETE FROM supervisors WHERE id = $1', [id]);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('❌ Erreur suppression propriétaire:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-// Liste des agents
-superadminRouter.get('/agents', async (req, res) => {
-  try {
-    const result = await pool.query(
-      'SELECT id, name, email, phone, active FROM agents ORDER BY name'
-    );
-    res.json(result.rows);
-  } catch (error) {
-    console.error('❌ Erreur récupération agents:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-// Supprimer un agent
-superadminRouter.delete('/agents/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    await pool.query('DELETE FROM agents WHERE id = $1', [id]);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('❌ Erreur suppression agent:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-// Liste des superviseurs (non propriétaires)
-superadminRouter.get('/supervisors', async (req, res) => {
-  try {
-    const result = await pool.query(
-      `SELECT id, name, email, phone, active FROM supervisors WHERE role != 'owner' OR role IS NULL ORDER BY name`
-    );
-    res.json(result.rows);
-  } catch (error) {
-    console.error('❌ Erreur récupération superviseurs:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-// Supprimer un superviseur
-superadminRouter.delete('/supervisors/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    await pool.query('DELETE FROM supervisors WHERE id = $1', [id]);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('❌ Erreur suppression superviseur:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-// Envoyer un message à un propriétaire (à stocker dans une table owner_messages)
-superadminRouter.post('/messages', async (req, res) => {
-  try {
-    const { ownerId, message } = req.body;
-    if (!ownerId || !message) {
-      return res.status(400).json({ error: 'ownerId et message requis' });
-    }
-    // On insère dans une table dédiée (à créer si besoin)
-    await pool.query(
-      `INSERT INTO owner_messages (owner_id, message, created_at, expires_at) VALUES ($1, $2, NOW(), NOW() + INTERVAL '10 minutes')`,
-      [ownerId, message]
-    );
-    res.json({ success: true });
-  } catch (error) {
-    console.error('❌ Erreur envoi message:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-// Rapports consolidés par propriétaire
-superadminRouter.get('/reports/owners', async (req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT 
-        s.id,
-        s.name,
-        COUNT(DISTINCT a.id) as agent_count,
-        COUNT(DISTINCT t.id) as ticket_count,
-        COALESCE(SUM(t.total_amount), 0) as total_bets,
-        COALESCE(SUM(t.win_amount), 0) as total_wins,
-        COALESCE(SUM(t.win_amount) - SUM(t.total_amount), 0) as net_result
-      FROM supervisors s
-      LEFT JOIN agents a ON a.supervisor_id = s.id
-      LEFT JOIN tickets t ON t.agent_id = a.id AND DATE(t.date) = CURRENT_DATE
-      WHERE s.role = 'owner' OR s.role IS NULL
-      GROUP BY s.id, s.name
-    `);
-    res.json(result.rows);
-  } catch (error) {
-    console.error('❌ Erreur rapports propriétaires:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-app.use('/api/superadmin', superadminRouter);
-
 // ==================== Routes statiques ====================
 app.use(express.static(__dirname));
 
@@ -1899,7 +1693,6 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/agent1.html', (req, res) => res.sendFile(path.join(__dirname, 'agent1.html')));
 app.get('/responsable.html', (req, res) => res.sendFile(path.join(__dirname, 'responsable.html')));
 app.get('/owner.html', (req, res) => res.sendFile(path.join(__dirname, 'owner.html')));
-app.get('/superadmin.html', (req, res) => res.sendFile(path.join(__dirname, 'superadmin.html')));
 
 // 404 API
 app.use('/api/*', (req, res) => {
