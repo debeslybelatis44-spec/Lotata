@@ -45,6 +45,14 @@ pool.on('connect', (client) => {
 pool.on('connect', () => console.log('✅ Connecté à PostgreSQL'));
 pool.on('error', (err) => console.error('❌ Erreur PostgreSQL:', err));
 
+// ===== AJOUT POUR CORRIGER LE FUSEAU HORAIRE =====
+require('moment-timezone'); // étend moment pour supporter les fuseaux
+const pg = require('pg');
+pg.types.setTypeParser(1114, (stringValue) => {
+  // stringValue est au format 'YYYY-MM-DD HH:MM:SS'
+  return moment.tz(stringValue, 'YYYY-MM-DD HH:mm:ss', 'America/Port-au-Prince').toDate();
+});
+// ===== FIN DE L'AJOUT =====
 // ==================== Utilitaires ====================
 async function columnExists(table, column) {
   const res = await pool.query(`
