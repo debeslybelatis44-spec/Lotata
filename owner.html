@@ -122,16 +122,16 @@
                     <div>Ventes totales (aujourd'hui)</div>
                 </div>
                 <div class="stat-card">
-                    <div style="font-size:2rem;" id="total-tickets-all">0</div>
-                    <div>Tickets vendus (total)</div>
+                    <div style="font-size:2rem;" id="total-tickets-today">0</div>
+                    <div>Tickets vendus (aujourd'hui)</div>
                 </div>
                 <div class="stat-card">
-                    <div style="font-size:2rem;" id="total-winning-tickets-all">0 G</div>
-                    <div>Gains totaux (tous temps)</div>  <!-- modifié : affiche le montant total des gains -->
+                    <div style="font-size:2rem;" id="total-wins-today">0 G</div>
+                    <div>Gains totaux (aujourd'hui)</div>
                 </div>
                 <div class="stat-card">
-                    <div style="font-size:2rem;" id="balance-all">0 G</div>
-                    <div>Balance globale (misé - gagné)</div>
+                    <div style="font-size:2rem;" id="balance-today">0 G</div>
+                    <div>Résultat net du jour (misé - gagné)</div>
                 </div>
             </div>
 
@@ -611,10 +611,11 @@
                 }
             }
 
-            // ---------- TABLEAU DE BORD (CORRIGÉ) ----------
+            // ---------- TABLEAU DE BORD MODIFIÉ ----------
             async function loadDashboard() {
                 const token = localStorage.getItem('auth_token');
                 try {
+                    // Charger les données du dashboard
                     const res = await fetch(`${API_URL}/api/owner/dashboard`, {
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
@@ -625,6 +626,7 @@
                     const data = await res.json();
                     console.log('Dashboard data:', data);
 
+                    // Mise à jour des connectés
                     document.getElementById('connected-sup-count').innerText = data.connected.supervisors_count;
                     document.getElementById('connected-agent-count').innerText = data.connected.agents_count;
                     
@@ -636,46 +638,50 @@
                     data.connected.agents.forEach(a => agentList += `<div>👤 ${a.name} (${a.username || a.email})</div>`);
                     document.getElementById('connected-agent-list').innerHTML = agentList || '<span style="opacity:0.7;">Aucun agent connecté</span>';
 
-                    document.getElementById('sales-today').innerHTML = `${data.sales_today.toLocaleString()} G`;
-
-                    // Statistiques globales
-                    if (data.global_stats) {
-                        document.getElementById('total-tickets-all').innerHTML = data.global_stats.total_tickets_all.toLocaleString();
-                        // Correction : afficher le montant total des gains, pas le nombre de tickets gagnants
-                        document.getElementById('total-winning-tickets-all').innerHTML = (data.global_stats.total_wins_all || 0).toLocaleString() + ' G';
+                    // Récupérer les statistiques du jour via l'API reports
+                    const reportRes = await fetch(`${API_URL}/api/owner/reports?period=today`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    
+                    if (reportRes.ok) {
+                        const reportData = await reportRes.json();
+                        const stats = reportData.summary || {};
                         
-                        const balanceEl = document.getElementById('balance-all');
-                        const netResult = data.global_stats.balance_all || 0;
-                        balanceEl.innerHTML = Math.abs(netResult).toLocaleString() + ' G';
+                        // Mettre à jour les statistiques du jour
+                        document.getElementById('sales-today').innerHTML = `${(stats.total_bets || 0).toLocaleString()} G`;
+                        document.getElementById('total-tickets-today').innerHTML = (stats.total_tickets || 0).toLocaleString();
+                        document.getElementById('total-wins-today').innerHTML = `${(stats.total_wins || 0).toLocaleString()} G`;
                         
-                        // Message gain/perte du jour (basé sur sales_today et total_wins du jour, mais ici on utilise balance_all)
+                        const netResult = stats.net_result || 0;
+                        const balanceEl = document.getElementById('balance-today');
+                        balanceEl.innerHTML = `${Math.abs(netResult).toLocaleString()} G`;
+                        
+                        // Message gain/perte du jour
                         const messageDiv = document.getElementById('daily-profit-message');
                         if (netResult > 0) {
                             balanceEl.style.color = '#00f190';
-                            balanceEl.innerHTML += ' 📈 (Gain)';
                             messageDiv.style.backgroundColor = 'rgba(0, 241, 144, 0.2)';
                             messageDiv.style.border = '1px solid #00f190';
                             messageDiv.style.color = '#00f190';
-                            messageDiv.innerHTML = 'resultat à jour!';
+                            messageDiv.innerHTML = '📈 Bénéfice aujourd\'hui !';
                             messageDiv.style.display = 'block';
                         } else if (netResult < 0) {
                             balanceEl.style.color = '#ff4d4d';
-                            balanceEl.innerHTML += ' 📉 (Perte)';
                             messageDiv.style.backgroundColor = 'rgba(255, 77, 77, 0.2)';
                             messageDiv.style.border = '1px solid #ff4d4d';
                             messageDiv.style.color = '#ff4d4d';
-                            messageDiv.innerHTML = 'resultat à jour!';
+                            messageDiv.innerHTML = '📉 Perte aujourd\'hui !';
                             messageDiv.style.display = 'block';
                         } else {
                             balanceEl.style.color = '#ffffff';
-                            balanceEl.innerHTML += ' ⚖️ (Équilibre)';
                             messageDiv.style.display = 'none';
                         }
                     } else {
-                        console.warn('global_stats manquant dans la réponse');
-                        document.getElementById('total-tickets-all').innerHTML = '0';
-                        document.getElementById('total-winning-tickets-all').innerHTML = '0 G';
-                        document.getElementById('balance-all').innerHTML = '0 G';
+                        console.warn('Impossible de récupérer les statistiques du jour');
+                        document.getElementById('sales-today').innerHTML = '0 G';
+                        document.getElementById('total-tickets-today').innerHTML = '0';
+                        document.getElementById('total-wins-today').innerHTML = '0 G';
+                        document.getElementById('balance-today').innerHTML = '0 G';
                     }
 
                     // Progression des limites
@@ -879,6 +885,7 @@
                 } catch (e) { console.error(e); }
             }
 
+            // ---------- PUBLICATION RÉSULTATS MODIFIÉE ----------
             async function publishManual() {
                 const token = localStorage.getItem('auth_token');
                 const drawId = document.getElementById('draw-select').value;
@@ -898,7 +905,15 @@
                         body: JSON.stringify({ drawId, numbers, lotto3 })
                     });
                     const result = await res.json();
-                    showMessage('publish-message', result.success ? '✅ Résultats publiés' : '❌ Erreur', result.success);
+                    if (result.success) {
+                        showMessage('publish-message', '✅ Résultats publiés - Nouveau bilan disponible', true);
+                        // Recharger le tableau de bord si on est sur l'onglet dashboard
+                        if (document.getElementById('tab-dashboard').classList.contains('active')) {
+                            loadDashboard();
+                        }
+                    } else {
+                        showMessage('publish-message', '❌ Erreur', false);
+                    }
                 } catch (e) { showMessage('publish-message', '❌ Erreur', false); }
             }
 
