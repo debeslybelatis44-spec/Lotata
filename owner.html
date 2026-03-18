@@ -248,6 +248,12 @@
                 <button class="btn-danger" onclick="toggleDrawBlock(true)">Bloquer</button>
                 <button class="btn-primary" onclick="toggleDrawBlock(false)">Débloquer</button>
             </div>
+
+            <!-- Section des résultats récents (ajoutée) -->
+            <div class="section-title"><i class="fas fa-history"></i> Résultats récents</div>
+            <div id="recent-results-container" class="list-container" style="max-height:300px; overflow-y:auto;">
+                <p>Chargement...</p>
+            </div>
         </div>
 
         <!-- ========== BOULES & LIMITES ========== -->
@@ -581,7 +587,10 @@
                 
                 if (tabId === 'dashboard') loadDashboard();
                 if (tabId === 'users') loadUsersLists();
-                if (tabId === 'draws') loadDraws();
+                if (tabId === 'draws') {
+                    loadDraws();
+                    loadRecentResults(); // Charger les résultats récents
+                }
                 if (tabId === 'numbers') {
                     loadBlockedNumbers();
                     loadDrawsForSelects();
@@ -615,7 +624,6 @@
             async function loadDashboard() {
                 const token = localStorage.getItem('auth_token');
                 try {
-                    // Charger les données du dashboard
                     const res = await fetch(`${API_URL}/api/owner/dashboard`, {
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
@@ -626,7 +634,6 @@
                     const data = await res.json();
                     console.log('Dashboard data:', data);
 
-                    // Mise à jour des connectés
                     document.getElementById('connected-sup-count').innerText = data.connected.supervisors_count;
                     document.getElementById('connected-agent-count').innerText = data.connected.agents_count;
                     
@@ -638,7 +645,6 @@
                     data.connected.agents.forEach(a => agentList += `<div>👤 ${a.name} (${a.username || a.email})</div>`);
                     document.getElementById('connected-agent-list').innerHTML = agentList || '<span style="opacity:0.7;">Aucun agent connecté</span>';
 
-                    // Récupérer les statistiques du jour via l'API reports
                     const reportRes = await fetch(`${API_URL}/api/owner/reports?period=today`, {
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
@@ -647,7 +653,6 @@
                         const reportData = await reportRes.json();
                         const stats = reportData.summary || {};
                         
-                        // Mettre à jour les statistiques du jour
                         document.getElementById('sales-today').innerHTML = `${(stats.total_bets || 0).toLocaleString()} G`;
                         document.getElementById('total-tickets-today').innerHTML = (stats.total_tickets || 0).toLocaleString();
                         document.getElementById('total-wins-today').innerHTML = `${(stats.total_wins || 0).toLocaleString()} G`;
@@ -656,7 +661,6 @@
                         const balanceEl = document.getElementById('balance-today');
                         balanceEl.innerHTML = `${Math.abs(netResult).toLocaleString()} G`;
                         
-                        // Message gain/perte du jour
                         const messageDiv = document.getElementById('daily-profit-message');
                         if (netResult > 0) {
                             balanceEl.style.color = '#00f190';
@@ -684,7 +688,6 @@
                         document.getElementById('balance-today').innerHTML = '0 G';
                     }
 
-                    // Progression des limites
                     let limitsHtml = '';
                     if (data.limits_progress.length === 0) {
                         limitsHtml = '<p>Aucune limite définie</p>';
@@ -708,7 +711,6 @@
                     }
                     document.getElementById('limits-progress-container').innerHTML = limitsHtml;
 
-                    // Agents avec gains/pertes
                     let agentsHtml = '';
                     if (data.agents_gain_loss.length === 0) {
                         agentsHtml = '<p>Aucun agent avec gain/perte aujourd\'hui</p>';
@@ -907,14 +909,14 @@
                     const result = await res.json();
                     if (result.success) {
                         showMessage('publish-message', '✅ Résultats publiés - Nouveau bilan disponible', true);
-                        // Recharger le tableau de bord si on est sur l'onglet dashboard
+                        loadRecentResults(); // Rafraîchir la liste des résultats récents
                         if (document.getElementById('tab-dashboard').classList.contains('active')) {
                             loadDashboard();
                         }
                     } else {
-                        showMessage('publish-message', '❌ Erreur', false);
+                        showMessage('publish-message', '❌ Erreur: ' + (result.error || 'Erreur inconnue'), false);
                     }
-                } catch (e) { showMessage('publish-message', '❌ Erreur', false); }
+                } catch (e) { showMessage('publish-message', '❌ Erreur réseau', false); }
             }
 
             async function toggleDrawBlock(block) {
@@ -936,9 +938,15 @@
                 const res = await fetch(`${API_URL}/api/owner/draws`, { headers: { 'Authorization': `Bearer ${token}` } });
                 const draws = await res.json();
                 let opts = '<option value="">Sélectionnez un tirage</option>';
+                // Ajout de l'option globale pour les limites
+                opts += '<option value="0">🌍 Tous les tirages (limite globale)</option>';
                 draws.forEach(d => { opts += `<option value="${d.id}">${d.name}</option>`; });
                 document.getElementById('limit-draw').innerHTML = opts;
-                document.getElementById('block-draw-select').innerHTML = opts;
+                
+                // Pour le sélecteur de blocage (pas d'option globale)
+                let blockOpts = '<option value="">Sélectionnez un tirage</option>';
+                draws.forEach(d => { blockOpts += `<option value="${d.id}">${d.name}</option>`; });
+                document.getElementById('block-draw-select').innerHTML = blockOpts;
             }
 
             async function loadBlockedNumbers() {
@@ -1506,6 +1514,44 @@
                 loadTickets();
             }
 
+            // ---------- RÉSULTATS RÉCENTS ----------
+            async function loadRecentResults() {
+                const token = localStorage.getItem('auth_token');
+                try {
+                    const res = await fetch(`${API_URL}/api/owner/recent-results`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (!res.ok) throw new Error('Erreur chargement');
+                    const results = await res.json();
+                    let html = '';
+                    if (results.length === 0) {
+                        html = '<p>Aucun résultat publié récemment.</p>';
+                    } else {
+                        html = '<table><thead><tr><th>Date</th><th>Tirage</th><th>Lotto 3</th><th>1er lot</th><th>2e lot</th><th>3e lot</th></tr></thead><tbody>';
+                        results.forEach(r => {
+                            const date = new Date(r.published_at).toLocaleDateString();
+                            const numbers = r.results || [];
+                            const premier = numbers[0] || '';
+                            const deux = numbers[1] || '';
+                            const trois = numbers[2] || '';
+                            html += `<tr>
+                                <td>${date}</td>
+                                <td>${r.name}</td>
+                                <td>${r.lotto3 || ''}</td>
+                                <td>${premier}</td>
+                                <td>${deux}</td>
+                                <td>${trois}</td>
+                            </tr>`;
+                        });
+                        html += '</tbody></table>';
+                    }
+                    document.getElementById('recent-results-container').innerHTML = html;
+                } catch (e) {
+                    console.error(e);
+                    document.getElementById('recent-results-container').innerHTML = '<p class="loss">Erreur de chargement</p>';
+                }
+            }
+
             // ---------- CONFIGURATION ----------
             async function loadSettings() {
                 const token = localStorage.getItem('auth_token');
@@ -1630,6 +1676,7 @@
                 loadDashboard();
                 loadUsersLists();
                 loadDraws();
+                loadRecentResults(); // Charger les résultats récents
                 loadBlockedNumbers();
                 loadDrawsForSelects();
                 loadSupervisorsAndAgents();
