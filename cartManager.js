@@ -352,7 +352,17 @@ async function processFinalTicket() {
                 body: JSON.stringify(payload)
             });
 
-            if (!res.ok) throw new Error("Erreur serveur");
+            if (!res.ok) {
+  let errorMsg = "Erreur serveur";
+  try {
+    const errorData = await res.json();
+    errorMsg = errorData.error || errorMsg;
+  } catch (e) {
+    // Si la réponse n'est pas du JSON, on prend le texte brut
+    errorMsg = await res.text() || errorMsg;
+  }
+  throw new Error(errorMsg);
+}
 
             const data = await res.json();
             printThermalTicket(data.ticket, printWindow);
