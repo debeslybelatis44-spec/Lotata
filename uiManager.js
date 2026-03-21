@@ -1390,3 +1390,4 @@ window.loadDrawReport = loadDrawReport;
 window.logout = logout;
 window.reprintTicket = reprintTicket;
 window.replayTicket = replayTicket;
+window.showWinnerDetails = showWinnerDetails;
