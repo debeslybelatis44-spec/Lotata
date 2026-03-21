@@ -314,40 +314,78 @@ app.post('/api/tickets/save', async (req, res) => {
     const blockedLotto3Res = await pool.query('SELECT number FROM blocked_lotto3_numbers');
     const blockedLotto3Set = new Set(blockedLotto3Res.rows.map(r => r.number));
 
+    // ===== RÉCUPÉRATION DES LIMITES PAR NUMÉRO =====
     const limits = await pool.query('SELECT number, limit_amount FROM draw_number_limits WHERE draw_id = $1', [drawId]);
     const limitsMap = new Map(limits.rows.map(r => [r.number, parseFloat(r.limit_amount)]));
 
+    // ===== COLLECTE DES NUMÉROS AYANT UNE LIMITE =====
+    const numbersWithLimits = new Set();
+    for (const bet of bets) {
+      const cleanNumber = bet.cleanNumber || (bet.number ? bet.number.replace(/[^0-9]/g, '') : '');
+      if (cleanNumber && limitsMap.has(cleanNumber)) {
+        numbersWithLimits.add(cleanNumber);
+      }
+    }
+
+    // ===== RÉCUPÉRATION DES TOTAUX DÉJÀ JOUÉS AUJOURD'HUI POUR CES NUMÉROS =====
+    const currentTotals = new Map();
+    if (numbersWithLimits.size > 0) {
+      const todayBetsResult = await pool.query(
+        `SELECT bet->>'cleanNumber' as number, SUM((bet->>'amount')::numeric) as total
+         FROM tickets, jsonb_array_elements(bets::jsonb) as bet
+         WHERE draw_id = $1 AND DATE(date) = CURRENT_DATE AND bet->>'cleanNumber' = ANY($2)
+         GROUP BY bet->>'cleanNumber'`,
+        [drawId, Array.from(numbersWithLimits)]
+      );
+      for (const row of todayBetsResult.rows) {
+        currentTotals.set(row.number, parseFloat(row.total) || 0);
+      }
+    }
+
+    // ===== VÉRIFICATION DES BLOCAGES ET DES LIMITES =====
+    const exceeded = [];
     for (const bet of bets) {
       const cleanNumber = bet.cleanNumber || (bet.number ? bet.number.replace(/[^0-9]/g, '') : '');
       if (!cleanNumber) continue;
 
+      // Vérification blocage global
       if (globalBlockedSet.has(cleanNumber)) {
         return res.status(403).json({ error: `Numéro ${cleanNumber} est bloqué globalement` });
       }
+      // Vérification blocage pour ce tirage
       if (drawBlockedSet.has(cleanNumber)) {
         return res.status(403).json({ error: `Numéro ${cleanNumber} est bloqué pour ce tirage` });
       }
-
-      // === AJOUT LOTTO3 BLOQUÉ ===
+      // Vérification lotto3 bloqué
       const game = bet.game || bet.specialType;
       if ((game === 'lotto3' || game === 'auto_lotto3') && cleanNumber.length === 3 && blockedLotto3Set.has(cleanNumber)) {
         return res.status(403).json({ error: `Numéro Lotto3 ${cleanNumber} est bloqué globalement` });
       }
 
-      if (limitsMap.has(cleanNumber)) {
-        const limit = limitsMap.get(cleanNumber);
-        const todayBetsResult = await pool.query(
-          `SELECT SUM((bets->>'amount')::numeric) as total
-           FROM tickets, jsonb_array_elements(bets::jsonb) as bet
-           WHERE draw_id = $1 AND DATE(date) = CURRENT_DATE AND bet->>'cleanNumber' = $2`,
-          [drawId, cleanNumber]
-        );
-        const currentTotal = parseFloat(todayBetsResult.rows[0]?.total) || 0;
+      // Vérification de la limite (uniquement si la mise n'est pas gratuite)
+      const limit = limitsMap.get(cleanNumber);
+      if (limit && limit > 0 && !bet.free) {
+        const currentTotal = currentTotals.get(cleanNumber) || 0;
         const betAmount = parseFloat(bet.amount) || 0;
         if (currentTotal + betAmount > limit) {
-          return res.status(403).json({ error: `Limite de mise pour le numéro ${cleanNumber} dépassée (max ${limit} Gdes)` });
+          exceeded.push({
+            number: cleanNumber,
+            limit: limit,
+            already: currentTotal,
+            requested: betAmount,
+            remaining: limit - currentTotal
+          });
         }
       }
+    }
+
+    // ===== SI DES LIMITES SONT DÉPASSÉES, ON RENVOIE UNE ERREUR DÉTAILLÉE =====
+    if (exceeded.length > 0) {
+      const message = exceeded.map(e => `Numéro ${e.number} : limite atteinte, reste ${e.remaining} G maximum.`).join('\n');
+      return res.status(403).json({
+        error: `Limite dépassée.\n${message}`,
+        limitExceeded: exceeded
+      });
     }
 
     const configResult = await pool.query('SELECT game_limits FROM lottery_config LIMIT 1');

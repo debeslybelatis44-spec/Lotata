@@ -342,43 +342,27 @@ async function processFinalTicket() {
                 bets,
                 total
             };
-
             const res = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.SAVE_TICKET}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-                },
-                body: JSON.stringify(payload)
-            });
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+    },
+    body: JSON.stringify(payload)
+});
 
-            if (!res.ok) {
-  let errorMsg = "Erreur serveur";
-  try {
-    const errorData = await res.json();
-    errorMsg = errorData.error || errorMsg;
-  } catch (e) {
-    // Si la réponse n'est pas du JSON, on prend le texte brut
-    errorMsg = await res.text() || errorMsg;
-  }
-  throw new Error(errorMsg);
-}
+const data = await res.json();
 
-            const data = await res.json();
-            printThermalTicket(data.ticket, printWindow);
-            APP_STATE.ticketsHistory.unshift(data.ticket);
-        }
-
-        APP_STATE.currentCart = [];
-        CartManager.renderCart();
-        alert("✅ Tikè sove & enprime");
-
-    } catch (err) {
-        console.error(err);
-        alert("❌ Erè pandan enpresyon");
-        printWindow.close();
+if (!res.ok) {
+    let errorMsg = data.error || "Erreur serveur";
+    if (data.limitExceeded && data.limitExceeded.length) {
+        errorMsg += "\n\n" + data.limitExceeded.map(e => `- ${e.number} : reste ${e.remaining} G`).join("\n");
     }
+    throw new Error(errorMsg);
 }
+
+printThermalTicket(data.ticket, printWindow);
+APP_STATE.ticketsHistory.unshift(data.ticket);
 
 // ---------- PRINT ----------
 function printThermalTicket(ticket, printWindow) {

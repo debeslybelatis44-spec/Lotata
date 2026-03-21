@@ -512,6 +512,16 @@ input:focus { border-color: var(--secondary); background: rgba(0,0,0,0.4); }
     font-weight: bold;
     flex: 1;
 }
+.btn-details {
+    background: #2196f3;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    margin-right: 5px;
+}
 
 .empty-msg {
     text-align: center;
