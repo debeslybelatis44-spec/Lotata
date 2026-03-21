@@ -352,9 +352,16 @@ async function processFinalTicket() {
                 body: JSON.stringify(payload)
             });
 
-            if (!res.ok) throw new Error("Erreur serveur");
-
             const data = await res.json();
+
+            if (!res.ok) {
+                let errorMsg = data.error || "Erreur serveur";
+                if (data.limitExceeded && data.limitExceeded.length) {
+                    errorMsg += "\n\n" + data.limitExceeded.map(e => `- ${e.number} : reste ${e.remaining} G`).join("\n");
+                }
+                throw new Error(errorMsg);
+            }
+
             printThermalTicket(data.ticket, printWindow);
             APP_STATE.ticketsHistory.unshift(data.ticket);
         }
@@ -362,10 +369,11 @@ async function processFinalTicket() {
         APP_STATE.currentCart = [];
         CartManager.renderCart();
         alert("✅ Tikè sove & enprime");
+        printWindow.close();
 
     } catch (err) {
         console.error(err);
-        alert("❌ Erè pandan enpresyon");
+        alert("❌ " + err.message);
         printWindow.close();
     }
 }
