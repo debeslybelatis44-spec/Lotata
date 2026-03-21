@@ -49,10 +49,10 @@ pool.on('error', (err) => console.error('❌ Erreur PostgreSQL:', err));
 require('moment-timezone'); // étend moment pour supporter les fuseaux
 const pg = require('pg');
 pg.types.setTypeParser(1114, (stringValue) => {
-  // stringValue est au format 'YYYY-MM-DD HH:MM:SS'
   return moment.tz(stringValue, 'YYYY-MM-DD HH:mm:ss', 'America/Port-au-Prince').toDate();
 });
 // ===== FIN DE L'AJOUT =====
+
 // ==================== Utilitaires ====================
 async function columnExists(table, column) {
   const res = await pool.query(`
@@ -79,6 +79,16 @@ async function initializeDatabase() {
     await addColumnIfNotExists('lottery_config', 'multipliers', 'JSONB');
     await addColumnIfNotExists('lottery_config', 'game_limits', 'JSONB');
     await addColumnIfNotExists('draw_results', 'lotto3', 'VARCHAR(3)');
+
+    // === AJOUT LOTTO3 BLOQUÉ ===
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS blocked_lotto3_numbers (
+        number VARCHAR(3) PRIMARY KEY,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    console.log('✅ Table blocked_lotto3_numbers prête');
+
     console.log('✅ Base de données prête');
   } catch (error) {
     console.error('❌ Erreur initialisation:', error);
@@ -289,41 +299,43 @@ app.post('/api/tickets/save', async (req, res) => {
       return res.status(403).json({ error: 'Vous ne pouvez enregistrer que vos propres tickets' });
     }
 
-    // Vérifier que le tirage est actif
     const drawCheck = await pool.query('SELECT active FROM draws WHERE id = $1', [drawId]);
     if (drawCheck.rows.length === 0 || !drawCheck.rows[0].active) {
       return res.status(403).json({ error: 'Tirage bloqué ou inexistant' });
     }
 
-    // Récupérer les blocages globaux
     const globalBlocked = await pool.query('SELECT number FROM blocked_numbers');
     const globalBlockedSet = new Set(globalBlocked.rows.map(r => r.number));
 
-    // Récupérer les blocages par tirage
     const drawBlocked = await pool.query('SELECT number FROM draw_blocked_numbers WHERE draw_id = $1', [drawId]);
     const drawBlockedSet = new Set(drawBlocked.rows.map(r => r.number));
 
-    // Récupérer les limites
+    // === AJOUT LOTTO3 BLOQUÉ ===
+    const blockedLotto3Res = await pool.query('SELECT number FROM blocked_lotto3_numbers');
+    const blockedLotto3Set = new Set(blockedLotto3Res.rows.map(r => r.number));
+
     const limits = await pool.query('SELECT number, limit_amount FROM draw_number_limits WHERE draw_id = $1', [drawId]);
     const limitsMap = new Map(limits.rows.map(r => [r.number, parseFloat(r.limit_amount)]));
 
-    // Vérifier chaque pari
     for (const bet of bets) {
       const cleanNumber = bet.cleanNumber || (bet.number ? bet.number.replace(/[^0-9]/g, '') : '');
       if (!cleanNumber) continue;
 
-      // Blocage global
       if (globalBlockedSet.has(cleanNumber)) {
         return res.status(403).json({ error: `Numéro ${cleanNumber} est bloqué globalement` });
       }
-      // Blocage par tirage
       if (drawBlockedSet.has(cleanNumber)) {
         return res.status(403).json({ error: `Numéro ${cleanNumber} est bloqué pour ce tirage` });
       }
-      // Limite de mise
+
+      // === AJOUT LOTTO3 BLOQUÉ ===
+      const game = bet.game || bet.specialType;
+      if ((game === 'lotto3' || game === 'auto_lotto3') && cleanNumber.length === 3 && blockedLotto3Set.has(cleanNumber)) {
+        return res.status(403).json({ error: `Numéro Lotto3 ${cleanNumber} est bloqué globalement` });
+      }
+
       if (limitsMap.has(cleanNumber)) {
         const limit = limitsMap.get(cleanNumber);
-        // Calculer le total déjà mis aujourd'hui sur ce numéro
         const todayBetsResult = await pool.query(
           `SELECT SUM((bets->>'amount')::numeric) as total
            FROM tickets, jsonb_array_elements(bets::jsonb) as bet
@@ -338,14 +350,12 @@ app.post('/api/tickets/save', async (req, res) => {
       }
     }
 
-    // Vérification des limites par type de jeu (avec fallback si config absente)
     const configResult = await pool.query('SELECT game_limits FROM lottery_config LIMIT 1');
     let gameLimits = {};
     if (configResult.rows.length > 0 && configResult.rows[0].game_limits) {
       const raw = configResult.rows[0].game_limits;
       gameLimits = typeof raw === 'string' ? JSON.parse(raw) : raw;
     } else {
-      // valeurs par défaut
       gameLimits = { lotto3: 0, lotto4: 0, lotto5: 0 };
     }
 
@@ -371,7 +381,6 @@ app.post('/api/tickets/save', async (req, res) => {
       }
     }
 
-    // Gestion des mariages gratuits (identique au court)
     const paidBets = bets.filter(b => !b.free);
     const totalPaid = paidBets.reduce((sum, b) => sum + (parseFloat(b.amount) || 0), 0);
 
@@ -961,7 +970,6 @@ ownerRouter.get('/dashboard', async (req, res) => {
        ORDER BY net_result DESC`
     );
 
-    // Statistiques globales : somme des gains, pas le nombre
     const globalStats = await pool.query(`
       SELECT
         COUNT(*)::integer AS total_tickets_all,
@@ -1131,7 +1139,6 @@ ownerRouter.post('/publish-results', async (req, res) => {
 
     await pool.query('UPDATE draws SET last_draw = NOW() WHERE id = $1', [drawId]);
 
-    // Calcul automatique des gagnants (simplifié)
     const lot1 = numbers[0];
     const lot2 = numbers[1];
     const lot3 = numbers[2];
@@ -1154,9 +1161,11 @@ ownerRouter.post('/publish-results', async (req, res) => {
 
           if (game === 'borlette' || game === 'BO' || (game && game.startsWith('n'))) {
             if (cleanNumber.length === 2) {
-              if (cleanNumber === lot2) gain = amount * 20;
-              else if (cleanNumber === lot3) gain = amount * 10;
-              else if (cleanNumber === lot1) gain = amount * 60;
+              let totalGain = 0;
+              if (cleanNumber === lot1) totalGain += amount * 60;
+              if (cleanNumber === lot2) totalGain += amount * 20;
+              if (cleanNumber === lot3) totalGain += amount * 10;
+              gain = totalGain;
             }
           }
           else if (game === 'lotto3') {
@@ -1291,6 +1300,45 @@ ownerRouter.post('/unblock-number-draw', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('❌ Erreur déblocage numéro par tirage:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// === AJOUT LOTTO3 BLOQUÉ : Routes pour gérer les Lotto3 bloqués ===
+ownerRouter.get('/blocked-lotto3', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT number FROM blocked_lotto3_numbers ORDER BY number');
+    res.json({ blockedNumbers: result.rows.map(r => r.number) });
+  } catch (error) {
+    console.error('❌ Erreur récupération lotto3 bloqués:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+ownerRouter.post('/block-lotto3', async (req, res) => {
+  try {
+    const { number } = req.body;
+    if (!number || number.length !== 3 || !/^\d{3}$/.test(number)) {
+      return res.status(400).json({ error: 'Numéro lotto3 invalide (3 chiffres requis)' });
+    }
+    await pool.query(
+      'INSERT INTO blocked_lotto3_numbers (number) VALUES ($1) ON CONFLICT DO NOTHING',
+      [number]
+    );
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Erreur blocage lotto3:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+ownerRouter.post('/unblock-lotto3', async (req, res) => {
+  try {
+    const { number } = req.body;
+    await pool.query('DELETE FROM blocked_lotto3_numbers WHERE number = $1', [number]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Erreur déblocage lotto3:', error);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -1744,13 +1792,11 @@ superadminRouter.use(authorize('superadmin'));
 // Liste des propriétaires (adaptée à la structure existante)
 superadminRouter.get('/owners', async (req, res) => {
   try {
-    // Si la colonne role existe, on filtre, sinon on renvoie tous les superviseurs actifs
     const roleExists = await columnExists('supervisors', 'role');
     let query;
     if (roleExists) {
       query = `SELECT id, name, email, phone, active FROM supervisors WHERE role = 'owner' ORDER BY name`;
     } else {
-      // Par défaut, on considère que tous les superviseurs sont des propriétaires potentiels
       query = `SELECT id, name, email, phone, active FROM supervisors ORDER BY name`;
     }
     const result = await pool.query(query);
@@ -1769,7 +1815,6 @@ superadminRouter.post('/owners', async (req, res) => {
       return res.status(400).json({ error: 'Nom, email et mot de passe requis' });
     }
     const hashedPassword = await bcrypt.hash(password, 10);
-    // On insère avec role='owner' si la colonne existe, sinon sans
     const roleExists = await columnExists('supervisors', 'role');
     if (roleExists) {
       await pool.query(
@@ -1793,7 +1838,7 @@ superadminRouter.post('/owners', async (req, res) => {
 superadminRouter.put('/owners/:id/block', async (req, res) => {
   try {
     const { id } = req.params;
-    const { block } = req.body; // block = true pour bloquer, false pour débloquer
+    const { block } = req.body;
     await pool.query('UPDATE supervisors SET active = $1 WHERE id = $2', [!block, id]);
     res.json({ success: true });
   } catch (error) {
@@ -1876,7 +1921,6 @@ superadminRouter.post('/messages', async (req, res) => {
     if (!ownerId || !message) {
       return res.status(400).json({ error: 'ownerId et message requis' });
     }
-    // Vérifier si la table owner_messages existe, sinon la créer
     const tableExists = await pool.query(`
       SELECT EXISTS (
         SELECT FROM information_schema.tables WHERE table_name = 'owner_messages'
