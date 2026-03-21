@@ -342,27 +342,33 @@ async function processFinalTicket() {
                 bets,
                 total
             };
+
             const res = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.SAVE_TICKET}`, {
-    method: 'POST',
-    headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-    },
-    body: JSON.stringify(payload)
-});
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+                },
+                body: JSON.stringify(payload)
+            });
 
-const data = await res.json();
+            if (!res.ok) throw new Error("Erreur serveur");
 
-if (!res.ok) {
-    let errorMsg = data.error || "Erreur serveur";
-    if (data.limitExceeded && data.limitExceeded.length) {
-        errorMsg += "\n\n" + data.limitExceeded.map(e => `- ${e.number} : reste ${e.remaining} G`).join("\n");
+            const data = await res.json();
+            printThermalTicket(data.ticket, printWindow);
+            APP_STATE.ticketsHistory.unshift(data.ticket);
+        }
+
+        APP_STATE.currentCart = [];
+        CartManager.renderCart();
+        alert("✅ Tikè sove & enprime");
+
+    } catch (err) {
+        console.error(err);
+        alert("❌ Erè pandan enpresyon");
+        printWindow.close();
     }
-    throw new Error(errorMsg);
 }
-
-printThermalTicket(data.ticket, printWindow);
-APP_STATE.ticketsHistory.unshift(data.ticket);
 
 // ---------- PRINT ----------
 function printThermalTicket(ticket, printWindow) {
