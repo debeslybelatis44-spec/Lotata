@@ -1171,17 +1171,158 @@ function showWinnerDetails(ticketId) {
         return;
     }
 
-    // Récupérer win_details (peut être sous forme de chaîne JSON)
-    let winDetails = ticket.win_details;
-    if (typeof winDetails === 'string') {
-        try {
-            winDetails = JSON.parse(winDetails);
-        } catch(e) {
-            winDetails = null;
+    // Récupérer les résultats du tirage correspondant
+    const drawResults = APP_STATE.winningResults.find(r => 
+        r.draw_id == (ticket.draw_id || ticket.drawId)
+    );
+
+    if (!drawResults || !drawResults.numbers) {
+        alert("Rezilta tiraj pa disponib pou kalkil detay.");
+        return;
+    }
+
+    const numbers = drawResults.numbers; // [lot1, lot2, lot3]
+    const lot1 = numbers[0];
+    const lot2 = numbers[1];
+    const lot3 = numbers[2];
+    const lotto3Result = drawResults.lotto3 || '';
+
+    // Récupérer les paris
+    let bets = ticket.bets;
+    if (typeof bets === 'string') {
+        try { bets = JSON.parse(bets); } catch(e) { bets = []; }
+    }
+    if (!Array.isArray(bets)) bets = [];
+
+    // Fonction utilitaire pour nettoyer un numéro
+    function cleanNumber(str) {
+        return str ? str.replace(/[^0-9]/g, '') : '';
+    }
+
+    // Stocker les gains détaillés
+    const winDetails = [];
+
+    for (const bet of bets) {
+        const game = (bet.game || bet.specialType || '').toLowerCase();
+        const rawNumber = bet.number || bet.numero || '';
+        const clean = cleanNumber(rawNumber);
+        const amount = parseFloat(bet.amount) || 0;
+        if (amount === 0) continue; // ignorer les paris gratuits ou nuls
+
+        let gain = 0;
+        let prizeLevel = null;
+        let reason = '';
+
+        // Borlette
+        if (game === 'borlette' || game === 'bo' || (game && game.startsWith('n'))) {
+            if (clean.length === 2) {
+                if (clean === lot1) {
+                    gain = amount * 60;
+                    prizeLevel = 1;
+                    reason = '1e lot';
+                } else if (clean === lot2) {
+                    gain = amount * 20;
+                    prizeLevel = 2;
+                    reason = '2e lot';
+                } else if (clean === lot3) {
+                    gain = amount * 10;
+                    prizeLevel = 3;
+                    reason = '3e lot';
+                }
+                if (gain > 0) {
+                    winDetails.push({
+                        game: 'BOR',
+                        number: rawNumber,
+                        gain: gain,
+                        prizeLevel: prizeLevel,
+                        reason: reason
+                    });
+                }
+            }
+        }
+        // Mariage
+        else if (game === 'mariage' || game === 'auto_marriage') {
+            if (clean.length === 4) {
+                const firstPair = clean.slice(0,2);
+                const secondPair = clean.slice(2,4);
+                const pairs = [lot1, lot2, lot3];
+                let win = false;
+                for (let i=0; i<3; i++) {
+                    for (let j=0; j<3; j++) {
+                        if (i !== j && firstPair === pairs[i] && secondPair === pairs[j]) {
+                            win = true;
+                            break;
+                        }
+                    }
+                    if (win) break;
+                }
+                if (win) {
+                    gain = amount * 1000;
+                    reason = 'Mariage ganyen';
+                    winDetails.push({
+                        game: 'MARIAGE',
+                        number: rawNumber,
+                        gain: gain,
+                        reason: reason
+                    });
+                }
+            }
+        }
+        // Lotto3
+        else if (game === 'lotto3' || game === 'auto_lotto3') {
+            if (clean.length === 3 && clean === lotto3Result) {
+                gain = amount * 500;
+                reason = 'Lotto3 ganyen';
+                winDetails.push({
+                    game: 'LOTTO3',
+                    number: rawNumber,
+                    gain: gain,
+                    reason: reason
+                });
+            }
+        }
+        // Lotto4
+        else if (game === 'lotto4' || game === 'auto_lotto4') {
+            if (clean.length === 4 && bet.option) {
+                const opt = parseInt(bet.option);
+                let expected = '';
+                if (opt === 1) expected = lot1 + lot2;
+                else if (opt === 2) expected = lot2 + lot3;
+                else if (opt === 3) expected = lot1 + lot3;
+                if (clean === expected) {
+                    gain = amount * 5000;
+                    reason = `Lotto4 opsyon ${opt}`;
+                    winDetails.push({
+                        game: 'LOTTO4',
+                        number: rawNumber,
+                        gain: gain,
+                        reason: reason
+                    });
+                }
+            }
+        }
+        // Lotto5
+        else if (game === 'lotto5' || game === 'auto_lotto5') {
+            if (clean.length === 5 && bet.option) {
+                const opt = parseInt(bet.option);
+                let expected = '';
+                if (opt === 1) expected = lotto3Result + lot2;
+                else if (opt === 2) expected = lotto3Result + lot3;
+                if (clean === expected) {
+                    gain = amount * 5000;
+                    reason = `Lotto5 opsyon ${opt}`;
+                    winDetails.push({
+                        game: 'LOTTO5',
+                        number: rawNumber,
+                        gain: gain,
+                        reason: reason
+                    });
+                }
+            }
         }
     }
 
-    if (!winDetails || winDetails.length === 0) {
+    if (winDetails.length === 0) {
         alert("Pa gen detay ganyen pou tikè sa a.");
         return;
     }
@@ -1212,32 +1353,20 @@ function showWinnerDetails(ticketId) {
         border: 2px solid var(--primary);
     `;
 
-    // Générer le contenu détaillé
     let detailsHtml = `<h3>Detay Ganyen Tikè #${ticket.ticket_id || ticket.id}</h3>`;
     detailsHtml += `<ul style="list-style: none; padding: 0;">`;
     
     winDetails.forEach(detail => {
-        const gain = detail.gain || 0;
-        const number = detail.number || detail.numero || '';
-        const game = detail.gameAbbr || detail.game || 'BOR';
-        
-        // Déterminer le type de lot
-        let lotText = '';
-        if (detail.prizeLevel !== undefined) {
-            lotText = `${detail.prizeLevel}e lot`;
-        } else if (detail.lot) {
-            lotText = `${detail.lot}e lot`;
-        } else if (detail.rank) {
-            lotText = `${detail.rank}e lot`;
-        } else if (detail.reason) {
-            lotText = detail.reason;
-        }
+        const gain = detail.gain;
+        const number = detail.number;
+        const game = detail.game;
+        const reason = detail.reason || '';
         
         detailsHtml += `
             <li style="margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 8px;">
                 <strong>${game}</strong> ${number} : 
                 <span style="color: var(--success); font-weight: bold;">${gain} Gdes</span>
-                ${lotText ? `<br><span style="font-size: 0.85rem;">${lotText} nan ${number}</span>` : ''}
+                ${reason ? `<br><span style="font-size: 0.85rem;">${reason} nan ${number}</span>` : ''}
             </li>
         `;
     });
@@ -1257,7 +1386,6 @@ function showWinnerDetails(ticketId) {
     modal.appendChild(modalContent);
     document.body.appendChild(modal);
 }
-
 function viewTicketDetails(ticketId) {
     const ticket = APP_STATE.ticketsHistory.find(t => 
         t.id === ticketId || t.ticket_id === ticketId
