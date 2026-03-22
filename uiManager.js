@@ -1378,6 +1378,119 @@ function logout() {
         window.location.href = 'index.html';
     });
 }
+// ========== AJOUT POUR LE BOUTON DETAY ==========
+(function() {
+    // Définir showWinnerDetails si elle n'existe pas
+    if (typeof window.showWinnerDetails !== 'function') {
+        window.showWinnerDetails = function(winDetails, ticketId) {
+            if (!winDetails || winDetails.length === 0) {
+                alert("Pa gen detay pou tikè sa a.");
+                return;
+            }
+            const modal = document.getElementById('winner-overlay');
+            const detailsDiv = document.getElementById('winner-details');
+            if (!modal || !detailsDiv) return;
+            const title = modal.querySelector('h2');
+            if (title) title.innerText = `Detay Tikè #${ticketId}`;
+            let html = '<ul style="list-style: none; padding: 0; text-align: left;">';
+            winDetails.forEach(d => {
+                let gameAbbr = d.gameAbbr || d.game;
+                if (typeof getGameAbbreviation === 'function') {
+                    gameAbbr = getGameAbbreviation(d.game, d);
+                }
+                html += `<li style="margin-bottom: 8px;">${gameAbbr} ${d.number} : +${d.gain} G (${d.reason})</li>`;
+            });
+            html += '</ul>';
+            detailsDiv.innerHTML = html;
+            modal.style.display = 'flex';
+        };
+    }
+
+    // Sauvegarder l'ancienne fonction si elle existe
+    const originalUpdateWinnersDisplay = window.updateWinnersDisplay;
+
+    // Nouvelle fonction qui ajoute le bouton Detay
+    window.updateWinnersDisplay = async function() {
+        const container = document.getElementById('winners-container');
+        if (!container) return;
+
+        const winningTickets = APP_STATE.winningTickets || [];
+        const winningResults = APP_STATE.winningResults || [];
+
+        if (winningTickets.length === 0) {
+            container.innerHTML = '<div class="empty-msg">Pa gen tikè genyen pou kounye a</div>';
+            document.getElementById('total-winners-today').textContent = '0';
+            document.getElementById('total-winning-amount').textContent = '0 Gdes';
+            document.getElementById('average-winning').textContent = '0 Gdes';
+            return;
+        }
+
+        const totalWins = winningTickets.length;
+        const totalAmount = winningTickets.reduce((sum, ticket) => {
+            const winAmount = parseFloat(ticket.win_amount || ticket.winAmount || ticket.prize_amount || 0);
+            return sum + winAmount;
+        }, 0);
+        const averageWin = totalWins > 0 ? totalAmount / totalWins : 0;
+
+        document.getElementById('total-winners-today').textContent = totalWins;
+        document.getElementById('total-winning-amount').textContent = totalAmount.toLocaleString('fr-FR') + ' Gdes';
+        document.getElementById('average-winning').textContent = averageWin.toFixed(2).toLocaleString('fr-FR') + ' Gdes';
+
+        container.innerHTML = winningTickets.map(ticket => {
+            const isPaid = ticket.paid || false;
+            const winningResult = winningResults.find(r => r.draw_id === (ticket.draw_id || ticket.drawId));
+            const resultStr = winningResult ? winningResult.numbers.join(', ') : 'N/A';
+
+            const betAmount = parseFloat(ticket.bet_amount || ticket.total_amount || ticket.amount || 0) || 0;
+            const winAmount = parseFloat(ticket.win_amount || ticket.winAmount || ticket.prize_amount || 0) || 0;
+            const netProfit = winAmount - betAmount;
+
+            // Récupération des win_details
+            let winDetails = ticket.win_details;
+            if (typeof winDetails === 'string') {
+                try { winDetails = JSON.parse(winDetails); } catch(e) { winDetails = null; }
+            }
+
+            return `
+                <div class="winner-ticket">
+                    <div class="winner-header">
+                        <div>
+                            <strong>Tikè #${ticket.ticket_id || ticket.id}</strong>
+                            <div style="font-size: 0.8rem; color: var(--text-dim);">
+                                ${ticket.draw_name || ticket.drawName} - ${new Date(ticket.date || ticket.created_at).toLocaleDateString('fr-FR')}
+                            </div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-weight: bold; color: var(--success); font-size: 1.1rem;">
+                                ${winAmount.toLocaleString('fr-FR')} Gdes
+                            </div>
+                            <div style="font-size: 0.8rem; color: var(--text-dim);">
+                                (Mise: ${betAmount.toLocaleString('fr-FR')}G | Net: ${netProfit.toLocaleString('fr-FR')}G)
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <p><strong>Rezilta Tiraj:</strong> ${resultStr}</p>
+                        <p><strong>Jwèt:</strong> ${ticket.game_type || ticket.gameType || 'Borlette'}</p>
+                        <p><strong>Nimewo Ganyen:</strong> ${ticket.winning_number || ticket.winningNumber || 'N/A'}</p>
+                    </div>
+                    <div class="winner-actions">
+                        <button class="btn-details" onclick="showWinnerDetails(${JSON.stringify(winDetails).replace(/"/g, '&quot;')}, '${ticket.ticket_id || ticket.id}')">
+                            <i class="fas fa-info-circle"></i> Detay
+                        </button>
+                        ${isPaid ? 
+                            '<button class="btn-paid" disabled><i class="fas fa-check"></i> Peye</button>' :
+                            '<button class="btn-paid" onclick="markAsPaid(\'' + (ticket.id || ticket.ticket_id) + '\')"><i class="fas fa-money-bill-wave"></i> Make kòm Peye</button>'
+                        }
+                    </div>
+                </div>
+            `;
+        }).join('');
+    };
+
+    // Si la fonction originale existait, on pourrait l'appeler pour conserver les anciens comportements,
+    // mais nous remplaçons entièrement l'affichage.
+})();
 
 // Exposer les fonctions globales
 window.editTicket = editTicket;
@@ -1390,4 +1503,3 @@ window.loadDrawReport = loadDrawReport;
 window.logout = logout;
 window.reprintTicket = reprintTicket;
 window.replayTicket = replayTicket;
-window.showWinnerDetails = showWinnerDetails;
