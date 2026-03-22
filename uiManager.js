@@ -1158,6 +1158,105 @@ async function markAsPaid(ticketId) {
         alert('Erè nan makaj tikè a.');
     }
 }
+function showWinnerDetails(ticketId) {
+    // Chercher le ticket dans winningTickets ou ticketsHistory
+    const ticket = APP_STATE.winningTickets.find(t => 
+        (t.id == ticketId || t.ticket_id == ticketId)
+    ) || APP_STATE.ticketsHistory.find(t => 
+        (t.id == ticketId || t.ticket_id == ticketId)
+    );
+    
+    if (!ticket) {
+        alert('Tikè pa jwenn!');
+        return;
+    }
+
+    // Récupérer win_details (peut être sous forme de chaîne JSON)
+    let winDetails = ticket.win_details;
+    if (typeof winDetails === 'string') {
+        try {
+            winDetails = JSON.parse(winDetails);
+        } catch(e) {
+            winDetails = null;
+        }
+    }
+
+    if (!winDetails || winDetails.length === 0) {
+        alert("Pa gen detay ganyen pou tikè sa a.");
+        return;
+    }
+
+    // Créer la modale
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 3000;
+    `;
+    
+    const modalContent = document.createElement('div');
+    modalContent.style.cssText = `
+        background: var(--bg);
+        padding: 20px;
+        border-radius: 20px;
+        max-width: 90%;
+        max-height: 80%;
+        overflow-y: auto;
+        border: 2px solid var(--primary);
+    `;
+
+    // Générer le contenu détaillé
+    let detailsHtml = `<h3>Detay Ganyen Tikè #${ticket.ticket_id || ticket.id}</h3>`;
+    detailsHtml += `<ul style="list-style: none; padding: 0;">`;
+    
+    winDetails.forEach(detail => {
+        const gain = detail.gain || 0;
+        const number = detail.number || detail.numero || '';
+        const game = detail.gameAbbr || detail.game || 'BOR';
+        
+        // Déterminer le type de lot
+        let lotText = '';
+        if (detail.prizeLevel !== undefined) {
+            lotText = `${detail.prizeLevel}e lot`;
+        } else if (detail.lot) {
+            lotText = `${detail.lot}e lot`;
+        } else if (detail.rank) {
+            lotText = `${detail.rank}e lot`;
+        } else if (detail.reason) {
+            lotText = detail.reason;
+        }
+        
+        detailsHtml += `
+            <li style="margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 8px;">
+                <strong>${game}</strong> ${number} : 
+                <span style="color: var(--success); font-weight: bold;">${gain} Gdes</span>
+                ${lotText ? `<br><span style="font-size: 0.85rem;">${lotText} nan ${number}</span>` : ''}
+            </li>
+        `;
+    });
+    
+    detailsHtml += `</ul>`;
+    detailsHtml += `<button onclick="this.closest('div').remove()" style="
+        background: var(--primary);
+        border: none;
+        color: white;
+        padding: 10px 20px;
+        border-radius: 10px;
+        margin-top: 20px;
+        cursor: pointer;
+    ">Fèmen</button>`;
+    
+    modalContent.innerHTML = detailsHtml;
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+}
 
 function viewTicketDetails(ticketId) {
     const ticket = APP_STATE.ticketsHistory.find(t => 
