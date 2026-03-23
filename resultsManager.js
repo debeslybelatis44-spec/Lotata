@@ -1,5 +1,5 @@
 // resultsManager.js - Version corrigée avec appel API autonome et affichage du Lotto 3 complet
-// Ajout : onglet Agents avec balance (ventes - gains payés)
+// Ajout : onglet Agents avec balance (ventes - gains payés) et défilement horizontal
 (function() {
     if (window.resultsManagerReady) return;
     window.resultsManagerReady = true;
@@ -42,13 +42,18 @@
             agentsScreen.innerHTML = `
                 <div style="padding: 20px;">
                     <h2 class="section-title">Balans Ajan</h2>
+                    <div class="agents-actions" style="margin-bottom: 15px; text-align: right;">
+                        <button id="refresh-agents-btn" class="filter-btn" style="padding: 8px 16px;">
+                            <i class="fas fa-sync-alt"></i> Rafraîchir
+                        </button>
+                    </div>
                     <div id="agents-container" class="agents-list">Chajman...</div>
                 </div>
             `;
             main.appendChild(agentsScreen);
         }
 
-        // Onglet Résultats (si pas déjà présent)
+        // Onglet Résultats
         const nav = document.querySelector('.nav-bar');
         if (nav && !document.querySelector('.nav-item[data-tab="results"]')) {
             const tab = document.createElement('a');
@@ -85,7 +90,7 @@
             nav.appendChild(agentsTab);
         }
 
-        // Styles (ajout des styles pour les agents si nécessaire)
+        // Ajout des styles (avec scroll horizontal)
         if (!document.getElementById('results-styles')) {
             const style = document.createElement('style');
             style.id = 'results-styles';
@@ -102,10 +107,15 @@
                 .result-numbers { font-family: 'Courier New', monospace; font-weight: bold; font-size: 1.2rem; background: rgba(0,212,255,0.1); padding: 6px 12px; border-radius: 20px; color: var(--secondary); }
                 .no-result { color: var(--text-dim); font-style: italic; text-align: center; padding: 20px; }
 
-                /* Styles pour l'affichage des agents */
-                .agents-list { padding-bottom: 80px; }
+                /* Styles pour l'affichage des agents avec scroll horizontal */
+                .agents-list {
+                    padding-bottom: 80px;
+                    overflow-x: auto;
+                    width: 100%;
+                }
                 .agents-table {
                     width: 100%;
+                    min-width: 700px;
                     border-collapse: collapse;
                     background: var(--surface);
                     border-radius: 16px;
@@ -126,6 +136,12 @@
                 .remettre { color: var(--success); font-weight: bold; }
             `;
             document.head.appendChild(style);
+        }
+
+        // Bouton de rafraîchissement
+        const refreshBtn = document.getElementById('refresh-agents-btn');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => loadAgentsBalance());
         }
     }
 
@@ -252,7 +268,6 @@
             const token = localStorage.getItem('auth_token');
             if (!token) throw new Error('Non authentifié');
 
-            // Récupérer tous les tickets
             const response = await fetch('/api/tickets', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -276,11 +291,9 @@
                 }
                 const agent = agentsMap.get(agentId);
 
-                // Ventes
                 const montant = parseFloat(ticket.total_amount || ticket.totalAmount || ticket.amount || 0);
                 agent.totalVentes += montant;
 
-                // Gains payés (ticket gagnant ET payé)
                 const estGagnant = (ticket.checked || ticket.verified) && parseFloat(ticket.win_amount || ticket.winAmount || ticket.prize_amount || 0) > 0;
                 const estPaye = ticket.paid === true;
                 if (estGagnant && estPaye) {
@@ -294,6 +307,7 @@
                 return;
             }
 
+            // Construction du tableau avec les 7 colonnes
             let html = `<table class="agents-table">
                 <thead>
                     <tr>
