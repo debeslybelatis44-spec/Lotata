@@ -1129,7 +1129,6 @@ function updateWinnersDisplay() {
         '<button class="btn-paid" onclick="markAsPaid(\'' + (ticket.id || ticket.ticket_id) + '\')"><i class="fas fa-money-bill-wave"></i> Make kòm Peye</button>'
     }
 </div>
-                    }
                 </div>
             </div>
         `;
