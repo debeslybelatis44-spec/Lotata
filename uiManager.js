@@ -1215,26 +1215,32 @@ function showWinnerDetails(ticketId) {
         // Borlette
         if (game === 'borlette' || game === 'bo' || (game && game.startsWith('n'))) {
             if (clean.length === 2) {
+                // Vérifier chaque lot indépendamment (permet plusieurs gains)
                 if (clean === lot1) {
-                    gain = amount * 60;
-                    prizeLevel = 1;
-                    reason = '1e lot';
-                } else if (clean === lot2) {
-                    gain = amount * 20;
-                    prizeLevel = 2;
-                    reason = '2e lot';
-                } else if (clean === lot3) {
-                    gain = amount * 10;
-                    prizeLevel = 3;
-                    reason = '3e lot';
-                }
-                if (gain > 0) {
                     winDetails.push({
                         game: 'BOR',
                         number: rawNumber,
-                        gain: gain,
-                        prizeLevel: prizeLevel,
-                        reason: reason
+                        gain: amount * 60,
+                        prizeLevel: 1,
+                        reason: '1e lot'
+                    });
+                }
+                if (clean === lot2) {
+                    winDetails.push({
+                        game: 'BOR',
+                        number: rawNumber,
+                        gain: amount * 20,
+                        prizeLevel: 2,
+                        reason: '2e lot'
+                    });
+                }
+                if (clean === lot3) {
+                    winDetails.push({
+                        game: 'BOR',
+                        number: rawNumber,
+                        gain: amount * 10,
+                        prizeLevel: 3,
+                        reason: '3e lot'
                     });
                 }
             }
@@ -1328,6 +1334,7 @@ function showWinnerDetails(ticketId) {
 
     // Créer la modale
     const modal = document.createElement('div');
+    modal.id = 'winner-details-modal';  // <-- AJOUT DE L'ID
     modal.style.cssText = `
         position: fixed;
         top: 0;
@@ -1371,7 +1378,7 @@ function showWinnerDetails(ticketId) {
     });
     
     detailsHtml += `</ul>`;
-    detailsHtml += `<button onclick="this.closest('div').remove()" style="
+    detailsHtml += `<button onclick="document.getElementById('winner-details-modal').remove()" style="
         background: var(--primary);
         border: none;
         color: white;
@@ -1382,128 +1389,6 @@ function showWinnerDetails(ticketId) {
     ">Fèmen</button>`;
     
     modalContent.innerHTML = detailsHtml;
-    modal.appendChild(modalContent);
-    document.body.appendChild(modal);
-}
-function viewTicketDetails(ticketId) {
-    const ticket = APP_STATE.ticketsHistory.find(t => 
-        t.id === ticketId || t.ticket_id === ticketId
-    );
-    
-    if (!ticket) {
-        alert(`Tikè pa jwenn! ID: ${ticketId}\nTotal tickets disponibles: ${APP_STATE.ticketsHistory.length}`);
-        return;
-    }
-    
-    const drawName = ticket.draw_name || ticket.drawName || ticket.draw_name_fr || 'Tiraj Inkonu';
-    const totalAmount = ticket.total_amount || ticket.totalAmount || ticket.amount || 0;
-    const date = ticket.date || ticket.created_at || ticket.created_date || new Date().toISOString();
-    const winAmount = ticket.win_amount || ticket.winAmount || ticket.prize_amount || 0;
-    const checked = ticket.checked || ticket.verified || false;
-    
-    let details = `
-        <h3>Detay Tikè #${ticket.ticket_id || ticket.id || 'N/A'}</h3>
-        <p><strong>Tiraj:</strong> ${drawName}</p>
-        <p><strong>Dat:</strong> ${new Date(date).toLocaleString('fr-FR')}</p>
-        <p><strong>Total Mis:</strong> ${totalAmount} Gdes</p>
-        <p><strong>Statis:</strong> ${checked ? (winAmount > 0 ? 'GANYEN' : 'PÈDI') : 'AP TANN'}</p>
-        ${winAmount > 0 ? `
-            <p><strong>Ganyen Total:</strong> ${winAmount} Gdes</p>
-            <p><strong>Pwofi Net:</strong> ${winAmount - totalAmount} Gdes</p>
-        ` : ''}
-        <hr>
-        <h4>Paray yo:</h4>
-    `;
-    
-    let bets = [];
-    
-    if (Array.isArray(ticket.bets)) {
-        bets = ticket.bets;
-    } else if (Array.isArray(ticket.numbers)) {
-        bets = ticket.numbers;
-    } else if (typeof ticket.bets === 'string') {
-        try {
-            bets = JSON.parse(ticket.bets);
-        } catch (e) {
-            bets = [{ number: ticket.bets, amount: totalAmount }];
-        }
-    } else if (ticket.bets && typeof ticket.bets === 'object') {
-        bets = Object.entries(ticket.bets).map(([key, value]) => {
-            return { number: key, amount: value };
-        });
-    } else {
-        bets = [{ number: 'N/A', amount: totalAmount }];
-    }
-    
-    if (!Array.isArray(bets)) {
-        bets = [bets];
-    }
-    
-    if (bets.length === 0) {
-        details += `<p>Pa gen detay paryaj</p>`;
-    } else {
-        bets.forEach((bet, index) => {
-            if (!bet) return;
-            
-            let gameName = (bet.game || '').toUpperCase() || 'BORLETTE';
-            if (bet.specialType) gameName = bet.specialType;
-            if (bet.option) gameName += ` (Opsyon ${bet.option})`;
-            
-            const betNumber = bet.number || bet.numero || bet.n || 'N/A';
-            const betAmount = bet.amount || bet.montant || bet.a || 0;
-            const betGain = bet.gain || bet.prize || 0;
-            
-            let betDetails = `${gameName} ${betNumber} - ${betAmount} Gdes`;
-            if (betGain) {
-                const netGain = betGain - betAmount;
-                betDetails += ` (Genyen: ${betGain}G | Net: ${netGain}G)`;
-            }
-            details += `<p>${betDetails}</p>`;
-        });
-    }
-    
-    const modal = document.createElement('div');
-    modal.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0,0,0,0.8);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 3000;
-    `;
-    
-    const modalContent = document.createElement('div');
-    modalContent.style.cssText = `
-        background: var(--bg);
-        padding: 20px;
-        border-radius: 20px;
-        max-width: 90%;
-        max-height: 80%;
-        overflow-y: auto;
-        border: 2px solid var(--primary);
-    `;
-    
-    modalContent.innerHTML = `
-        <div style="text-align: left;">
-            ${details}
-        </div>
-        <button onclick="this.parentElement.parentElement.remove()" style="
-            background: var(--primary);
-            border: none;
-            color: white;
-            padding: 10px 20px;
-            border-radius: 10px;
-            margin-top: 20px;
-            cursor: pointer;
-        ">
-            Fèmen
-        </button>
-    `;
-    
     modal.appendChild(modalContent);
     document.body.appendChild(modal);
 }
