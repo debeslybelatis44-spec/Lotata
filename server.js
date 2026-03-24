@@ -80,22 +80,31 @@ async function initializeDatabase() {
     await addColumnIfNotExists('lottery_config', 'game_limits', 'JSONB');
     await addColumnIfNotExists('draw_results', 'lotto3', 'VARCHAR(3)');
 
-    // === AJOUT LOTTO3 BLOQUÉ ===
+    // === TABLES DE BLOCAGE / LIMITES ===
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS blocked_numbers (
+        number VARCHAR(2) PRIMARY KEY,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    console.log('✅ Table blocked_numbers prête');
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS blocked_lotto3_numbers (
         number VARCHAR(3) PRIMARY KEY,
         created_at TIMESTAMP DEFAULT NOW()
       )
     `);
-    await pool.query(`
-  CREATE TABLE IF NOT EXISTS global_number_limits (
-    number VARCHAR(2) PRIMARY KEY,
-    limit_amount DECIMAL(10,2) NOT NULL,
-    updated_at TIMESTAMP DEFAULT NOW()
-  )
-`);
-console.log('✅ Table global_number_limits prête');
     console.log('✅ Table blocked_lotto3_numbers prête');
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS global_number_limits (
+        number VARCHAR(2) PRIMARY KEY,
+        limit_amount DECIMAL(10,2) NOT NULL,
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    console.log('✅ Table global_number_limits prête');
 
     console.log('✅ Base de données prête');
   } catch (error) {
@@ -312,58 +321,65 @@ app.post('/api/tickets/save', async (req, res) => {
       return res.status(403).json({ error: 'Tirage bloqué ou inexistant' });
     }
 
+    // === Récupération des blocages globaux (borlette) ===
     const globalBlocked = await pool.query('SELECT number FROM blocked_numbers');
     const globalBlockedSet = new Set(globalBlocked.rows.map(r => r.number));
 
+    // === Blocages pour ce tirage (borlette) ===
     const drawBlocked = await pool.query('SELECT number FROM draw_blocked_numbers WHERE draw_id = $1', [drawId]);
     const drawBlockedSet = new Set(drawBlocked.rows.map(r => r.number));
 
-    // === AJOUT LOTTO3 BLOQUÉ ===
+    // === Blocages Lotto3 ===
     const blockedLotto3Res = await pool.query('SELECT number FROM blocked_lotto3_numbers');
     const blockedLotto3Set = new Set(blockedLotto3Res.rows.map(r => r.number));
 
-    // ===== RÉCUPÉRATION DES LIMITES PAR NUMÉRO =====
+    // === Limites par numéro pour ce tirage (draw_number_limits) ===
     const limits = await pool.query('SELECT number, limit_amount FROM draw_number_limits WHERE draw_id = $1', [drawId]);
     const limitsMap = new Map(limits.rows.map(r => [r.number, parseFloat(r.limit_amount)]));
-    // --- Vérification des limites globales ---
-const globalLimitsResult = await pool.query('SELECT number, limit_amount FROM global_number_limits');
-const globalLimitsMap = new Map();
-globalLimitsResult.rows.forEach(r => globalLimitsMap.set(r.number, parseFloat(r.limit_amount)));
 
-const numbersWithGlobalLimit = new Set();
-for (const bet of bets) {
-  const game = bet.game || bet.specialType;
-  if (game === 'borlette' || game === 'BO' || (game && game.startsWith('n'))) {
-    const rawNumber = bet.cleanNumber || (bet.number ? bet.number.replace(/\D/g, '') : '');
-    const normalized = rawNumber.padStart(2, '0');
-    if (globalLimitsMap.has(normalized)) numbersWithGlobalLimit.add(normalized);
-  }
-}
+    // === Limites globales (tous tirages) ===
+    const globalLimitsResult = await pool.query('SELECT number, limit_amount FROM global_number_limits');
+    const globalLimitsMap = new Map();
+    globalLimitsResult.rows.forEach(r => globalLimitsMap.set(r.number, parseFloat(r.limit_amount)));
 
-const globalTotals = new Map();
-if (numbersWithGlobalLimit.size > 0) {
-  const todayAllDrawsResult = await pool.query(
-    `SELECT bet->>'cleanNumber' as number, SUM((bet->>'amount')::numeric) as total
-     FROM tickets, jsonb_array_elements(bets::jsonb) as bet
-     WHERE DATE(date) = CURRENT_DATE AND bet->>'cleanNumber' = ANY($1)
-     GROUP BY bet->>'cleanNumber'`,
-    [Array.from(numbersWithGlobalLimit)]
-  );
-  for (const row of todayAllDrawsResult.rows) {
-    globalTotals.set(row.number, parseFloat(row.total) || 0);
-  }
-}
-
-    // ===== COLLECTE DES NUMÉROS AYANT UNE LIMITE =====
-    const numbersWithLimits = new Set();
+    // === Collecte des numéros (borlette) ayant une limite globale ===
+    const numbersWithGlobalLimit = new Set();
     for (const bet of bets) {
-      const cleanNumber = bet.cleanNumber || (bet.number ? bet.number.replace(/[^0-9]/g, '') : '');
-      if (cleanNumber && limitsMap.has(cleanNumber)) {
-        numbersWithLimits.add(cleanNumber);
+      const game = bet.game || bet.specialType;
+      if (game === 'borlette' || game === 'BO' || (game && game.startsWith('n'))) {
+        const rawNumber = bet.cleanNumber || (bet.number ? bet.number.replace(/\D/g, '') : '');
+        const normalized = rawNumber.padStart(2, '0');
+        if (globalLimitsMap.has(normalized)) numbersWithGlobalLimit.add(normalized);
       }
     }
 
-    // ===== RÉCUPÉRATION DES TOTAUX DÉJÀ JOUÉS AUJOURD'HUI POUR CES NUMÉROS =====
+    // === Totaux globaux aujourd'hui pour ces numéros (tous tirages) ===
+    const globalTotals = new Map();
+    if (numbersWithGlobalLimit.size > 0) {
+      const todayAllDrawsResult = await pool.query(
+        `SELECT bet->>'cleanNumber' as number, SUM((bet->>'amount')::numeric) as total
+         FROM tickets, jsonb_array_elements(bets::jsonb) as bet
+         WHERE DATE(date) = CURRENT_DATE AND bet->>'cleanNumber' = ANY($1)
+         GROUP BY bet->>'cleanNumber'`,
+        [Array.from(numbersWithGlobalLimit)]
+      );
+      for (const row of todayAllDrawsResult.rows) {
+        globalTotals.set(row.number, parseFloat(row.total) || 0);
+      }
+    }
+
+    // === Collecte des numéros ayant une limite par tirage ===
+    const numbersWithLimits = new Set();
+    for (const bet of bets) {
+      const game = bet.game || bet.specialType;
+      if (game === 'borlette' || game === 'BO' || (game && game.startsWith('n'))) {
+        const rawNumber = bet.cleanNumber || (bet.number ? bet.number.replace(/\D/g, '') : '');
+        const normalized = rawNumber.padStart(2, '0');
+        if (limitsMap.has(normalized)) numbersWithLimits.add(normalized);
+      }
+    }
+
+    // === Totaux pour ce tirage aujourd'hui ===
     const currentTotals = new Map();
     if (numbersWithLimits.size > 0) {
       const todayBetsResult = await pool.query(
@@ -378,60 +394,74 @@ if (numbersWithGlobalLimit.size > 0) {
       }
     }
 
-    // ===== VÉRIFICATION DES BLOCAGES ET DES LIMITES =====
+    // === Vérifications : blocages et limites ===
     const exceeded = [];
+
     for (const bet of bets) {
-      const cleanNumber = bet.cleanNumber || (bet.number ? bet.number.replace(/[^0-9]/g, '') : '');
-      if (!cleanNumber) continue;
-
-      // Vérification blocage global
-      if (globalBlockedSet.has(cleanNumber)) {
-        return res.status(403).json({ error: `Numéro ${cleanNumber} est bloqué globalement` });
-      }
-      // Vérification blocage pour ce tirage
-      if (drawBlockedSet.has(cleanNumber)) {
-        return res.status(403).json({ error: `Numéro ${cleanNumber} est bloqué pour ce tirage` });
-      }
-      // Vérification lotto3 bloqué
       const game = bet.game || bet.specialType;
-      if ((game === 'lotto3' || game === 'auto_lotto3') && cleanNumber.length === 3 && blockedLotto3Set.has(cleanNumber)) {
-        return res.status(403).json({ error: `Numéro Lotto3 ${cleanNumber} est bloqué globalement` });
+      let rawNumber = bet.cleanNumber || (bet.number ? bet.number.replace(/\D/g, '') : '');
+      if (!rawNumber) continue;
+
+      let normalizedNumber = rawNumber;
+
+      // Normalisation selon le type de jeu
+      if (game === 'borlette' || game === 'BO' || (game && game.startsWith('n'))) {
+        normalizedNumber = rawNumber.padStart(2, '0');
+      } else if (game === 'lotto3' || game === 'auto_lotto3') {
+        normalizedNumber = rawNumber.padStart(3, '0');
+      }
+      // Pour les autres jeux (mariage, lotto4, lotto5) on ne normalise pas car les numéros ont leur propre longueur
+
+      // --- Vérification blocage global borlette ---
+      if (globalBlockedSet.has(normalizedNumber)) {
+        return res.status(403).json({ error: `Numéro ${normalizedNumber} est bloqué globalement` });
       }
 
-      // Vérification de la limite (uniquement si la mise n'est pas gratuite)
-      const limit = limitsMap.get(cleanNumber);
-      if (limit && limit > 0 && !bet.free) {
-        const currentTotal = currentTotals.get(cleanNumber) || 0;
+      // --- Vérification blocage pour ce tirage ---
+      if (drawBlockedSet.has(normalizedNumber)) {
+        return res.status(403).json({ error: `Numéro ${normalizedNumber} est bloqué pour ce tirage` });
+      }
+
+      // --- Vérification lotto3 bloqué ---
+      if ((game === 'lotto3' || game === 'auto_lotto3') && normalizedNumber.length === 3 && blockedLotto3Set.has(normalizedNumber)) {
+        return res.status(403).json({ error: `Numéro Lotto3 ${normalizedNumber} est bloqué globalement` });
+      }
+
+      // --- Vérification limite par tirage ---
+      const limitPerDraw = limitsMap.get(normalizedNumber);
+      if (limitPerDraw && limitPerDraw > 0 && !bet.free) {
+        const currentTotal = currentTotals.get(normalizedNumber) || 0;
         const betAmount = parseFloat(bet.amount) || 0;
-        if (currentTotal + betAmount > limit) {
+        if (currentTotal + betAmount > limitPerDraw) {
           exceeded.push({
-            number: cleanNumber,
-            limit: limit,
+            number: normalizedNumber,
+            limit: limitPerDraw,
             already: currentTotal,
             requested: betAmount,
-            remaining: limit - currentTotal
+            remaining: limitPerDraw - currentTotal,
+            type: 'per_draw'
+          });
+        }
+      }
+
+      // --- Vérification limite globale (tous tirages) ---
+      const globalLimit = globalLimitsMap.get(normalizedNumber);
+      if (globalLimit && globalLimit > 0 && !bet.free) {
+        const currentGlobalTotal = globalTotals.get(normalizedNumber) || 0;
+        const betAmount = parseFloat(bet.amount) || 0;
+        if (currentGlobalTotal + betAmount > globalLimit) {
+          exceeded.push({
+            number: normalizedNumber,
+            limit: globalLimit,
+            already: currentGlobalTotal,
+            requested: betAmount,
+            remaining: globalLimit - currentGlobalTotal,
+            type: 'global'
           });
         }
       }
     }
-    // Vérification de la limite globale
-const globalLimit = globalLimitsMap.get(cleanNumber);
-if (globalLimit && globalLimit > 0 && !bet.free) {
-  const currentGlobalTotal = globalTotals.get(cleanNumber) || 0;
-  const betAmount = parseFloat(bet.amount) || 0;
-  if (currentGlobalTotal + betAmount > globalLimit) {
-    exceeded.push({
-      number: cleanNumber,
-      limit: globalLimit,
-      already: currentGlobalTotal,
-      requested: betAmount,
-      remaining: globalLimit - currentGlobalTotal,
-      type: 'global'
-    });
-  }
-}
 
-    // ===== SI DES LIMITES SONT DÉPASSÉES, ON RENVOIE UNE ERREUR DÉTAILLÉE =====
     if (exceeded.length > 0) {
       const message = exceeded.map(e => `Numéro ${e.number} : limite atteinte, reste ${e.remaining} G maximum.`).join('\n');
       return res.status(403).json({
@@ -440,6 +470,7 @@ if (globalLimit && globalLimit > 0 && !bet.free) {
       });
     }
 
+    // === Limites par type de jeu (game_limits) ===
     const configResult = await pool.query('SELECT game_limits FROM lottery_config LIMIT 1');
     let gameLimits = {};
     if (configResult.rows.length > 0 && configResult.rows[0].game_limits) {
@@ -471,6 +502,7 @@ if (globalLimit && globalLimit > 0 && !bet.free) {
       }
     }
 
+    // === Génération des free bets (mariage spécial) ===
     const paidBets = bets.filter(b => !b.free);
     const totalPaid = paidBets.reduce((sum, b) => sum + (parseFloat(b.amount) || 0), 0);
 
@@ -1342,9 +1374,13 @@ ownerRouter.post('/block-number', async (req, res) => {
   try {
     const { number } = req.body;
     if (!number) return res.status(400).json({ error: 'Numéro requis' });
+    const normalized = number.padStart(2, '0');
+    if (!/^\d{2}$/.test(normalized)) {
+      return res.status(400).json({ error: 'Numéro invalide (2 chiffres requis)' });
+    }
     await pool.query(
       'INSERT INTO blocked_numbers (number) VALUES ($1) ON CONFLICT DO NOTHING',
-      [number]
+      [normalized]
     );
     res.json({ success: true });
   } catch (error) {
@@ -1356,7 +1392,8 @@ ownerRouter.post('/block-number', async (req, res) => {
 ownerRouter.post('/unblock-number', async (req, res) => {
   try {
     const { number } = req.body;
-    await pool.query('DELETE FROM blocked_numbers WHERE number = $1', [number]);
+    const normalized = number.padStart(2, '0');
+    await pool.query('DELETE FROM blocked_numbers WHERE number = $1', [normalized]);
     res.json({ success: true });
   } catch (error) {
     console.error('❌ Erreur déblocage numéro:', error);
@@ -1369,9 +1406,10 @@ ownerRouter.post('/block-number-draw', async (req, res) => {
   try {
     const { drawId, number } = req.body;
     if (!drawId || !number) return res.status(400).json({ error: 'drawId et number requis' });
+    const normalized = number.padStart(2, '0');
     await pool.query(
       'INSERT INTO draw_blocked_numbers (draw_id, number) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-      [drawId, number]
+      [drawId, normalized]
     );
     res.json({ success: true });
   } catch (error) {
@@ -1383,9 +1421,10 @@ ownerRouter.post('/block-number-draw', async (req, res) => {
 ownerRouter.post('/unblock-number-draw', async (req, res) => {
   try {
     const { drawId, number } = req.body;
+    const normalized = number.padStart(2, '0');
     await pool.query(
       'DELETE FROM draw_blocked_numbers WHERE draw_id = $1 AND number = $2',
-      [drawId, number]
+      [drawId, normalized]
     );
     res.json({ success: true });
   } catch (error) {
@@ -1433,7 +1472,7 @@ ownerRouter.post('/unblock-lotto3', async (req, res) => {
   }
 });
 
-// Définir une limite pour un numéro sur un tirage
+// Définir une limite pour un numéro (tirage ou globale)
 ownerRouter.post('/number-limit', async (req, res) => {
   try {
     const { drawId, number, limitAmount } = req.body;
@@ -1447,7 +1486,7 @@ ownerRouter.post('/number-limit', async (req, res) => {
     }
 
     if (drawId === '0') {
-      // Limite globale (tous tirages)
+      // Limite globale
       await pool.query(`
         INSERT INTO global_number_limits (number, limit_amount)
         VALUES ($1, $2)
@@ -1456,9 +1495,9 @@ ownerRouter.post('/number-limit', async (req, res) => {
       return res.json({ success: true });
     }
 
-    // Limite par tirage (comportement existant)
     if (!drawId) return res.status(400).json({ error: 'drawId requis' });
 
+    // Limite par tirage
     await pool.query(
       `INSERT INTO draw_number_limits (draw_id, number, limit_amount)
        VALUES ($1, $2, $3)
@@ -1471,6 +1510,7 @@ ownerRouter.post('/number-limit', async (req, res) => {
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
+
 // Liste des numéros globalement bloqués
 ownerRouter.get('/blocked-numbers', async (req, res) => {
   try {
@@ -1498,7 +1538,7 @@ ownerRouter.get('/blocked-numbers-per-draw', async (req, res) => {
   }
 });
 
-// Liste des limites de numéros
+// Liste des limites de numéros (par tirage)
 ownerRouter.get('/number-limits', async (req, res) => {
   try {
     const result = await pool.query(
@@ -1514,16 +1554,17 @@ ownerRouter.get('/number-limits', async (req, res) => {
   }
 });
 
-// Supprimer une limite de numéro
+// Supprimer une limite de numéro (par tirage)
 ownerRouter.post('/remove-number-limit', async (req, res) => {
   try {
     const { drawId, number } = req.body;
     if (!drawId || !number) {
       return res.status(400).json({ error: 'drawId et number requis' });
     }
+    const normalized = number.padStart(2, '0');
     await pool.query(
       'DELETE FROM draw_number_limits WHERE draw_id = $1 AND number = $2',
-      [drawId, number]
+      [drawId, normalized]
     );
     res.json({ success: true });
   } catch (error) {
