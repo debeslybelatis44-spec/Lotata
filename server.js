@@ -1069,6 +1069,7 @@ ownerRouter.get('/dashboard', async (req, res) => {
       `SELECT COALESCE(SUM(total_amount), 0) as total FROM tickets WHERE DATE(date) = CURRENT_DATE`
     );
 
+    // Limites par tirage
     const limitsProgress = await pool.query(
       `SELECT d.name as draw_name, l.number, l.limit_amount,
               COALESCE(SUM(t.total_amount), 0) as current_bets,
@@ -1080,6 +1081,25 @@ ownerRouter.get('/dashboard', async (req, res) => {
        ORDER BY progress_percent DESC`
     );
 
+    // Limites globales
+    const globalLimitsProgress = await pool.query(`
+      SELECT '🌍 Global (tous tirages)' as draw_name,
+             g.number,
+             g.limit_amount,
+             COALESCE(SUM((bet->>'amount')::numeric), 0) as current_bets,
+             (COALESCE(SUM((bet->>'amount')::numeric), 0) / g.limit_amount * 100) as progress_percent
+      FROM global_number_limits g
+      LEFT JOIN tickets t ON DATE(t.date) = CURRENT_DATE
+      LEFT JOIN LATERAL jsonb_array_elements(t.bets) AS bet ON (bet->>'cleanNumber') = g.number
+      GROUP BY g.number, g.limit_amount
+      ORDER BY progress_percent DESC
+    `);
+
+    // Fusion des deux listes
+    const allLimitsProgress = [...limitsProgress.rows, ...globalLimitsProgress.rows];
+    allLimitsProgress.sort((a, b) => parseFloat(b.progress_percent) - parseFloat(a.progress_percent));
+
+    // Agents avec gains/pertes du jour
     const agentsGainLoss = await pool.query(
       `SELECT a.id, a.name,
               COALESCE(SUM(t.total_amount), 0) as total_bets,
@@ -1092,6 +1112,7 @@ ownerRouter.get('/dashboard', async (req, res) => {
        ORDER BY net_result DESC`
     );
 
+    // Statistiques globales
     const globalStats = await pool.query(`
       SELECT
         COUNT(*)::integer AS total_tickets_all,
@@ -1108,8 +1129,8 @@ ownerRouter.get('/dashboard', async (req, res) => {
         agents: connectedAgents.rows
       },
       sales_today: parseFloat(salesToday.rows[0].total),
-      limits_progress: limitsProgress.rows,
-      agents_gain_loss: agentsGainLoss.rows,
+      limits_progress: allLimitsProgress,          // <-- fusionnée
+      agents_gain_loss: agentsGainLoss.rows,       // <-- maintenant définie
       global_stats: globalStats.rows[0]
     });
   } catch (error) {
