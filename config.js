@@ -40,7 +40,7 @@ const CONFIG = {
         { id: 'ga_matin', name: 'Georgia Matin', time: '12:30', color: 'var(--georgia)' },
         { id: 'ga_soir', name: 'Georgia Soir', time: '19:00', color: 'var(--georgia)' },
         { id: 'tx_matin', name: 'Texas Matin', time: '10:55', color: 'var(--texas)' },
-        { id: 'tx_soir', name: 'Texas Soir', time: '23:58', color: 'var(--texas)' }
+        { id: 'tx_soir', name: 'Texas Soir', time: '18:58', color: 'var(--texas)' }
     ],
     LOTTERY_NAME: 'LOTATO PRO',
     LOTTERY_LOGO: 'https://raw.githubusercontent.com/your-username/your-repo/main/logo.png',
