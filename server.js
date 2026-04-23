@@ -561,7 +561,7 @@ app.get('/api/tickets', async (req, res) => {
       params.push(req.user.id);
       query += ` AND agent_id = $${params.length}`;
     }
-    query += ' ORDER BY date DESC LIMIT 50';
+    query += ' ORDER BY date DESC';
     const result = await pool.query(query, params);
     const tickets = result.rows.map(t => ({
       ...t,
@@ -573,7 +573,6 @@ app.get('/api/tickets', async (req, res) => {
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
-
 // --- Route de suppression (identique au court) ---
 app.delete('/api/tickets/:ticketId', authenticateToken, async (req, res) => {
   try {
