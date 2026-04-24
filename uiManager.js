@@ -726,79 +726,58 @@ async function loadReports() {
     try {
         initReportFilters();
 
-        // Récupérer tous les tickets (pas de limite)
-        const allTickets = await fetchTickets();
-        APP_STATE.ticketsHistory = allTickets;
+        const token = localStorage.getItem('auth_token');
+        const period = window.reportFilters.period;
+        const drawId = window.reportFilters.drawId;
+        const fromDate = window.reportFilters.fromDate;
+        const toDate = window.reportFilters.toDate;
 
-        // Filtrer par période et tirage
-        const filteredTickets = filterTicketsByDate(allTickets, window.reportFilters);
-        const finalTickets = window.reportFilters.drawId !== 'all' 
-            ? filteredTickets.filter(t => (t.draw_id === window.reportFilters.drawId || t.drawId === window.reportFilters.drawId))
-            : filteredTickets;
+        // Construire l'URL avec les paramètres
+        let url = `/api/agent/reports?period=${encodeURIComponent(period)}`;
+        if (drawId && drawId !== 'all') url += `&drawId=${encodeURIComponent(drawId)}`;
+        if (period === 'custom' && fromDate && toDate) {
+            url += `&fromDate=${encodeURIComponent(fromDate)}&toDate=${encodeURIComponent(toDate)}`;
+        }
 
-        let totalTickets = finalTickets.length;
-        let totalBets = 0;
-        let totalWins = 0;
-
-        // Calcul aligné avec le propriétaire (pas de condition checked)
-        finalTickets.forEach(ticket => {
-            const ticketAmount = parseFloat(ticket.total_amount || ticket.totalAmount || ticket.amount || 0);
-            const winAmount = parseFloat(ticket.win_amount || ticket.winAmount || ticket.prize_amount || 0);
-            totalBets += ticketAmount;
-            totalWins += winAmount;
+        const response = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${token}` }
         });
-        const totalLoss = totalBets - totalWins;
-        const balance = totalBets - totalWins;
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-        document.getElementById('total-tickets').textContent = totalTickets;
-        document.getElementById('total-bets').textContent = totalBets.toLocaleString('fr-FR') + ' Gdes';
-        document.getElementById('total-wins').textContent = totalWins.toLocaleString('fr-FR') + ' Gdes';
+        const data = await response.json();
+        const summary = data.summary;
+
+        // Mise à jour des indicateurs
+        document.getElementById('total-tickets').textContent = summary.total_tickets || 0;
+        document.getElementById('total-bets').textContent = (summary.total_bets || 0).toLocaleString('fr-FR') + ' Gdes';
+        document.getElementById('total-wins').textContent = (summary.total_wins || 0).toLocaleString('fr-FR') + ' Gdes';
+        const totalLoss = (summary.total_bets || 0) - (summary.total_wins || 0);
+        const balance = summary.net_result || 0;
         document.getElementById('total-loss').textContent = totalLoss.toLocaleString('fr-FR') + ' Gdes';
         document.getElementById('balance').textContent = balance.toLocaleString('fr-FR') + ' Gdes';
         document.getElementById('balance').style.color = balance >= 0 ? 'var(--success)' : 'var(--danger)';
 
-        // Mise à jour du sélecteur de tirage
+        // Mise à jour du sélecteur de tirage (si CONFIG.DRAWS existe)
         const drawSelector = document.getElementById('draw-report-selector');
-        if (drawSelector) {
+        if (drawSelector && typeof CONFIG !== 'undefined' && CONFIG.DRAWS) {
             drawSelector.innerHTML = '<option value="all">Tout Tiraj</option>';
             CONFIG.DRAWS.forEach(draw => {
                 const option = document.createElement('option');
                 option.value = draw.id;
                 option.textContent = draw.name;
-                if (draw.id === window.reportFilters.drawId) option.selected = true;
+                if (draw.id === drawId) option.selected = true;
                 drawSelector.appendChild(option);
             });
         }
 
-        // Affichage du détail par tirage (calculé à partir des tickets)
-        const drawMap = new Map();
-        finalTickets.forEach(t => {
-            const did = t.draw_id || t.drawId;
-            const dname = t.draw_name || t.drawName;
-            if (!did) return;
-            if (!drawMap.has(did)) {
-                drawMap.set(did, { name: dname, tickets: 0, bets: 0, wins: 0 });
-            }
-            const entry = drawMap.get(did);
-            entry.tickets++;
-            entry.bets += parseFloat(t.total_amount || 0);
-            entry.wins += parseFloat(t.win_amount || 0);
-        });
-        const detail = Array.from(drawMap.values()).map(d => ({
-            draw_name: d.name,
-            tickets: d.tickets,
-            bets: d.bets,
-            wins: d.wins,
-            result: d.wins - d.bets
-        })).sort((a,b) => b.result - a.result);
-
-        if (detail.length > 0) {
+        // Affichage du détail par tirage (si présent)
+        if (data.detail && data.detail.length > 0) {
             let detailHtml = '<div class="section-title"><i class="fas fa-chart-line"></i> Détail par tirage</div><div class="list-container"><table class="table"><thead><th>Tirage</th><th>Tickets</th><th>Mises</th><th>Gains</th><th>Résultat</th></thead><tbody>';
-            detail.forEach(d => {
+            data.detail.forEach(d => {
                 const resClass = d.result >= 0 ? 'profit' : 'loss';
-                detailHtml += `<tr><td>${d.draw_name}</td><td>${d.tickets}</td><td>${d.bets.toLocaleString()} G</td><td>${d.wins.toLocaleString()} G</td><td class="${resClass}">${d.result.toLocaleString()} G</td></tr>`;
+                detailHtml += `<tr><td>${d.draw_name}</td><td>${d.tickets}</td><td>${(d.bets || 0).toLocaleString()} G</td><td>${(d.wins || 0).toLocaleString()} G</td><td class="${resClass}">${(d.result || 0).toLocaleString()} G</td></tr>`;
             });
-            detailHtml += '</tbody></table></div>';
+            detailHtml += '</tbody></tr></div>';
             const existing = document.getElementById('agent-detail-container');
             if (existing) existing.remove();
             const detailDiv = document.createElement('div');
@@ -809,10 +788,10 @@ async function loadReports() {
 
         // Message de période
         let periodText = '';
-        if (window.reportFilters.period === 'today') periodText = 'Jodi a';
-        else if (window.reportFilters.period === 'yesterday') periodText = 'Yè';
-        else if (window.reportFilters.period === 'week') periodText = 'Semèn sa a';
-        else if (window.reportFilters.period === 'custom') periodText = `Soti ${window.reportFilters.fromDate} rive ${window.reportFilters.toDate}`;
+        if (period === 'today') periodText = 'Jodi a';
+        else if (period === 'yesterday') periodText = 'Yè';
+        else if (period === 'week') periodText = 'Semèn sa a';
+        else if (period === 'custom') periodText = `Soti ${fromDate} rive ${toDate}`;
         let periodInfo = document.querySelector('.period-info');
         if (!periodInfo) {
             periodInfo = document.createElement('div');
@@ -828,12 +807,19 @@ async function loadReports() {
         if (printBtn) printBtn.style.display = 'block';
 
     } catch (error) {
-        console.error('Erreur chargement rapports:', error);
-        document.getElementById('total-tickets').textContent = '0';
-        document.getElementById('total-bets').textContent = '0 Gdes';
-        document.getElementById('total-wins').textContent = '0 Gdes';
-        document.getElementById('total-loss').textContent = '0 Gdes';
-        document.getElementById('balance').textContent = '0 Gdes';
+        console.error('Erreur loadReports:', error);
+        // Afficher un message d'erreur visible
+        const summaryDiv = document.querySelector('.reports-summary');
+        if (summaryDiv) {
+            summaryDiv.innerHTML = `<div class="alert alert-danger">Erreur : ${error.message}</div>`;
+        } else {
+            alert('Erreur chargement rapport : ' + error.message);
+        }
+        // Réinitialiser les affichages
+        ['total-tickets', 'total-bets', 'total-wins', 'total-loss', 'balance'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = id.includes('bets') || id.includes('wins') || id.includes('loss') || id.includes('balance') ? '0 Gdes' : '0';
+        });
     }
 }
 async function loadDrawReport(drawId = null) {
