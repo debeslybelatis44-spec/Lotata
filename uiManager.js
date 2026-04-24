@@ -731,7 +731,7 @@ async function loadReports() {
         // Récupérer tous les tickets
         const allTickets = await fetchTickets();
         
-        // Filtrer les tickets selon les critères
+        // Filtrer les tickets selon la période
         const filteredTickets = filterTicketsByDate(allTickets, window.reportFilters);
         APP_STATE.ticketsHistory = filteredTickets;
         
@@ -745,35 +745,39 @@ async function loadReports() {
         let totalTickets = finalTickets.length;
         let totalBets = 0;
         let totalWins = 0;
-        let totalLoss = 0;
         
+        // ========== CALCUL IDENTIQUE AU PROPRIÉTAIRE ==========
+        // On ignore le champ "checked" : tous les tickets sont pris en compte
         finalTickets.forEach(ticket => {
-            const ticketAmount = parseFloat(ticket.total_amount || ticket.totalAmount || ticket.amount || 0);
-            totalBets += ticketAmount;
-            
-            if (ticket.checked || ticket.verified) {
-                const winAmount = parseFloat(ticket.win_amount || ticket.winAmount || ticket.prize_amount || 0);
-                if (winAmount > 0) {
-                    totalWins += winAmount;
-                } else {
-                    totalLoss += ticketAmount;
-                }
-            }
+            const totalAmount = parseFloat(ticket.total_amount || ticket.totalAmount || ticket.amount || 0);
+            const winAmount = parseFloat(ticket.win_amount || ticket.winAmount || ticket.prize_amount || 0);
+            totalBets += totalAmount;
+            totalWins += winAmount;
         });
         
-        const totalProfit = totalBets - totalWins;
+        const totalLoss = totalBets - totalWins;   // pertes réelles (mises non remboursées)
+        const balance = totalBets - totalWins;     // résultat net
         
         document.getElementById('total-tickets').textContent = totalTickets;
         document.getElementById('total-bets').textContent = totalBets.toLocaleString('fr-FR') + ' Gdes';
         document.getElementById('total-wins').textContent = totalWins.toLocaleString('fr-FR') + ' Gdes';
         document.getElementById('total-loss').textContent = totalLoss.toLocaleString('fr-FR') + ' Gdes';
-        document.getElementById('balance').textContent = totalProfit.toLocaleString('fr-FR') + ' Gdes';
-        document.getElementById('balance').style.color = (totalProfit >= 0) ? 'var(--success)' : 'var(--danger)';
+        document.getElementById('balance').textContent = balance.toLocaleString('fr-FR') + ' Gdes';
+        document.getElementById('balance').style.color = (balance >= 0) ? 'var(--success)' : 'var(--danger)';
         
         // Ajouter l'information de période dans le rapport
-        const periodInfo = document.createElement('div');
-        periodInfo.className = 'period-info';
-        periodInfo.style.cssText = 'text-align: center; margin: 10px 0; font-size: 0.9rem; color: var(--text-dim);';
+        let periodInfo = document.querySelector('.period-info');
+        if (!periodInfo) {
+            periodInfo = document.createElement('div');
+            periodInfo.className = 'period-info';
+            periodInfo.style.cssText = 'text-align: center; margin: 10px 0; font-size: 0.9rem; color: var(--text-dim);';
+            const reportsSummary = document.querySelector('.reports-summary');
+            if (reportsSummary) {
+                reportsSummary.insertAdjacentElement('afterend', periodInfo);
+            } else {
+                document.getElementById('reports-screen')?.appendChild(periodInfo);
+            }
+        }
         
         let periodText = '';
         if (window.reportFilters.period === 'today') periodText = 'Jodi a';
@@ -782,38 +786,27 @@ async function loadReports() {
         else if (window.reportFilters.period === 'custom') {
             periodText = `Soti ${window.reportFilters.fromDate} rive ${window.reportFilters.toDate}`;
         }
-        
         periodInfo.innerHTML = `Peryòd: <strong>${periodText}</strong>`;
         
-        const existingPeriodInfo = document.querySelector('.period-info');
-        if (existingPeriodInfo) {
-            existingPeriodInfo.remove();
-        }
-        
-        const reportsSummary = document.querySelector('.reports-summary');
-        if (reportsSummary) {
-            reportsSummary.insertAdjacentElement('afterend', periodInfo);
-        }
-        
+        // Mettre à jour le sélecteur de tirage
         const drawSelector = document.getElementById('draw-report-selector');
-        drawSelector.innerHTML = '<option value="all">Tout Tiraj</option>';
-        
-        CONFIG.DRAWS.forEach(draw => {
-            const option = document.createElement('option');
-            option.value = draw.id;
-            option.textContent = draw.name;
-            if (draw.id === window.reportFilters.drawId) {
-                option.selected = true;
-            }
-            drawSelector.appendChild(option);
-        });
+        if (drawSelector) {
+            drawSelector.innerHTML = '<option value="all">Tout Tiraj</option>';
+            CONFIG.DRAWS.forEach(draw => {
+                const option = document.createElement('option');
+                option.value = draw.id;
+                option.textContent = draw.name;
+                if (draw.id === window.reportFilters.drawId) {
+                    option.selected = true;
+                }
+                drawSelector.appendChild(option);
+            });
+        }
         
         await loadDrawReport(window.reportFilters.drawId);
         
         const printBtn = document.querySelector('.print-report-btn');
-        if (printBtn) {
-            printBtn.style.display = 'block';
-        }
+        if (printBtn) printBtn.style.display = 'block';
         
     } catch (error) {
         console.error('Erreur chargement rapports:', error);
@@ -825,7 +818,6 @@ async function loadReports() {
         document.getElementById('balance').style.color = 'var(--success)';
     }
 }
-
 async function loadDrawReport(drawId = null) {
     try {
         const selectedDrawId = drawId || document.getElementById('draw-report-selector').value;
