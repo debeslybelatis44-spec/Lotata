@@ -725,70 +725,41 @@ function reprintTicket(ticketId) {
 
 async function loadReports() {
     try {
-        // Initialiser les filtres s'ils n'existent pas
         initReportFilters();
 
-        // Récupérer tous les tickets
-        const allTickets = await fetchTickets();
-        
-        // Filtrer les tickets selon la période
-        const filteredTickets = filterTicketsByDate(allTickets, window.reportFilters);
-        APP_STATE.ticketsHistory = filteredTickets;
-        
-        // Filtrer par tirage si nécessaire
-        const finalTickets = window.reportFilters.drawId !== 'all' 
-            ? filteredTickets.filter(t => 
-                (t.draw_id === window.reportFilters.drawId || t.drawId === window.reportFilters.drawId)
-              )
-            : filteredTickets;
-        
-        let totalTickets = finalTickets.length;
-        let totalBets = 0;
-        let totalWins = 0;
-        
-        // ========== CALCUL IDENTIQUE AU PROPRIÉTAIRE ==========
-        // On ignore le champ "checked" : tous les tickets sont pris en compte
-        finalTickets.forEach(ticket => {
-            const totalAmount = parseFloat(ticket.total_amount || ticket.totalAmount || ticket.amount || 0);
-            const winAmount = parseFloat(ticket.win_amount || ticket.winAmount || ticket.prize_amount || 0);
-            totalBets += totalAmount;
-            totalWins += winAmount;
+        const token = localStorage.getItem('auth_token');
+        const params = new URLSearchParams();
+        const period = window.reportFilters.period;
+        const drawId = window.reportFilters.drawId;
+        const fromDate = window.reportFilters.fromDate;
+        const toDate = window.reportFilters.toDate;
+
+        params.append('period', period);
+        if (drawId && drawId !== 'all') params.append('drawId', drawId);
+        if (period === 'custom' && fromDate && toDate) {
+            params.append('fromDate', fromDate);
+            params.append('toDate', toDate);
+        }
+
+        const response = await fetch(`${API_CONFIG.BASE_URL}/api/agent/reports?${params}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
         });
+        if (!response.ok) throw new Error('Erreur chargement rapport');
+
+        const data = await response.json();
+        const summary = data.summary;
+
+        document.getElementById('total-tickets').textContent = summary.total_tickets || 0;
+        document.getElementById('total-bets').textContent = (summary.total_bets || 0).toLocaleString('fr-FR') + ' Gdes';
+        document.getElementById('total-wins').textContent = (summary.total_wins || 0).toLocaleString('fr-FR') + ' Gdes';
         
-        const totalLoss = totalBets - totalWins;   // pertes réelles (mises non remboursées)
-        const balance = totalBets - totalWins;     // résultat net
-        
-        document.getElementById('total-tickets').textContent = totalTickets;
-        document.getElementById('total-bets').textContent = totalBets.toLocaleString('fr-FR') + ' Gdes';
-        document.getElementById('total-wins').textContent = totalWins.toLocaleString('fr-FR') + ' Gdes';
+        const totalLoss = (summary.total_bets || 0) - (summary.total_wins || 0);
+        const balance = summary.net_result || 0;
         document.getElementById('total-loss').textContent = totalLoss.toLocaleString('fr-FR') + ' Gdes';
         document.getElementById('balance').textContent = balance.toLocaleString('fr-FR') + ' Gdes';
-        document.getElementById('balance').style.color = (balance >= 0) ? 'var(--success)' : 'var(--danger)';
-        
-        // Ajouter l'information de période dans le rapport
-        let periodInfo = document.querySelector('.period-info');
-        if (!periodInfo) {
-            periodInfo = document.createElement('div');
-            periodInfo.className = 'period-info';
-            periodInfo.style.cssText = 'text-align: center; margin: 10px 0; font-size: 0.9rem; color: var(--text-dim);';
-            const reportsSummary = document.querySelector('.reports-summary');
-            if (reportsSummary) {
-                reportsSummary.insertAdjacentElement('afterend', periodInfo);
-            } else {
-                document.getElementById('reports-screen')?.appendChild(periodInfo);
-            }
-        }
-        
-        let periodText = '';
-        if (window.reportFilters.period === 'today') periodText = 'Jodi a';
-        else if (window.reportFilters.period === 'yesterday') periodText = 'Yè';
-        else if (window.reportFilters.period === 'week') periodText = 'Semèn sa a';
-        else if (window.reportFilters.period === 'custom') {
-            periodText = `Soti ${window.reportFilters.fromDate} rive ${window.reportFilters.toDate}`;
-        }
-        periodInfo.innerHTML = `Peryòd: <strong>${periodText}</strong>`;
-        
-        // Mettre à jour le sélecteur de tirage
+        document.getElementById('balance').style.color = balance >= 0 ? 'var(--success)' : 'var(--danger)';
+
+        // Mise à jour du sélecteur de tirage (inchangé)
         const drawSelector = document.getElementById('draw-report-selector');
         if (drawSelector) {
             drawSelector.innerHTML = '<option value="all">Tout Tiraj</option>';
@@ -796,18 +767,46 @@ async function loadReports() {
                 const option = document.createElement('option');
                 option.value = draw.id;
                 option.textContent = draw.name;
-                if (draw.id === window.reportFilters.drawId) {
-                    option.selected = true;
-                }
+                if (draw.id === window.reportFilters.drawId) option.selected = true;
                 drawSelector.appendChild(option);
             });
         }
-        
-        await loadDrawReport(window.reportFilters.drawId);
-        
+
+        // Afficher le détail par tirage si présent
+        if (data.detail && data.detail.length > 0) {
+            let detailHtml = '<div class="section-title"><i class="fas fa-chart-line"></i> Détail par tirage</div><div class="list-container"><table class="table"><thead><th>Tirage</th><th>Tickets</th><th>Mises</th><th>Gains</th><th>Résultat</th></thead><tbody>';
+            data.detail.forEach(d => {
+                const resClass = d.result >= 0 ? 'profit' : 'loss';
+                detailHtml += `<tr><td>${d.draw_name}</td><td>${d.tickets}</td><td>${d.bets.toLocaleString()} G</td><td>${d.wins.toLocaleString()} G</td><td class="${resClass}">${d.result.toLocaleString()} G</td></tr>`;
+            });
+            detailHtml += '</tbody></table></div>';
+            const existingDetail = document.getElementById('agent-detail-container');
+            if (existingDetail) existingDetail.remove();
+            const detailDiv = document.createElement('div');
+            detailDiv.id = 'agent-detail-container';
+            detailDiv.innerHTML = detailHtml;
+            document.getElementById('reports-screen').appendChild(detailDiv);
+        }
+
+        // Message de période (optionnel)
+        let periodText = '';
+        if (period === 'today') periodText = 'Jodi a';
+        else if (period === 'yesterday') periodText = 'Yè';
+        else if (period === 'week') periodText = 'Semèn sa a';
+        else if (period === 'custom') periodText = `Soti ${fromDate} rive ${toDate}`;
+        let periodInfo = document.querySelector('.period-info');
+        if (!periodInfo) {
+            periodInfo = document.createElement('div');
+            periodInfo.className = 'period-info';
+            periodInfo.style.cssText = 'text-align: center; margin: 10px 0; font-size: 0.9rem; color: var(--text-dim);';
+            const reportsSummary = document.querySelector('.reports-summary');
+            if (reportsSummary) reportsSummary.insertAdjacentElement('afterend', periodInfo);
+        }
+        periodInfo.innerHTML = `Peryòd: <strong>${periodText}</strong>`;
+
         const printBtn = document.querySelector('.print-report-btn');
         if (printBtn) printBtn.style.display = 'block';
-        
+
     } catch (error) {
         console.error('Erreur chargement rapports:', error);
         document.getElementById('total-tickets').textContent = '0';
@@ -815,7 +814,6 @@ async function loadReports() {
         document.getElementById('total-wins').textContent = '0 Gdes';
         document.getElementById('total-loss').textContent = '0 Gdes';
         document.getElementById('balance').textContent = '0 Gdes';
-        document.getElementById('balance').style.color = 'var(--success)';
     }
 }
 async function loadDrawReport(drawId = null) {

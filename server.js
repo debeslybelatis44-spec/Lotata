@@ -2116,6 +2116,83 @@ superadminRouter.post('/messages', async (req, res) => {
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
+// ==================== Rapports pour agent ====================
+app.get('/api/agent/reports', authenticateToken, async (req, res) => {
+  // Seul un agent peut accéder
+  if (req.user.role !== 'agent') {
+    return res.status(403).json({ error: 'Accès réservé aux agents' });
+  }
+
+  const agentId = req.user.id;
+  const { period, fromDate, toDate, drawId } = req.query;
+
+  let conditions = ['t.agent_id = $1'];
+  let params = [agentId];
+  let paramIndex = 2;
+
+  if (drawId && drawId !== 'all') {
+    conditions.push(`t.draw_id = $${paramIndex++}`);
+    params.push(drawId);
+  }
+
+  let dateCondition = '';
+  if (period === 'today') {
+    dateCondition = 'DATE(t.date) = CURRENT_DATE';
+  } else if (period === 'yesterday') {
+    dateCondition = 'DATE(t.date) = CURRENT_DATE - INTERVAL \'1 day\'';
+  } else if (period === 'week') {
+    dateCondition = 't.date >= DATE_TRUNC(\'week\', CURRENT_DATE)';
+  } else if (period === 'month') {
+    dateCondition = 't.date >= DATE_TRUNC(\'month\', CURRENT_DATE)';
+  } else if (period === 'custom' && fromDate && toDate) {
+    dateCondition = `DATE(t.date) BETWEEN $${paramIndex++} AND $${paramIndex++}`;
+    params.push(fromDate, toDate);
+  }
+  if (dateCondition) {
+    conditions.push(dateCondition);
+  }
+
+  const whereClause = conditions.join(' AND ');
+
+  const query = `
+    SELECT 
+      COUNT(*) as total_tickets,
+      COALESCE(SUM(t.total_amount), 0) as total_bets,
+      COALESCE(SUM(t.win_amount), 0) as total_wins,
+      COALESCE(SUM(t.win_amount) - SUM(t.total_amount), 0) as net_result
+    FROM tickets t
+    WHERE ${whereClause}
+  `;
+
+  try {
+    const result = await pool.query(query, params);
+    const summary = result.rows[0];
+
+    // Détail par tirage si drawId = 'all' (optionnel)
+    let detail = [];
+    if (!drawId || drawId === 'all') {
+      const detailQuery = `
+        SELECT d.name as draw_name, d.id as draw_id,
+               COUNT(t.id) as tickets,
+               COALESCE(SUM(t.total_amount), 0) as bets,
+               COALESCE(SUM(t.win_amount), 0) as wins,
+               COALESCE(SUM(t.win_amount) - SUM(t.total_amount), 0) as result
+        FROM tickets t
+        JOIN draws d ON t.draw_id = d.id
+        WHERE ${whereClause}
+        GROUP BY d.id, d.name
+        ORDER BY result DESC
+      `;
+      const detailRes = await pool.query(detailQuery, params);
+      detail = detailRes.rows;
+    }
+
+    res.json({ summary, detail });
+  } catch (error) {
+    console.error('❌ Erreur rapport agent:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
 
 // Rapports consolidés par propriétaire (adapté)
 superadminRouter.get('/reports/owners', async (req, res) => {
